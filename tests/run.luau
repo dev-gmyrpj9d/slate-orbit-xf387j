@@ -12,6 +12,7 @@ for _, suite in
 		"./feel.spec",
 		"./wayfinding.spec",
 		"./sound.spec",
+		"./silhouette.spec",
 	}
 do
 	print(suite)

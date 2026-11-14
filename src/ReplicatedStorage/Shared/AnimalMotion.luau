@@ -19,6 +19,11 @@ AnimalMotion.PARTS = {
 	Stalk = { role = "ear", parent = "Head" },
 	EarInner = { parent = "Ear" },
 	EarTip = { parent = "Ear" }, -- dark tips ride on the ear, so they move with it
+	WingSpot = { parent = "Wing" }, -- moth eye-spots flap with their wing
+	WingTip = { parent = "Wing" }, -- bird flight-feather tips flap with their wing
+	PincerTip = { parent = "Claw" }, -- crab pincer tips snap with the claw
+	Throat = { parent = "Head" }, -- frog throat moves with the head
+	Glow = { parent = "Antenna" }, -- the lure bead rides on its stalk
 	Eye = { parent = "Head" },
 	Shine = { parent = "Eye" },
 	EyeBall = { parent = "Stalk" },
@@ -125,6 +130,9 @@ function AnimalMotion.jointAngles(role: string, side: number, front: boolean, p:
 			return sin(t * 12 + (if side > 0 then 0 else math.pi)) * 0.4 - 0.2, 0, 0
 		elseif state == "Refuse" then
 			return 0, s * 0.35, 0
+		elseif state == "Idle" and p.pose == "watch" then
+			-- Personality: a watching crab raises its claws and waves them, out of step.
+			return -0.35 + sin(t * 4 + side * 1.3) * 0.3, 0, 0
 		end
 		return sin(t * 2.5 + side) * 0.08, 0, 0
 	elseif role == "head" then
@@ -136,12 +144,20 @@ function AnimalMotion.jointAngles(role: string, side: number, front: boolean, p:
 			return 0.1, 0, sin(t * 7) * 0.16
 		elseif state == "Anticipate" then
 			return 0.12, p.lookYaw, sin(t * 4) * 0.06
+		elseif p.pose == "sniff" and p.archetype == "bird" then
+			-- Personality: birds peck at the ground in quick jabs instead of a slow sniff.
+			local jab = math.max(0, sin(t * 6)) ^ 6
+			return -0.15 - 0.75 * jab, sin(t * 1.1) * 0.15, 0
 		elseif p.pose == "sniff" then
 			return -0.28 + sin(t * 9) * 0.04, sin(t * 1.3) * 0.2, 0
 		elseif p.pose == "rest" then
 			return -0.12, sin(t * 0.5) * 0.1, 0.12
 		elseif p.pose == "watch" then
 			return 0.05, p.lookYaw, sin(t * 0.8) * 0.08
+		end
+		if p.archetype == "tortoise" then
+			-- Personality: a tortoise looks around slowly and deliberately.
+			return 0.05, sin(t * 0.3) * 0.28 + p.lookYaw * 0.5, 0
 		end
 		return 0, sin(t * 0.6) * 0.2 + p.lookYaw * 0.5, 0
 	elseif role == "fin" then
@@ -192,7 +208,12 @@ end
 
 -- Cosmetic (dy, pitch) a client adds to a stationary animal: breathing, sniffing, chewing.
 -- Never replicated, never used by gameplay. Amplitudes match the old server-side bob.
-function AnimalMotion.idleBob(state: string, pose: string?, t: number): (number, number)
+-- `archetype` (optional) adds family personality on top: moths hover-bob while idle.
+function AnimalMotion.idleBob(state: string, pose: string?, t: number, archetype: string?): (number, number)
+	if archetype == "moth" and state == "Idle" then
+		local dy, pitch = AnimalMotion.idleBob(state, pose, t)
+		return dy + sin(t * 2.6) * 0.15, pitch + sin(t * 2.6 + 1) * 0.04
+	end
 	if state == "Eat" then
 		return 0, sin(t * 16) * 0.08
 	elseif state == "Anticipate" or state == "Happy" or state == "Refuse" then

@@ -18,7 +18,18 @@ To go back to the original, open `place/WildFeastIslands.original.rbxl`. To go b
 
 Earlier passes found no gamepasses in the original place. There is now a small optional lineup: the Lantern Egg (always hatches a Lanternkit companion), the Painter's Kit (throw trails) and the Field Satchel (+2 food bar pins). Ownership is checked on the server, prices come from Roblox, and buying stays disabled until real pass IDs go into `Config.Passes`. Design, configuration steps and Studio checks are in [`docs/MONETIZATION.md`](docs/MONETIZATION.md).
 
-## Fourth pass (this branch)
+## Fifth pass (this branch)
+
+- **Fixes:**
+  - Visitor features now sit on the head or back each body plan actually builds; 18 parts on 11 visitors used to float or be buried.
+  - Fox tails are raised to meet their glowing tips.
+  - The snail spiral is now visible.
+- **New details:** bird wing tips and tail fan, tortoise scutes, otter tail rudder, crab pincer tips, frog throat and stripe, moth collar and antennae.
+- **Personality motion:** birds peck, tortoises look slowly, crabs wave, moths hover.
+- **Safer sound cues:** tunes can't stack, notes respect the Sound setting, and the shore loop starts once.
+- **Tests:** `tests/silhouette.spec.luau` checks all 106 species. Details are in the [audit](docs/AUDIT.md#fifth-pass).
+
+## Fourth pass
 
 - **Sound fix:** four engine sound files the game used are no longer shipped by the client, so most cues were likely silent. Every cue now uses a verified file (`Shared/EngineSounds`, enforced by a test). Chimes and fanfares are short pitched note sequences.
 - **Shore ambience:** surf near the shoreline.
@@ -70,7 +81,7 @@ Benchmark: the public listing for *Throw Food For Animals* (Roblox search API) d
 Done offline (both passes, `tools/check.sh`):
 - StyLua check.
 - `luau-lsp analyze` in strict mode with Roblox definitions on all of `src/`.
-- 40 Lune tests (fourth pass: shipped-sound check, silhouette details; third pass: idle-bob split and write budget, throw meter copy, throw and landing curves, discovery rules, wayfinding placement against the built place; earlier: pass rules, save schema v4, companion rig, monetization boundaries, plus the first pass's tests):
+- 44 Lune tests (fifth pass: every species' details attached and visible, ride on their joints, part budget, family personality; fourth pass: shipped-sound check, silhouette details; third pass: idle-bob split and write budget, throw meter copy, throw and landing curves, discovery rules, wayfinding placement against the built place; earlier: pass rules, save schema v4, companion rig, monetization boundaries, plus the first pass's tests):
   - pose curves are finite and mirrored
   - idle choices behave as intended
   - separation pushes animals apart
@@ -105,5 +116,9 @@ Needs Roblox Studio (not run here; pass-specific checks are in `docs/MONETIZATIO
    - **Sounds:** every cue is audible, with the note cues in tune, on desktop and mobile. The shore loop fades in on the beaches and is inaudible at the meadow centre.
    - **Models:** ear tips, bellies and the boar ridge look right in 3D (the offline renders are 2D projections).
    - **Anticipation:** heads track incoming food.
+10. Fifth pass:
+    - **Visitors:** a few visitors of each body plan look right in 3D, with features on the head or back and nothing floating. The offline projections are 2D, and their draw order is approximate.
+    - **Motion:** the bird peck, crab wave, tortoise look and moth hover read well and don't clip.
+    - **Sound:** a burst of rewards sounds clean.
 
 Ambient island audio (waves, birds) would need licensed audio from the Creator Store. It was left out rather than guessing asset IDs.

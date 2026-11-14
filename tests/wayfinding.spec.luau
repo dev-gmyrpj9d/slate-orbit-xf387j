@@ -27,48 +27,8 @@ local function load()
 	return luau.load(fs.readFile(SOURCE), { debugName = SOURCE, environment = env })()
 end
 
--- Oriented-box overlap (separating axis test, 15 axes). `pad` < 0 lets boxes touch.
-local function obb(part)
-	return {
-		c = part.CFrame.Position,
-		a = { part.CFrame.XVector, part.CFrame.YVector, part.CFrame.ZVector },
-		h = { part.Size.X / 2, part.Size.Y / 2, part.Size.Z / 2 },
-	}
-end
-
-local function radius(box, axis)
-	local r = 0
-	for i = 1, 3 do
-		r += box.h[i] * math.abs(box.a[i]:Dot(axis))
-	end
-	return r
-end
-
-local function overlaps(a, b, pad)
-	local axes = {}
-	for i = 1, 3 do
-		table.insert(axes, a.a[i])
-		table.insert(axes, b.a[i])
-		for j = 1, 3 do
-			local cross = a.a[i]:Cross(b.a[j])
-			if cross.Magnitude > 1e-6 then
-				table.insert(axes, cross.Unit)
-			end
-		end
-	end
-	local d = b.c - a.c
-	for _, axis in axes do
-		if math.abs(d:Dot(axis)) > radius(a, axis) + radius(b, axis) + pad then
-			return false
-		end
-	end
-	return true
-end
-
-local function bottomY(part)
-	local r = obb(part)
-	return r.c.Y - radius(r, roblox.Vector3.new(0, 1, 0))
-end
+local Geo = require("./geometry")
+local obb, overlaps, bottomY = Geo.obb, Geo.overlaps, Geo.bottomY
 
 -- Parts that are ground or water, which new pieces are meant to sit on or above.
 local SURFACES = { GroundTop = true, Beach = true, Cliff = true, Sea = true, Seabed = true, Deck = true }

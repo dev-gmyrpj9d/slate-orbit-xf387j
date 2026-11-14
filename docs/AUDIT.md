@@ -74,3 +74,37 @@ The starting point was the owner's eight screenshots ([SCREENSHOT_ANALYSIS.md](S
   - Ear tips hang from the ear (`AnimalMotion.PARTS.EarTip`), so they move with it. Every detail part is welded, not animated, so the joint count is unchanged.
   - `tools/profileview.luau` renders side profiles of any species, from the current factory or an older copy, for review.
 - **Anticipation.** While anticipating, animals turn their heads toward the food flying at them (`Effects.nearestFood`) instead of the player.
+
+## Fifth pass
+
+`tests/silhouette.spec.luau` checks every one of the 106 species: each feature and detail part touches the model and isn't hidden inside another part. Details that belong to a moving part must ride on it. The largest model must stay within 64 parts.
+
+**Defects it found, now fixed:**
+- **Floating or buried visitor features (18 parts, 11 visitors).** Features sat at fixed coordinates whatever the body plan. Whiskers floated off hopper and frog faces, moth spots, glow orbs and crab horns hung in the air, and snail and tortoise spots and snail fluff were buried in the shell. Features are now placed from the head and back each body plan actually builds (`anchorFor`).
+  - Moth spots became eye-spots that flap with the wing.
+  - The glow became a lure bead on a swaying stalk.
+- **Fox tails (all 10 fox species).** The tail drooped at +25 degrees while its glowing tip sat where a raised tail would end, so the tip floated. The brush is now raised to meet its tip.
+- **Snail spiral (all snails).** It was a small ball entirely inside the shell, so it was never visible. It is now a pale centre and a dark band, as side discs that break the shell's surface.
+
+**New details per family** (reference principles: one or two strong add-ons per species, two-tone bodies):
+- bird: dark wing tips that flap with the wing, and a tail fan that wags
+- tortoise: a ring of shell scutes
+- otter: a dark tail rudder
+- crab: dark pincer tips that snap with the claw
+- frog: a pale throat and a dark back stripe
+- moth: a pale collar and default antennae (not doubled for antenna or lure visitors)
+
+All of these are welded, or ride on an existing joint, so the joint count is unchanged.
+
+**Personality motion** (`AnimalMotion`):
+- birds peck in quick jabs when sniffing
+- tortoises look around slowly
+- watching crabs raise and wave their claws
+- moths hover-bob while idle (client-side, so no network cost)
+
+The new motion has its own tests. The regression test keeps the old bob exact for every other case.
+
+**Sound lifecycle:**
+- A tune that is already playing can't restart within 0.25 s, so a burst of rewards doesn't stack into noise.
+- Queued notes re-check the Sound setting before playing.
+- The shore loop can only start once.

@@ -48,8 +48,17 @@ for index, id in args do
 			table.insert(parts, p)
 		end
 	end
+	-- Painter's order for a camera on +X: whichever part reaches furthest toward the camera
+	-- draws last (centres alone mis-order concentric parts such as a shell and its spiral).
+	local function near(p)
+		if p.Shape == roblox.Enum.PartType.Ball then
+			return p.CFrame.Position.X + math.min(p.Size.X, p.Size.Y, p.Size.Z) / 2
+		end
+		local c, s = p.CFrame, p.Size
+		return c.Position.X + math.abs(c.XVector.X) * s.X / 2 + math.abs(c.YVector.X) * s.Y / 2 + math.abs(c.ZVector.X) * s.Z / 2
+	end
 	table.sort(parts, function(a, b)
-		return a.CFrame.Position.X < b.CFrame.Position.X
+		return near(a) < near(b)
 	end)
 	local ox, oy = (index - 1) * CELL + CELL / 2, CELL * 0.62
 	table.insert(
@@ -65,7 +74,19 @@ for index, id in args do
 		local c, s = p.CFrame, p.Size
 		local col = p.Color
 		local fill = string.format("rgb(%d,%d,%d)", col.R * 255, col.G * 255, col.B * 255)
-		if p.Shape == roblox.Enum.PartType.Ball then
+		local endOn = p.Shape == roblox.Enum.PartType.Cylinder and math.abs(c.XVector.X) > 0.99
+		if endOn then
+			table.insert(
+				svg,
+				string.format(
+					'<circle cx="%.1f" cy="%.1f" r="%.1f" fill="%s" stroke="rgba(0,0,0,0.35)"/>',
+					ox + c.Position.Z * SCALE,
+					oy - c.Position.Y * SCALE,
+					math.min(s.Y, s.Z) / 2 * SCALE,
+					fill
+				)
+			)
+		elseif p.Shape == roblox.Enum.PartType.Ball then
 			-- Balls are spheres (Size is uniform in Roblox; use the smallest axis).
 			local r = math.min(s.X, s.Y, s.Z) / 2
 			table.insert(

@@ -206,4 +206,46 @@ return function(H)
 		H.check(not AnimalMotion.needsWrite(a, { 1.001, 2, 3, 0.5, 0, 0 }), "sub-epsilon move")
 		H.check(AnimalMotion.needsWrite(a, { 1, 2, 3, 0.51, 0, 0 }), "yaw change")
 	end)
+
+	H.test("family personality: bird pecks, tortoise looks slowly, crab waves, moth hovers", function()
+		local function head(archetype, pose, t)
+			return AnimalMotion.jointAngles(
+				"head",
+				0,
+				false,
+				{ state = "Idle", pose = pose, archetype = archetype, walk = 0, lookYaw = 0 },
+				t
+			)
+		end
+		local deepest = 0
+		for t = 0, 3, 0.01 do
+			deepest = math.min(deepest, (head("bird", "sniff", t)))
+		end
+		H.check(deepest < -0.8, "birds peck: head pitch reaches " .. deepest)
+		-- Tortoise head yaw changes slower than the default look-around.
+		local function maxRate(archetype)
+			local rate, last = 0, nil
+			for t = 0, 20, 0.05 do
+				local _, yaw = head(archetype, "wander", t)
+				if last then
+					rate = math.max(rate, math.abs(yaw - last) / 0.05)
+				end
+				last = yaw
+			end
+			return rate
+		end
+		H.check(maxRate("tortoise") < maxRate("fox"), "tortoise looks around more slowly")
+		local idle =
+			AnimalMotion.jointAngles("claw", 1, true, { state = "Idle", pose = "wander", archetype = "crab", walk = 0, lookYaw = 0 }, 1)
+		local watching =
+			AnimalMotion.jointAngles("claw", 1, true, { state = "Idle", pose = "watch", archetype = "crab", walk = 0, lookYaw = 0 }, 1)
+		H.check(watching < idle - 0.2, "a watching crab lifts its claws")
+		local lo, hi = math.huge, -math.huge
+		for t = 0, 5, 0.05 do
+			local dy = AnimalMotion.idleBob("Idle", "wander", t, "moth")
+			lo, hi = math.min(lo, dy), math.max(hi, dy)
+		end
+		H.check(hi - lo > 0.25 and hi < 0.3 and lo > -0.3, "moths hover-bob gently")
+		H.check(AnimalMotion.idleBob("Happy", "wander", 1, "moth") == 0, "no hover on top of server-driven states")
+	end)
 end

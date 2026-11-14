@@ -118,7 +118,17 @@ local ARCHETYPES: { [string]: (Adder, Color3, Color3) -> (Vector3, number) } = {
 			)
 			add("Leg", nil, Vector3.new(0.3, 1, 0.3), CFrame.new(side * 0.6, -1.7, 0), accent)
 			add("Foot", nil, Vector3.new(0.8, 0.2, 1), CFrame.new(side * 0.6, -2.1, -0.3), accent)
+			-- Dark flight-feather tips at the back of each wing; they ride on (and flap with) it.
+			add(
+				"WingTip",
+				nil,
+				Vector3.new(0.42, 1.2, 0.8),
+				CFrame.new(side * 1.66, 0.05, 1.1) * CFrame.Angles(math.rad(10), 0, 0),
+				body:Lerp(BLACK, 0.45)
+			)
 		end
+		-- A short tail fan breaks up the round silhouette from the side and wags when happy.
+		add("Tail", nil, Vector3.new(1.1, 0.25, 1.3), CFrame.new(0, 0.3, 1.95) * CFrame.Angles(math.rad(-25), 0, 0), body:Lerp(BLACK, 0.25))
 		add("Belly", Enum.PartType.Ball, Vector3.new(2.6, 2.4, 2.6), CFrame.new(0, -0.3, -0.4), WHITE)
 		return Vector3.new(0, 1.7, -2.9), 2.2
 	end,
@@ -130,6 +140,17 @@ local ARCHETYPES: { [string]: (Adder, Color3, Color3) -> (Vector3, number) } = {
 			for _, z in ipairs({ -1.6, 1.6 }) do
 				add("Leg", nil, Vector3.new(1.1, 1.4, 1.1), CFrame.new(x, -0.9, z), body:Lerp(accent, 0.35))
 			end
+		end
+		-- Shell plates: a darker ring of scutes around the shell's shoulder reads as "tortoise" at a glance.
+		for i = 0, 5 do
+			local a = i * math.pi / 3
+			add(
+				"Scute",
+				nil,
+				Vector3.new(0.9, 0.25, 0.9),
+				CFrame.new(math.cos(a) * 1.0, 0.5 + 1.38, math.sin(a) * 1.0) * CFrame.Angles(0, -a, 0) * CFrame.Angles(0, 0, math.rad(-38)),
+				body:Lerp(BLACK, 0.3)
+			)
 		end
 		add("Moss", nil, Vector3.new(1.4, 0.7, 1.4), CFrame.new(0.6, 2.1, 0.4) * CFrame.Angles(0, math.rad(30), 0), accent)
 		add("Moss", nil, Vector3.new(1, 0.6, 1), CFrame.new(-0.9, 1.9, -0.6) * CFrame.Angles(0, math.rad(10), 0), accent)
@@ -156,8 +177,9 @@ local ARCHETYPES: { [string]: (Adder, Color3, Color3) -> (Vector3, number) } = {
 		end
 		-- Pale chest: the fox reads as two-tone from the front and the side.
 		add("Chest", nil, Vector3.new(1.6, 1.3, 0.9), CFrame.new(0, -0.25, -1.8), body:Lerp(WHITE, 0.7))
-		add("Tail", nil, Vector3.new(0.9, 0.9, 2.6), CFrame.new(0, 0.7, 2.8) * CFrame.Angles(math.rad(25), 0, 0), body)
-		local tip = add("TailTip", nil, Vector3.new(0.95, 0.95, 0.9), CFrame.new(0, 1.3, 4.0) * CFrame.Angles(math.rad(25), 0, 0), accent)
+		-- The brush is raised (it used to droop at +25 degrees, leaving its tip floating above it).
+		add("Tail", nil, Vector3.new(0.9, 0.9, 2.6), CFrame.new(0, 0.7, 2.8) * CFrame.Angles(math.rad(-25), 0, 0), body)
+		local tip = add("TailTip", nil, Vector3.new(0.95, 0.95, 0.9), CFrame.new(0, 1.3, 4.0) * CFrame.Angles(math.rad(-25), 0, 0), accent)
 		tip.Material = Enum.Material.Neon
 		return Vector3.new(0, 0.8, -3.9), 1.95
 	end,
@@ -168,6 +190,8 @@ local ARCHETYPES: { [string]: (Adder, Color3, Color3) -> (Vector3, number) } = {
 		add("Nose", Enum.PartType.Ball, Vector3.new(0.4, 0.3, 0.3), CFrame.new(0, 0.85, -3.7), BLACK)
 		eyes(add, 0.5, 1.3, -3.2, 0.35)
 		add("Tail", nil, Vector3.new(0.9, 0.35, 2.6), CFrame.new(0, -0.5, 2.9), body)
+		-- A darker, flatter rudder at the tail's end (rides on the tail joint).
+		add("TailTip", nil, Vector3.new(1.1, 0.3, 1.0), CFrame.new(0, -0.55, 4.4), body:Lerp(BLACK, 0.35))
 		for _, side in ipairs({ -1, 1 }) do
 			add("Paw", Enum.PartType.Ball, Vector3.new(0.7, 0.7, 0.7), CFrame.new(side * 0.9, -0.9, -1.4), body:Lerp(BLACK, 0.3))
 		end
@@ -186,6 +210,14 @@ local ARCHETYPES: { [string]: (Adder, Color3, Color3) -> (Vector3, number) } = {
 				Vector3.new(0.5, 0.5, 0.9),
 				CFrame.new(side * 2.0, 0.7, -2.6) * CFrame.Angles(0, math.rad(side * 20), 0),
 				body:Lerp(WHITE, 0.2)
+			)
+			-- Dark pincer tips: the claw's outline reads even against pale sand.
+			add(
+				"PincerTip",
+				nil,
+				Vector3.new(0.52, 0.52, 0.35),
+				CFrame.new(side * 1.85, 0.7, -3.0) * CFrame.Angles(0, math.rad(side * 20), 0),
+				body:Lerp(BLACK, 0.55)
 			)
 			for i, z in ipairs({ -0.5, 0.3, 1.1 }) do
 				add(
@@ -211,11 +243,18 @@ ARCHETYPES.frog = function(add, body, accent)
 	end
 	eyes(add, 0.75, 1.55, -2.0, 0.45)
 	add("Belly", Enum.PartType.Ball, Vector3.new(2.4, 1.4, 2.2), CFrame.new(0, -0.5, -0.4), accent:Lerp(WHITE, 0.5))
+	-- A pale throat under the wide mouth (rides on the head) and a dark stripe down the back.
+	add("Throat", Enum.PartType.Ball, Vector3.new(1.3, 1.3, 1.3), CFrame.new(0, 0.05, -1.75), accent:Lerp(WHITE, 0.6))
+	add("Stripe", nil, Vector3.new(0.4, 0.2, 2.2), CFrame.new(0, 0.95, 0.3), body:Lerp(BLACK, 0.4))
 	return Vector3.new(0, 0.3, -2.4), 1.25
 end
 ARCHETYPES.snail = function(add, body, accent)
 	add("Shell", Enum.PartType.Ball, Vector3.new(2.8, 2.8, 2.6), CFrame.new(0, 1.3, 0.5), accent)
-	add("Swirl", Enum.PartType.Ball, Vector3.new(1.2, 1.2, 2.7), CFrame.new(0, 1.4, 0.5), accent:Lerp(WHITE, 0.4))
+	-- The spiral shows as rings on both sides of the shell: a dark band and a pale centre, as
+	-- side-on discs (cylinders along X) that just break the shell's surface. The old spiral was a
+	-- small ball entirely inside the shell, so it was never visible.
+	add("ShellBand", Enum.PartType.Cylinder, Vector3.new(2.62, 2.0, 2.0), CFrame.new(0, 1.3, 0.5), accent:Lerp(BLACK, 0.3))
+	add("Swirl", Enum.PartType.Cylinder, Vector3.new(2.72, 1.2, 1.2), CFrame.new(0, 1.35, 0.5), accent:Lerp(WHITE, 0.4))
 	add("Neck", nil, Vector3.new(1, 1.6, 1), CFrame.new(0, 0.6, -1.4), body)
 	for _, side in ipairs({ -1, 1 }) do
 		add("Stalk", nil, Vector3.new(0.2, 1, 0.2), CFrame.new(side * 0.3, 1.8, -1.5), body)
@@ -226,6 +265,8 @@ end
 ARCHETYPES.moth = function(add, body, accent)
 	add("Head", Enum.PartType.Ball, Vector3.new(1.4, 1.4, 1.4), CFrame.new(0, 0.5, -1.6), body)
 	eyes(add, 0.4, 0.7, -2.2, 0.4)
+	-- A pale fuzzy collar between head and body: the moth's soft outline.
+	add("Collar", Enum.PartType.Ball, Vector3.new(1.3, 1.3, 1.3), CFrame.new(0, 0.45, -1.05), body:Lerp(WHITE, 0.55))
 	for _, side in ipairs({ -1, 1 }) do
 		add("Wing", nil, Vector3.new(2.6, 0.15, 2.2), CFrame.new(side * 1.9, 0.7, -0.2) * CFrame.Angles(0, 0, math.rad(side * 18)), accent)
 		add(
@@ -254,54 +295,129 @@ ARCHETYPES.boar = function(add, body, accent)
 	return Vector3.new(0, 0.2, -3.7), 1.8
 end
 
--- Small details that make visitors of the same body plan look different.
-local FEATURES: { [string]: (Adder, Color3, Color3) -> () } = {
-	crest = function(add, _body, accent)
-		add("Crest", nil, Vector3.new(0.3, 1, 1.2), CFrame.new(0, 2.6, -1.4), accent)
+-- Where a visitor's feature goes, measured from the parts its body plan actually built (in
+-- unscaled units). Features used to sit at fixed coordinates, so on some body plans they floated
+-- in the air (whiskers, moth spots, crab horns, glow orbs) or were buried inside a shell (snail
+-- and tortoise spots, snail fluff); tests/silhouette.spec.luau now checks every visitor.
+type Anchor = {
+	headTop: Vector3, -- top centre of the head (the body, for plans without a head)
+	headFront: Vector3, -- front-most point of the head
+	headWidth: number,
+	backTop: (dx: number, dz: number) -> number, -- height of the back's surface at (dx, dz) from its centre
+	backCentre: Vector3,
+	wings: { BasePart }, -- the plan's front wings (moths), for eye-spots
+	scale: number,
+}
+
+local function radiusOf(part: BasePart): Vector3
+	if part:IsA("Part") and (part :: Part).Shape == Enum.PartType.Ball then
+		local r = math.min(part.Size.X, part.Size.Y, part.Size.Z) / 2
+		return Vector3.new(r, r, r)
+	end
+	return part.Size / 2
+end
+
+local function anchorFor(model: Model, root: BasePart, scale: number): Anchor
+	-- Snails have no Head part: their neck carries the eye stalks, so head features go there.
+	local head = model:FindFirstChild("Head") :: BasePart? or model:FindFirstChild("Neck") :: BasePart? or root
+	local hp, hr = head.CFrame.Position / scale, radiusOf(head) / scale
+	-- The highest of the body and a shell is "the back" (snails carry theirs on top).
+	local back = root
+	local shell = model:FindFirstChild("Shell") :: BasePart?
+	if shell and shell.CFrame.Position.Y + radiusOf(shell).Y > root.CFrame.Position.Y + radiusOf(root).Y then
+		back = shell
+	end
+	local bp, br = back.CFrame.Position / scale, radiusOf(back) / scale
+	local round = back:IsA("Part") and (back :: Part).Shape == Enum.PartType.Ball
+	local wings = {}
+	for _, child in ipairs(model:GetChildren()) do
+		if child.Name == "Wing" and child:IsA("BasePart") then
+			table.insert(wings, child)
+		end
+	end
+	return {
+		headTop = hp + Vector3.new(0, hr.Y, 0),
+		headFront = hp - Vector3.new(0, 0, hr.Z),
+		headWidth = hr.X * 2,
+		backTop = function(dx: number, dz: number): number
+			if round then
+				return bp.Y + math.sqrt(math.max(br.Y * br.Y - dx * dx - dz * dz, 0))
+			end
+			return bp.Y + br.Y
+		end,
+		backCentre = bp,
+		wings = wings,
+		scale = scale,
+	}
+end
+
+-- Small details that make visitors of the same body plan look different. Each one is set into
+-- the surface it belongs to (sunk ~0.15 so it reads as attached, never hidden).
+local FEATURES: { [string]: (Adder, Color3, Color3, Anchor) -> () } = {
+	crest = function(add, _body, accent, at)
+		add("Crest", nil, Vector3.new(0.3, 1, 1.2), CFrame.new(at.headTop + Vector3.new(0, 0.35, 0.15)), accent)
 	end,
-	horns = function(add, _body, accent)
+	horns = function(add, _body, accent, at)
+		local x = math.min(0.5, at.headWidth * 0.3)
 		for _, side in ipairs({ -1, 1 }) do
 			add(
 				"Horn",
 				nil,
 				Vector3.new(0.25, 0.9, 0.25),
-				CFrame.new(side * 0.5, 2.3, -1.8) * CFrame.Angles(0, 0, math.rad(-side * 20)),
+				CFrame.new(at.headTop + Vector3.new(side * x, 0.3, 0)) * CFrame.Angles(0, 0, math.rad(-side * 20)),
 				accent:Lerp(WHITE, 0.5)
 			)
 		end
 	end,
-	antennae = function(add, _body, accent)
+	antennae = function(add, _body, accent, at)
 		for _, side in ipairs({ -1, 1 }) do
 			add(
 				"Antenna",
 				nil,
 				Vector3.new(0.12, 1.4, 0.12),
-				CFrame.new(side * 0.35, 1.8, -1.8) * CFrame.Angles(math.rad(-20), 0, math.rad(-side * 20)),
+				CFrame.new(at.headTop + Vector3.new(side * 0.3, 0.5, -0.15)) * CFrame.Angles(math.rad(-20), 0, math.rad(-side * 20)),
 				accent
 			)
 		end
 	end,
-	spots = function(add, _body, accent)
+	spots = function(add, _body, accent, at)
+		local color = accent:Lerp(WHITE, 0.3)
+		if #at.wings > 0 then
+			-- Moths: one eye-spot on each wing (it rides on the wing joint and flaps with it).
+			for _, wing in ipairs(at.wings) do
+				local w = wing.CFrame
+				local spot = CFrame.new(w.Position / at.scale) * (w - w.Position) * CFrame.new(0, wing.Size.Y / 2 / at.scale, 0)
+				add("WingSpot", nil, Vector3.new(0.9, 0.08, 0.9), spot, color)
+			end
+			return
+		end
 		for i = 1, 3 do
-			add(
-				"Spot",
-				Enum.PartType.Ball,
-				Vector3.new(0.6, 0.6, 0.6),
-				CFrame.new((i - 2) * 0.7, 1.25, (i % 2) * 0.6 - 0.2),
-				accent:Lerp(WHITE, 0.3)
-			)
+			local dx, dz = (i - 2) * 0.6, (i % 2) * 0.5 - 0.2
+			local y = at.backTop(dx, dz) - 0.12
+			add("Spot", Enum.PartType.Ball, Vector3.new(0.6, 0.6, 0.6), CFrame.new(at.backCentre.X + dx, y, at.backCentre.Z + dz), color)
 		end
 	end,
-	fluff = function(add, body, _accent)
-		add("Fluff", Enum.PartType.Ball, Vector3.new(1.4, 1.1, 1.4), CFrame.new(0, 1.4, 0.4), body:Lerp(WHITE, 0.6))
+	fluff = function(add, body, _accent, at)
+		local y = at.backTop(0, 0.3) + 0.25
+		add(
+			"Fluff",
+			Enum.PartType.Ball,
+			Vector3.new(1.4, 1.1, 1.4),
+			CFrame.new(at.backCentre.X, y, at.backCentre.Z + 0.3),
+			body:Lerp(WHITE, 0.6)
+		)
 	end,
-	glow = function(add, _body, accent)
-		local orb = add("Glow", Enum.PartType.Ball, Vector3.new(0.6, 0.6, 0.6), CFrame.new(0, 2.4, -0.6), accent)
+	glow = function(add, _body, accent, at)
+		-- An angler-style lure: a thin stalk from the head (it sways like an antenna) holding a
+		-- glowing bead that rides on it.
+		add("Antenna", nil, Vector3.new(0.1, 0.9, 0.1), CFrame.new(at.headTop + Vector3.new(0, 0.4, -0.05)), accent:Lerp(BLACK, 0.3))
+		local orb =
+			add("Glow", Enum.PartType.Ball, Vector3.new(0.55, 0.55, 0.55), CFrame.new(at.headTop + Vector3.new(0, 0.95, -0.05)), accent)
 		orb.Material = Enum.Material.Neon
 	end,
-	whiskers = function(add, _body, _accent)
+	whiskers = function(add, _body, _accent, at)
 		for _, side in ipairs({ -1, 1 }) do
-			add("Whisker", nil, Vector3.new(1.2, 0.06, 0.06), CFrame.new(side * 0.9, 0.9, -2.8), WHITE)
+			add("Whisker", nil, Vector3.new(1.2, 0.06, 0.06), CFrame.new(at.headFront + Vector3.new(side * 0.6, -0.1, 0.12)), WHITE)
 		end
 	end,
 }
@@ -448,9 +564,22 @@ function AnimalFactory.build(species: any, animalId: string): Built
 		return newPart(model, name, partShape, partSize * scale, scaled, color)
 	end
 	local mouth, halfHeight = ARCHETYPES[species.Archetype](add, bodyColor, accentColor)
+	-- Moths read as moths by their feathery antennae; visitors whose feature already puts
+	-- something on the head (antennae, a glow lure) keep just that.
+	if species.Archetype == "moth" and species.Feature ~= "antennae" and species.Feature ~= "glow" then
+		for _, side in ipairs({ -1, 1 }) do
+			add(
+				"Antenna",
+				nil,
+				Vector3.new(0.1, 1.2, 0.1),
+				CFrame.new(side * 0.3, 1.55, -1.85) * CFrame.Angles(math.rad(-25), 0, math.rad(-side * 25)),
+				bodyColor:Lerp(BLACK, 0.4)
+			)
+		end
+	end
 	local feature = species.Feature and FEATURES[species.Feature]
 	if feature then
-		feature(add, bodyColor, accentColor)
+		feature(add, bodyColor, accentColor, anchorFor(model, root, scale))
 	end
 	-- Re-centre so the root's CFrame is the model origin (body may be offset for tortoises).
 	if offset.Magnitude > 0 then

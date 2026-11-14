@@ -27,7 +27,13 @@ function ShoreAmbience.level(x: number, z: number): number
 	return math.clamp(1 - best / HEAR, 0, 1)
 end
 
+local started = false
+
 function ShoreAmbience.start(store: any)
+	if started then
+		return -- one loop per client, however often this is called
+	end
+	started = true
 	local sound = Instance.new("Sound")
 	sound.Name = "WFI_Shore"
 	sound.SoundId = EngineSounds.Path.swim

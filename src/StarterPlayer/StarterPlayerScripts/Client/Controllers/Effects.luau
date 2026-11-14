@@ -44,6 +44,8 @@ local MELODIES: { [string]: { { number } } } = {
 	fanfare = { { 1, 0 }, { 1.25, 0.1 }, { 1.5, 0.2 }, { 2, 0.34 } },
 }
 local random = Random.new()
+local MELODY_GAP = 0.25
+local melodyAt: { [string]: number } = {}
 
 local folder: Folder
 local sounds: { [string]: Sound } = {}
@@ -67,12 +69,22 @@ function Effects.play(name: string)
 	end
 	local melody = MELODIES[name]
 	if melody then
+		-- A burst of rewards (several catches at once) plays each tune at most every
+		-- MELODY_GAP seconds instead of stacking into noise.
+		local now = os.clock()
+		if now - (melodyAt[name] or -math.huge) < MELODY_GAP then
+			return
+		end
+		melodyAt[name] = now
 		-- One Sound per note (built in init), so overlapping notes never bend each other's pitch.
 		for i, note in ipairs(melody) do
 			local sound = sounds[name .. "_" .. i]
 			if sound then
 				task.delay(note[2], function()
-					SoundService:PlayLocalSound(sound)
+					-- Sound may have been switched off between the first note and this one.
+					if Store.setting("sound") ~= false then
+						SoundService:PlayLocalSound(sound)
+					end
 				end)
 			end
 		end

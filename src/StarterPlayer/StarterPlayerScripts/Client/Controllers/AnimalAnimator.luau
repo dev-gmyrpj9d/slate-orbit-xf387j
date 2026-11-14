@@ -226,7 +226,7 @@ local function step(dt: number)
 		if rig.archetype ~= "giant" then
 			local dy, pitch = 0, 0
 			if rig.walk < 0.05 then
-				dy, pitch = AnimalMotion.idleBob(pose.state, pose.pose, rig.t)
+				dy, pitch = AnimalMotion.idleBob(pose.state, pose.pose, rig.t, rig.archetype)
 			end
 			local target = rig.base * CFrame.new(0, dy, 0) * CFrame.Angles(pitch, 0, 0)
 			if not same(target, current) then

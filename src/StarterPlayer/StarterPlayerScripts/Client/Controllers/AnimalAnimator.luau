@@ -1,8 +1,11 @@
 --!strict
 -- Brings the procedural animals to life on this client. Each frame it poses their limb joints
 -- (walk cycles, ear and tail wags, wing flaps, claw snaps, a head that turns toward you), makes
--- their eyes blink, and pops hearts or a puff when an animal is fed. The server only moves each
--- animal's body and publishes its State/Pose attributes; nothing here affects gameplay.
+-- their eyes blink, and pops hearts or a puff when an animal is fed. It also adds the small
+-- breathing / sniffing / chewing bob to stationary animals (AnimalMotion.idleBob): the server
+-- stops writing an animal's root once it holds still, so that bob costs no network traffic.
+-- The server only moves each animal's body and publishes its State/Pose attributes; nothing
+-- here affects gameplay.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -25,6 +28,8 @@ type Rig = {
 	eyes: { Eye },
 	shines: { BasePart },
 	lastPos: Vector3,
+	base: CFrame, -- the root CFrame last replicated from the server
+	written: CFrame?, -- what this client last wrote on top of it (base * idle bob)
 	walk: number,
 	lookYaw: number,
 	t: number,
@@ -105,6 +110,8 @@ local function track(model: Model)
 		eyes = {},
 		shines = {},
 		lastPos = root.Position,
+		base = root.CFrame,
+		written = nil,
 		walk = 0,
 		lookYaw = 0,
 		t = random:NextNumber(0, 20),
@@ -151,6 +158,13 @@ local function lookYaw(rig: Rig, target: Vector3?): number
 	return math.clamp(math.atan2(-offset.X, -offset.Z), -MAX_LOOK, MAX_LOOK)
 end
 
+-- True when two CFrames are the same to within float noise.
+local function same(a: CFrame, b: CFrame): boolean
+	return (a.Position - b.Position).Magnitude < 1e-4
+		and a.LookVector:Dot(b.LookVector) > 0.999999
+		and a.UpVector:Dot(b.UpVector) > 0.999999
+end
+
 local function setBlink(rig: Rig, closed: boolean)
 	for _, eye in ipairs(rig.eyes) do
 		if eye.part.Parent then
@@ -179,7 +193,12 @@ local function step(dt: number)
 			untrack(model)
 			continue
 		end
-		local pos = root.Position
+		-- Anything other than our own last write came from the server: that is the new base.
+		local current = root.CFrame
+		if not rig.written or not same(current, rig.written :: CFrame) then
+			rig.base = current
+		end
+		local pos = rig.base.Position
 		local moved = Vector3.new(pos.X - rig.lastPos.X, 0, pos.Z - rig.lastPos.Z).Magnitude
 		rig.lastPos = pos
 		if (pos - cameraPos).Magnitude > MAX_DISTANCE then
@@ -199,6 +218,17 @@ local function step(dt: number)
 		local desired = if pose.state == "Anticipate" or pose.state == "Idle" then lookYaw(rig, headPos) else 0
 		rig.lookYaw += (desired - rig.lookYaw) * math.min(1, dt * 5)
 		pose.lookYaw = rig.lookYaw
+		if rig.archetype ~= "giant" then
+			local dy, pitch = 0, 0
+			if rig.walk < 0.05 then
+				dy, pitch = AnimalMotion.idleBob(pose.state, pose.pose, rig.t)
+			end
+			local target = rig.base * CFrame.new(0, dy, 0) * CFrame.Angles(pitch, 0, 0)
+			if not same(target, current) then
+				root.CFrame = target
+			end
+			rig.written = root.CFrame
+		end
 		for _, joint in ipairs(rig.joints) do
 			local rx, ry, rz = AnimalMotion.jointAngles(joint.role, joint.side, joint.front, pose, rig.t)
 			joint.motor.Transform = CFrame.Angles(rx, ry, rz)

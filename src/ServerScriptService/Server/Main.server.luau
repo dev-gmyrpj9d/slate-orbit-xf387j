@@ -9,6 +9,7 @@ local Rng = require(Shared:WaitForChild("Rng"))
 
 local WorldBuilder = require(script.Parent.World.WorldBuilder)
 local Ambience = require(script.Parent.World.Ambience)
+local Wayfinding = require(script.Parent.World.Wayfinding)
 local Services = script.Parent.Services
 local DataService = require(Services.DataService)
 local StateService = require(Services.StateService)
@@ -27,6 +28,11 @@ if not world then
 end
 assert(world, "world folder missing")
 Ambience.apply()
+-- Paths, signposts and bridge lanterns over the baked world. Decorative: never fatal.
+local wayfindingOk, wayfindingErr = pcall(Wayfinding.apply, Config, world)
+if not wayfindingOk then
+	warn("[WildFeast] Wayfinding skipped: " .. tostring(wayfindingErr))
+end
 
 local getProfile = DataService.getProfile
 local markDirty = StateService.markDirty

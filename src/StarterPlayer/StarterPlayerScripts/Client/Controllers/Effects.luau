@@ -1,6 +1,7 @@
 --!strict
 -- Client-only visuals and audio: renders thrown food along the server-broadcast arc (with a
--- short trail), bursts, catch rings, hearts, floating reward text and sounds. Bounded by
+-- short trail), a closing landing ring for your own throws, bursts, catch rings, hearts,
+-- floating reward text and sounds. Bounded by
 -- Config.Caps.ClientEffects and the reduced-effects setting. Purely cosmetic: nothing here
 -- affects rewards.
 
@@ -12,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Trajectory = require(ReplicatedStorage.Shared.Trajectory)
+local Feel = require(ReplicatedStorage.Shared.Feel)
 local Store = require(script.Parent.Store)
 local Ui = require(script.Parent.Ui)
 
@@ -37,7 +39,17 @@ local random = Random.new()
 
 local folder: Folder
 local sounds: { [string]: Sound } = {}
-local active: { [number]: { part: BasePart, origin: Vector3, velocity: Vector3, started: number } } = {}
+type Projectile = {
+	part: BasePart,
+	origin: Vector3,
+	velocity: Vector3,
+	started: number,
+	ring: BasePart?, -- landing ring (this player's own throws only)
+	landsAt: number?, -- seconds after release the arc meets the ground
+}
+local active: { [number]: Projectile } = {}
+local landParams = RaycastParams.new()
+landParams.FilterType = Enum.RaycastFilterType.Include
 local activeCount = 0
 local transientCount = 0
 
@@ -309,9 +321,61 @@ local function removeProjectile(id: number)
 	local entry = active[id]
 	if entry then
 		entry.part:Destroy()
+		if entry.ring then
+			entry.ring:Destroy()
+		end
 		active[id] = nil
 		activeCount -= 1
 	end
+end
+
+-- Where (and when) the arc first meets the world, sampled like the server's projectile step.
+local function predictLanding(origin: Vector3, velocity: Vector3): (Vector3?, number?)
+	local steps = 48
+	local duration = Config.Throw.MaxLifetime
+	local previous = origin
+	for i = 1, steps do
+		local t = duration * i / steps
+		local p = Trajectory.positionAt(origin, velocity, Config.Throw.Gravity, t)
+		local hit = workspace:Raycast(previous, p - previous, landParams)
+		if hit then
+			local fraction = (hit.Position - previous).Magnitude / math.max((p - previous).Magnitude, 1e-3)
+			return hit.Position, duration * (i - 1 + fraction) / steps
+		end
+		previous = p
+	end
+	return nil, nil
+end
+
+-- A flat ring on the ground where your food will land. It closes in as the food falls, so you
+-- can watch the animal instead of the food and still feel the landing coming (Feel.landingRing).
+local function landingRing(entry: Projectile)
+	local world = workspace:FindFirstChild(Config.World.FolderName)
+	if not world then
+		return
+	end
+	landParams.FilterDescendantsInstances = { world }
+	local position, landsAt = predictLanding(entry.origin, entry.velocity)
+	if not position or not landsAt or landsAt < 0.25 then
+		return
+	end
+	local diameter, transparency = Feel.landingRing(0, reduced())
+	entry.landsAt = landsAt
+	entry.ring = Ui.new("Part", {
+		Name = "LandingRing",
+		Shape = Enum.PartType.Cylinder,
+		Anchored = true,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CastShadow = false,
+		Material = Enum.Material.SmoothPlastic,
+		Color = Ui.Colors.Panel,
+		Transparency = transparency,
+		Size = Vector3.new(0.12, diameter, diameter),
+		CFrame = CFrame.new(position + Vector3.new(0, 0.08, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+		Parent = folder,
+	})
 end
 
 local QUALITY_COLORS = {
@@ -330,10 +394,14 @@ local function onFx(payload: any)
 			return
 		end
 		activeCount += 1
-		active[payload.id] =
+		local entry: Projectile =
 			{ part = foodPart(payload.food, payload.owner), origin = payload.origin, velocity = payload.velocity, started = os.clock() }
+		active[payload.id] = entry
 		if payload.owner == Players.LocalPlayer.UserId then
 			Effects.play("throw")
+			landingRing(entry)
+		else
+			Store.emit("throwFx", payload.owner)
 		end
 	elseif kind == "end" then
 		removeProjectile(payload.id)
@@ -404,6 +472,12 @@ function Effects.init()
 			else
 				local pos = Trajectory.positionAt(entry.origin, entry.velocity, Config.Throw.Gravity, t)
 				entry.part.CFrame = CFrame.new(pos) * CFrame.Angles(t * 6, t * 4, 0)
+				local ring, landsAt = entry.ring, entry.landsAt
+				if ring and landsAt then
+					local diameter, transparency = Feel.landingRing(t / landsAt, reduced())
+					ring.Size = Vector3.new(0.12, diameter, diameter)
+					ring.Transparency = if t > landsAt + 0.15 then 1 else transparency
+				end
 			end
 		end
 	end)

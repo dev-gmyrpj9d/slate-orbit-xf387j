@@ -9,8 +9,9 @@ if [ ! -f "$DEFS" ]; then
 	curl -sSfL -o "$DEFS" https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/main/scripts/globalTypes.d.luau
 fi
 stylua --check src tests tools
-lune run tests/run.luau
+# Build first: tests/wayfinding.spec.luau checks placement against the built place.
 lune run tools/build.luau
+lune run tests/run.luau
 lune run tools/roundtrip.luau place/WildFeastIslands.original.rbxl build/WildFeastIslands.rbxl
 lune run tools/sourcemap.luau
 luau-lsp analyze --definitions="$DEFS" --sourcemap=sourcemap.json src

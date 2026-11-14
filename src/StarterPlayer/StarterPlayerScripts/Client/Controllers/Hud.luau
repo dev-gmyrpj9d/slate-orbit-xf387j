@@ -1,5 +1,5 @@
 --!strict
--- Responsive HUD: currencies, next goal, food bar, power/cooldown meter, touch throw button,
+-- Responsive HUD: currencies, next goal, food bar, throw meter (ThrowMeter), touch throw button,
 -- feast banner, toasts, contextual tutorial hint + world marker, and a tabbed panel
 -- (Pantry, Kitchen, Quests, Decor, Upgrades, Map, Journal, Shop, Settings). Every state is
 -- spelled out in words or shapes, never colour alone. Clusters scale with the viewport and stay
@@ -21,6 +21,7 @@ local ThrowController = require(script.Parent.ThrowController)
 local Effects = require(script.Parent.Effects)
 local Shop = require(script.Parent.Shop)
 local Passes = require(ReplicatedStorage.Shared.Passes)
+local ThrowMeter = require(script.Parent.ThrowMeter)
 
 local ActionRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Action") :: RemoteEvent
 
@@ -35,9 +36,8 @@ local goalText: TextLabel
 local goalBar: Frame
 local goalBarText: TextLabel
 local foodBar: Frame
-local powerFrame: Frame
-local powerFill: Frame
-local powerText: TextLabel
+local goalCluster: Frame
+local hintWanted = false -- the tutorial hint has text and is switched on (hidden while aiming)
 local throwButton: TextButton
 local crosshair: TextLabel
 local feastBanner: TextLabel
@@ -1026,6 +1026,18 @@ end
 
 rebuildPanelRef = rebuildPanel
 
+-- Lets other controllers add a HUD cluster that shares the HUD's scale and safe area.
+function Hud.cluster(name: string, props: { [string]: any }): Frame
+	local frame = cluster(name, props)
+	updateScale()
+	return frame
+end
+
+-- True while a full-screen panel is open (transient cards wait until it closes).
+function Hud.panelOpen(): boolean
+	return (panel :: Frame?) ~= nil and panel.Visible
+end
+
 function Hud.openPanel(tab: string)
 	currentTab = tab
 	panel.Visible = true
@@ -1261,7 +1273,8 @@ local function refresh()
 	local showHint = profile.settings.tutorial ~= false
 	local text, target = hintFor(goal)
 	hintLabel.Text = text
-	hintLabel.Visible = showHint and text ~= ""
+	hintWanted = showHint and text ~= ""
+	hintLabel.Visible = hintWanted and not ThrowController.charging
 	worldMarker.Adornee = (if showHint then target else nil) :: any
 	worldMarker.Enabled = showHint and target ~= nil
 
@@ -1333,6 +1346,7 @@ function Hud.init()
 	-- Goal card (top-right).
 	local goalCard =
 		cluster("Goal", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -8, 0, 8), Size = UDim2.fromOffset(320, 110) })
+	goalCluster = goalCard
 	local card = Ui.new(
 		"Frame",
 		{ Size = UDim2.fromScale(1, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = C.Panel, Parent = goalCard },
@@ -1383,7 +1397,7 @@ function Hud.init()
 		menuButtons[tab] = button
 	end
 
-	-- Food bar (bottom-centre) + power meter above it.
+	-- Food bar (bottom-centre) with the tutorial hint above it.
 	local bottom =
 		cluster("Bottom", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -8), Size = UDim2.fromOffset(780, 170) })
 	foodBar = Ui.new("Frame", {
@@ -1400,25 +1414,13 @@ function Hud.init()
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
 	})
-	powerFrame = Ui.new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -104),
-		Size = UDim2.fromOffset(340, 26),
-		BackgroundColor3 = C.PanelDark,
-		Visible = false,
-		Parent = bottom,
-	}, { Ui.corner(10) })
-	powerFill = Ui.new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = C.Primary, Parent = powerFrame }, { Ui.corner(10) })
-	powerText = Ui.new("TextLabel", {
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		TextColor3 = C.White,
-		FontFace = Ui.BoldFont,
-		TextSize = 16,
-		ZIndex = 2,
-		TextStrokeTransparency = 0.4,
-		Parent = powerFrame,
+	-- Throw meter: right of the aim point, vertically centred (ThrowMeter / ThrowReadout).
+	local meter = cluster("ThrowMeter", {
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0.5, 70, 0.5, 0),
+		Size = UDim2.fromOffset(260, 210),
 	})
+	ThrowMeter.build(meter)
 	hintLabel = Ui.new("TextLabel", {
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -136),
@@ -1736,15 +1738,10 @@ function Hud.init()
 	Store.on("reward", function(payload)
 		local species = Config.Species[payload.species]
 		local food = Config.Foods[payload.food]
-		if payload.discovered and species and food then
-			local verb = if payload.preference == "favorite"
-				then "loves"
-				elseif payload.preference == "disliked" then "won't eat"
-				else "likes"
-			Hud.toast(
-				string.format("Noted in your journal: %s %s %s.", species.Name, verb, food.Name),
-				if payload.preference == "favorite" then "success" else "info"
-			)
+		-- A newly found favourite gets the Discovery journal card instead of a toast.
+		if payload.discovered and species and food and payload.preference ~= "favorite" then
+			local verb = if payload.preference == "disliked" then "won't eat" else "likes"
+			Hud.toast(string.format("Noted in your journal: %s %s %s.", species.Name, verb, food.Name), "info")
 		end
 		if payload.leveledUp and species then
 			Hud.toast(string.format("%s trust reached level %d.", species.Name, payload.trustLevel), "success")
@@ -1764,19 +1761,19 @@ function Hud.init()
 		local charging = ThrowController.charging
 		local cooldown = ThrowController.cooldownRemaining()
 		local tap = ThrowController.tapMode()
-		setIfChanged(powerFrame, "Visible", charging or cooldown > 0)
-		if charging then
-			local power = ThrowController.power
-			setIfChanged(powerFill, "Size", UDim2.fromScale(power, 1))
-			setIfChanged(
-				powerText,
-				"Text",
-				string.format("Power %d%%  ·  %s to throw", math.floor(power * 100 + 0.5), if tap then "tap again" else "let go")
-			)
-		elseif cooldown > 0 then
-			setIfChanged(powerFill, "Size", UDim2.fromScale(0, 1))
-			setIfChanged(powerText, "Text", string.format("Ready in %.1fs", cooldown))
-		end
+		ThrowMeter.update({
+			charging = charging,
+			power = ThrowController.power,
+			cooldown = cooldown,
+			cooldownTotal = ThrowController.cooldownTotal,
+			source = ThrowController.source,
+			tapMode = tap,
+			target = ThrowController.target,
+			distance = ThrowController.distance,
+		})
+		-- Focus while aiming: the goal card and tutorial hint step aside so the target stays clear.
+		setIfChanged(goalCluster, "Visible", not charging)
+		setIfChanged(hintLabel, "Visible", hintWanted and not charging)
 		setIfChanged(
 			throwButton,
 			"Text",

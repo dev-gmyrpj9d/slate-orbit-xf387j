@@ -2,7 +2,9 @@
 local process = require("@lune/process")
 local H = require("./harness")
 
-for _, suite in { "./motion.spec", "./factory.spec", "./monetization.spec", "./passes.spec", "./companion.spec" } do
+for _, suite in
+	{ "./motion.spec", "./factory.spec", "./monetization.spec", "./passes.spec", "./companion.spec", "./feel.spec", "./wayfinding.spec" }
+do
 	print(suite)
 	require(suite)(H)
 end

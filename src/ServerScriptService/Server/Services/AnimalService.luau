@@ -55,6 +55,7 @@ export type Animal = {
 	phase: number,
 	idleMode: string, -- wander | sniff | watch | rest (only meaningful while Idle)
 	sink: number, -- eased 0..1 for how far a resting animal has settled down
+	lastWrite: { number }?, -- last replicated root pose { x, y, z, yaw, pitch, roll }
 	-- visitor slots only
 	slot: { habitat: string, index: number, cursor: number, since: number, luredUntil: number, lockedUntil: number }?,
 }
@@ -65,6 +66,8 @@ type Deps = {
 }
 
 local AnimalService = {}
+-- Root CFrame writes (each one replicates to every client). Read by tests and debugging.
+AnimalService.stats = { writes = 0 }
 
 local animals: { Animal } = {}
 local folder: Folder
@@ -153,6 +156,7 @@ local function spawnModel(animal: Animal)
 	animal.emote = built.emote
 	animal.mouthOffset = built.mouthOffset
 	animal.halfHeight = built.halfHeight
+	animal.lastWrite = nil -- a fresh model must be placed on its next step
 	built.model:SetAttribute("Pose", animal.idleMode)
 	built.model.Parent = folder
 end
@@ -457,46 +461,26 @@ local function move(animal: Animal, dt: number, now: number)
 	animal.phase += dt
 
 	local t = animal.phase
-	local y = animal.habitat.GroundY + animal.halfHeight
-	local extraYaw, roll, pitch = 0, 0, 0
-	local archetype = animal.species.Archetype
-	if moving then
-		if archetype == "hopper" then
-			y += math.abs(math.sin(t * 10)) * 0.9
-		elseif archetype == "bird" then
-			roll = math.sin(t * 9) * 0.14
-		elseif archetype == "crab" then
-			roll = math.sin(t * 14) * 0.06
-			y += math.abs(math.sin(t * 14)) * 0.15
-		else
-			y += math.abs(math.sin(t * 8)) * 0.25
-		end
-	elseif state == "Anticipate" then
-		y += math.abs(math.sin(t * 6)) * 0.5
-		pitch = 0.1
-	elseif state == "Eat" then
-		pitch = -0.12 + math.sin(t * 16) * 0.08
-	elseif state == "Happy" then
-		local progress = math.clamp((now - animal.stateStarted) / Config.Animal.HappyDuration, 0, 1)
-		extraYaw = progress * math.pi * 2
-		y += math.abs(math.sin(t * 9)) * 1.2
-	elseif state == "Refuse" then
-		extraYaw = math.sin(t * 20) * 0.35
-	elseif animal.idleMode == "rest" then
-		y += math.sin(t * 1.2) * 0.04 -- slow breathing
-	elseif animal.idleMode == "sniff" then
-		pitch = -0.06
-		y += math.sin(t * 2) * 0.05
-	else
-		y += math.sin(t * 2) * 0.08
-	end
+	local progress = if state == "Happy" then math.clamp((now - animal.stateStarted) / Config.Animal.HappyDuration, 0, 1) else 0
+	local dy, extraYaw, pitch, roll = AnimalMotion.bodyMotion(state, animal.species.Archetype, moving, t, progress)
+	local y = animal.habitat.GroundY + animal.halfHeight + dy
 
 	local resting = if state == "Idle" and animal.idleMode == "rest" then 1 else 0
 	animal.sink += (resting - animal.sink) * math.min(1, dt * 4)
+	if math.abs(resting - animal.sink) < 1e-3 then
+		animal.sink = resting
+	end
 	y -= animal.halfHeight * REST_SINK * animal.sink
 
-	local cf = CFrame.new(animal.pos.X, y, animal.pos.Z) * CFrame.Angles(0, animal.yaw + extraYaw, 0) * CFrame.Angles(pitch, 0, roll)
-	animal.root.CFrame = cf
+	-- Only replicate real changes: a resting animal settles, then stops sending updates. The
+	-- breathing / sniffing / chewing bob is added by each client (AnimalAnimator, idleBob).
+	local yaw = animal.yaw + extraYaw
+	local pose = { animal.pos.X, y, animal.pos.Z, yaw, pitch, roll }
+	if AnimalMotion.needsWrite(animal.lastWrite, pose) then
+		animal.lastWrite = pose
+		animal.root.CFrame = CFrame.new(animal.pos.X, y, animal.pos.Z) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, roll)
+		AnimalService.stats.writes += 1
+	end
 end
 
 local function spotSpecies()

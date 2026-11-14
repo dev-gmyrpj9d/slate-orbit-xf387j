@@ -103,4 +103,107 @@ return function(H)
 		dx, dz = AnimalMotion.separation(0, 0, 2, { { 0, 0, 2 } }, 0.6)
 		H.check(dx == dx and dz == dz and (dx ~= 0 or dz ~= 0), "coincident animals still separate")
 	end)
+
+	-- The pre-split server bob, kept here as the reference the split must reproduce.
+	local function oldBob(state, pose, archetype, moving, t, progress)
+		local sin = math.sin
+		local y, extraYaw, roll, pitch = 0, 0, 0, 0
+		if moving then
+			if archetype == "hopper" then
+				y += math.abs(sin(t * 10)) * 0.9
+			elseif archetype == "bird" then
+				roll = sin(t * 9) * 0.14
+			elseif archetype == "crab" then
+				roll = sin(t * 14) * 0.06
+				y += math.abs(sin(t * 14)) * 0.15
+			else
+				y += math.abs(sin(t * 8)) * 0.25
+			end
+		elseif state == "Anticipate" then
+			y += math.abs(sin(t * 6)) * 0.5
+			pitch = 0.1
+		elseif state == "Eat" then
+			pitch = -0.12 + sin(t * 16) * 0.08
+		elseif state == "Happy" then
+			extraYaw = progress * math.pi * 2
+			y += math.abs(sin(t * 9)) * 1.2
+		elseif state == "Refuse" then
+			extraYaw = sin(t * 20) * 0.35
+		elseif pose == "rest" then
+			y += sin(t * 1.2) * 0.04
+		elseif pose == "sniff" then
+			pitch = -0.06
+			y += sin(t * 2) * 0.05
+		else
+			y += sin(t * 2) * 0.08
+		end
+		return y, extraYaw, pitch, roll
+	end
+
+	H.test("server bodyMotion + client idleBob reproduce the old body bob", function()
+		for _, state in STATES do
+			for _, pose in POSES do
+				for _, archetype in ARCHETYPES do
+					for _, moving in { false, true } do
+						for t = 0, 5, 0.29 do
+							local ey, eyaw, epitch, eroll = oldBob(state, pose, archetype, moving, t, 0.4)
+							local dy, yaw, pitch, roll = AnimalMotion.bodyMotion(state, archetype, moving, t, 0.4)
+							if not moving then
+								local by, bp = AnimalMotion.idleBob(state, pose, t)
+								dy += by
+								pitch += bp
+							end
+							local where = string.format("%s/%s/%s/%s t=%.2f", state, pose, archetype, tostring(moving), t)
+							H.near(dy, ey, 1e-9, "height " .. where)
+							H.near(yaw, eyaw, 1e-9, "yaw " .. where)
+							H.near(pitch, epitch, 1e-9, "pitch " .. where)
+							H.near(roll, eroll, 1e-9, "roll " .. where)
+						end
+					end
+				end
+			end
+		end
+	end)
+
+	-- Mirrors AnimalService.move's write decision for one animal.
+	local function simulate(state, pose, moving, frames)
+		local dt = 1 / 60
+		local writes, t, sink, x, last = 0, 0, 0, 0, nil
+		local resting = if state == "Idle" and pose == "rest" then 1 else 0
+		for _ = 1, frames do
+			t += dt
+			if moving then
+				x += 8 * dt
+			end
+			local dy, yaw, pitch, roll = AnimalMotion.bodyMotion(state, "fox", moving, t, 0)
+			sink += (resting - sink) * math.min(1, dt * 4)
+			if math.abs(resting - sink) < 1e-3 then
+				sink = resting
+			end
+			local pose6 = { x, 6 + 1 + dy - 0.22 * sink, 0, 1.3 + yaw, pitch, roll }
+			if AnimalMotion.needsWrite(last, pose6) then
+				last = pose6
+				writes += 1
+			end
+		end
+		return writes
+	end
+
+	H.test("stationary idle animals stop replicating; moving ones keep updating", function()
+		for _, pose in POSES do
+			-- 10 s idle: a few writes while a resting animal settles, then none.
+			local writes = simulate("Idle", pose, false, 600)
+			H.check(writes <= 40, string.format("%s idle wrote %d times in 600 frames", pose, writes))
+		end
+		H.check(simulate("Eat", "wander", false, 600) <= 2, "eating (chew is client-side) should not stream")
+		H.check(simulate("Idle", "wander", true, 600) >= 590, "walking animals must keep replicating")
+		H.check(simulate("Happy", "wander", false, 120) >= 100, "the happy hop is gameplay feedback; it stays replicated")
+	end)
+
+	H.test("needsWrite respects the epsilon", function()
+		local a = { 1, 2, 3, 0.5, 0, 0 }
+		H.check(AnimalMotion.needsWrite(nil, a), "first write")
+		H.check(not AnimalMotion.needsWrite(a, { 1.001, 2, 3, 0.5, 0, 0 }), "sub-epsilon move")
+		H.check(AnimalMotion.needsWrite(a, { 1, 2, 3, 0.51, 0, 0 }), "yaw change")
+	end)
 end

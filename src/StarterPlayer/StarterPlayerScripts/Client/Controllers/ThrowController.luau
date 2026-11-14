@@ -35,6 +35,12 @@ raycastParams.FilterType = Enum.RaycastFilterType.Include
 
 ThrowController.power = 0
 ThrowController.charging = false
+ThrowController.source = "" -- input that is charging: "mouse" | "key" | "gamepad" | "touch"
+-- What the current arc will do, for the throw meter: the species whose mouth it passes, or how
+-- far away it lands (nil when the landing is beyond the preview).
+ThrowController.target = nil :: string?
+ThrowController.distance = nil :: number?
+ThrowController.cooldownTotal = 0
 
 local function head(): Vector3?
 	local character = player.Character
@@ -91,6 +97,7 @@ function ThrowController.begin(source: string)
 	end
 	charging = true
 	chargeSource = source
+	ThrowController.source = source
 	chargeStart = os.clock()
 	ThrowController.charging = true
 	Store.emit("charge", true)
@@ -130,7 +137,9 @@ function ThrowController.release(source: string, tapped: boolean?)
 		Store.emit("toast", "Out of " .. Config.Foods[foodId].Name .. ". Prepare more in the Pantry, or use free Sunberries.", "warn")
 		return
 	end
-	cooldownUntil = os.clock() + Economy.throwCooldown(Config, profile)
+	ThrowController.cooldownTotal = Economy.throwCooldown(Config, profile)
+	cooldownUntil = os.clock() + ThrowController.cooldownTotal
+	Store.emit("thrown", power)
 	-- The head position is sent so the server launches from where this client previewed the arc
 	-- (its own copy of a moving character lags); the server only accepts it within a few studs.
 	ThrowRemote:FireServer(foodId, direction, power, origin)
@@ -165,6 +174,7 @@ local function updatePreview()
 		end
 	end
 	local catchTarget: BasePart? = nil
+	local catchName: string? = nil
 	local animals = workspace:FindFirstChild("WildFeastAnimals")
 	if animals then
 		for _, model in ipairs(animals:GetChildren()) do
@@ -187,6 +197,7 @@ local function updatePreview()
 					for i = 2, visibleCount do
 						if Trajectory.distanceToSegment(points[i - 1], points[i], mouth) <= radius then
 							catchTarget = root
+							catchName = if species then species.Name else nil
 							break
 						end
 					end
@@ -217,6 +228,8 @@ local function updatePreview()
 	else
 		marker.Transparency = 1
 	end
+	ThrowController.target = catchName
+	ThrowController.distance = if landed then Vector3.new(landed.X - origin.X, 0, landed.Z - origin.Z).Magnitude else nil
 	catchGui.Adornee = catchTarget :: any
 	catchGui.Enabled = catchTarget ~= nil
 end

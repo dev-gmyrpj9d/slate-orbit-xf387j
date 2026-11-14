@@ -150,6 +150,76 @@ function AnimalMotion.jointAngles(role: string, side: number, front: boolean, p:
 end
 
 --------------------------------------------------------------------------------
+-- Body motion: what the server replicates vs. what each client adds locally
+--------------------------------------------------------------------------------
+-- The server writes an animal's root CFrame only when it changes by more than WriteEpsilon, so a
+-- resting or sniffing animal stops replicating every frame. Gameplay-visible motion (walking
+-- gaits, the anticipation hop, the happy spin, the refusal shake) stays on the server in
+-- `bodyMotion`; the small stationary bobs live in `idleBob`, which each client applies on top.
+
+AnimalMotion.WriteEpsilon = 0.002 -- studs / radians
+
+-- Offsets (dy, extraYaw, pitch, roll) the server bakes into the root. `happyProgress` is 0..1
+-- through the Happy state.
+function AnimalMotion.bodyMotion(
+	state: string,
+	archetype: string,
+	moving: boolean,
+	t: number,
+	happyProgress: number
+): (number, number, number, number)
+	if moving then
+		if archetype == "hopper" then
+			return math.abs(sin(t * 10)) * 0.9, 0, 0, 0
+		elseif archetype == "bird" then
+			return 0, 0, 0, sin(t * 9) * 0.14
+		elseif archetype == "crab" then
+			return math.abs(sin(t * 14)) * 0.15, 0, 0, sin(t * 14) * 0.06
+		end
+		return math.abs(sin(t * 8)) * 0.25, 0, 0, 0
+	elseif state == "Anticipate" then
+		return math.abs(sin(t * 6)) * 0.5, 0, 0.1, 0
+	elseif state == "Eat" then
+		return 0, 0, -0.12, 0 -- leaning in; the chewing nod is client-side (idleBob)
+	elseif state == "Happy" then
+		return math.abs(sin(t * 9)) * 1.2, happyProgress * math.pi * 2, 0, 0
+	elseif state == "Refuse" then
+		return 0, sin(t * 20) * 0.35, 0, 0
+	end
+	return 0, 0, 0, 0
+end
+
+-- Cosmetic (dy, pitch) a client adds to a stationary animal: breathing, sniffing, chewing.
+-- Never replicated, never used by gameplay. Amplitudes match the old server-side bob.
+function AnimalMotion.idleBob(state: string, pose: string?, t: number): (number, number)
+	if state == "Eat" then
+		return 0, sin(t * 16) * 0.08
+	elseif state == "Anticipate" or state == "Happy" or state == "Refuse" then
+		return 0, 0 -- the server already moves the body for these
+	elseif pose == "rest" then
+		return sin(t * 1.2) * 0.04, 0
+	elseif pose == "sniff" then
+		return sin(t * 2) * 0.05, -0.06
+	end
+	return sin(t * 2) * 0.08, 0
+end
+
+-- True when a root pose { x, y, z, yaw, pitch, roll } differs from the last written one enough
+-- to be worth replicating.
+function AnimalMotion.needsWrite(last: { number }?, pose: { number }, epsilon: number?): boolean
+	if not last then
+		return true
+	end
+	local eps = epsilon or AnimalMotion.WriteEpsilon
+	for i = 1, 6 do
+		if math.abs(pose[i] - last[i]) > eps then
+			return true
+		end
+	end
+	return false
+end
+
+--------------------------------------------------------------------------------
 -- Idle behaviour (server)
 --------------------------------------------------------------------------------
 export type IdleChoice = { mode: string, min: number, max: number }

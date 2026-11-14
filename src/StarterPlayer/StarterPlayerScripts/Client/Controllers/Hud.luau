@@ -1566,7 +1566,18 @@ function Hud.init()
 	end)
 	Store.on("inputMode", applyInputMode)
 	Store.on("profile", refresh)
+	local lastFeastState: string? = nil
 	Store.on("feast", function()
+		-- A bell chime when the feast becomes ready or the giant surfaces; a fanfare as it leaves.
+		local feastState = Store.feast and Store.feast.state
+		if feastState ~= lastFeastState then
+			if lastFeastState ~= nil and (feastState == "Ready" or feastState == "Arriving") then
+				Effects.play("chime")
+			elseif lastFeastState == "Active" and feastState == "Leaving" then
+				Effects.play("fanfare")
+			end
+			lastFeastState = feastState
+		end
 		refreshFeast()
 		-- The Map tab shows a "Ring the bell" button only while the feast is ready.
 		if currentTab == "Map" then

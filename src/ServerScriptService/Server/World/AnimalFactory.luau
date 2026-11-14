@@ -1,7 +1,13 @@
 --!strict
 -- Builds animal models procedurally from primitive parts (no external assets, no model scripts).
--- Each model is a single anchored root ("Body") with every other part welded to it, so the server
--- only has to move one CFrame per animal and replication stays cheap.
+-- Each model is a single anchored root ("Body") that carries every other part, so the server
+-- only has to move one CFrame per animal and replication stays cheap. Heads, legs, ears, tails,
+-- wings and claws hang from Motor6D joints (rules in Shared.AnimalMotion) that each client poses
+-- locally; everything else is welded to the part it sits on.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local AnimalMotion = require(ReplicatedStorage.Shared.AnimalMotion)
 
 local AnimalFactory = {}
 
@@ -335,13 +341,70 @@ local function addEmote(root: BasePart, name: string, offsetY: number, nameDista
 	return icon
 end
 
-local function finish(model: Model, root: BasePart)
+-- The point on `part`'s box closest to `target`: where a limb meets what it hangs from.
+local function attachPoint(part: BasePart, target: Vector3): Vector3
+	local localPoint = part.CFrame:PointToObjectSpace(target)
+	local half = part.Size / 2
+	return part.CFrame:PointToWorldSpace(
+		Vector3.new(
+			math.clamp(localPoint.X, -half.X, half.X),
+			math.clamp(localPoint.Y, -half.Y, half.Y),
+			math.clamp(localPoint.Z, -half.Z, half.Z)
+		)
+	)
+end
+
+local function nearestNamed(model: Model, name: string, from: BasePart, maxDistance: number?): BasePart?
+	local best: BasePart? = nil
+	local bestDistance = maxDistance or math.huge
+	for _, other in ipairs(model:GetChildren()) do
+		if other ~= from and other.Name == name and other:IsA("BasePart") then
+			local d = (other.CFrame.Position - from.CFrame.Position).Magnitude
+			if d < bestDistance then
+				best, bestDistance = other, d
+			end
+		end
+	end
+	return best
+end
+
+-- Joins every part to the root assembly. Must run while the model is still in its build pose
+-- (root at the origin, unrotated) so joint axes line up with the body: X right, Y up, -Z ahead.
+local function rig(model: Model, root: BasePart, rules: { [string]: AnimalMotion.PartRule }, scale: number)
 	for _, child in ipairs(model:GetChildren()) do
 		if child:IsA("BasePart") and child ~= root then
-			local weld = Instance.new("WeldConstraint")
-			weld.Part0 = root
-			weld.Part1 = child
-			weld.Parent = child
+			local rule = rules[child.Name]
+			local role = rule and rule.role
+			local holder: BasePart = root
+			if rule and rule.parent then
+				local limit = if child.Name == "Foot" then AnimalMotion.FootAttachDistance * scale else nil
+				local found = nearestNamed(model, rule.parent, child, limit)
+				if found then
+					holder = found
+					if child.Name == "Foot" then
+						role = nil -- rides on its leg
+					end
+				end
+			end
+			if role then
+				local pivot = CFrame.new(attachPoint(child, holder.CFrame.Position))
+				local motor = Instance.new("Motor6D")
+				motor.Name = role .. "Joint"
+				motor.Part0 = holder
+				motor.Part1 = child
+				motor.C0 = holder.CFrame:Inverse() * pivot
+				motor.C1 = child.CFrame:Inverse() * pivot
+				local offset = root.CFrame:PointToObjectSpace(child.CFrame.Position)
+				motor:SetAttribute("Role", role)
+				motor:SetAttribute("Side", if offset.X > 0.15 * scale then 1 elseif offset.X < -0.15 * scale then -1 else 0)
+				motor:SetAttribute("Front", offset.Z < 0)
+				motor.Parent = child
+			else
+				local weld = Instance.new("WeldConstraint")
+				weld.Part0 = holder
+				weld.Part1 = child
+				weld.Parent = child
+			end
 		end
 	end
 	model.PrimaryPart = root
@@ -376,7 +439,7 @@ function AnimalFactory.build(species: any, animalId: string): Built
 		end
 		root.CFrame = CFrame.new()
 	end
-	finish(model, root)
+	rig(model, root, AnimalMotion.PARTS, scale)
 
 	local mouthOffset = (mouth - offset) * scale
 	model:SetAttribute("Species", species.Id)
@@ -434,7 +497,7 @@ function AnimalFactory.buildGiant(name: string): Built
 		)
 	end
 	newPart(model, "TailFin", nil, Vector3.new(18, 2, 8), CFrame.new(0, 2, 24), teal:Lerp(BLACK, 0.15))
-	finish(model, root)
+	rig(model, root, AnimalMotion.GIANT_PARTS, 1)
 	local mouthOffset = Vector3.new(0, 3, -31)
 	model:SetAttribute("Giant", true)
 	model:SetAttribute("MouthOffset", mouthOffset)

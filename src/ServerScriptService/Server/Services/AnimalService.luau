@@ -3,6 +3,8 @@
 --   Idle (wander) -> Approach (walk to ground food) -> Eat -> Happy -> Idle
 --   Idle -> Anticipate (a nearby player holds food it likes; mouth target grows)
 --   Eat/Refuse are entered when food reaches the animal.
+-- While idle an animal also picks a pose (wander / sniff / watch a nearby player / rest), sent to
+-- clients as the "Pose" attribute so they can animate it, and neighbours gently push apart.
 -- Animals are anchored single-root assemblies moved by CFrame each frame (cheap replication),
 -- clamped to their island, and recovered automatically if stuck, displaced or destroyed.
 
@@ -13,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Guard = require(ReplicatedStorage.Shared.Guard)
 local Economy = require(ReplicatedStorage.Shared.Economy)
+local AnimalMotion = require(ReplicatedStorage.Shared.AnimalMotion)
 local AnimalFactory = require(script.Parent.Parent.World.AnimalFactory)
 
 export type GroundFood = {
@@ -50,6 +53,8 @@ export type Animal = {
 	bestDistance: number,
 	lastProgressAt: number,
 	phase: number,
+	idleMode: string, -- wander | sniff | watch | rest (only meaningful while Idle)
+	sink: number, -- eased 0..1 for how far a resting animal has settled down
 	-- visitor slots only
 	slot: { habitat: string, index: number, cursor: number, since: number, luredUntil: number, lockedUntil: number }?,
 }
@@ -69,6 +74,10 @@ local groundFoodsProvider: () -> { GroundFood } = function()
 end
 local reachFoodCallback: (Animal, GroundFood) -> () = function(_animal: Animal, _food: GroundFood) end
 local random = Random.new(Config.World.Seed + 7)
+
+local WATCH_RADIUS = 22 -- idle animals may stop and watch a player this close
+local SEPARATION_STEP = 0.6 -- most an animal is nudged away from its neighbours per AI tick
+local REST_SINK = 0.22 -- fraction of its height a resting animal settles down
 
 local EMOTES = {
 	Idle = "",
@@ -107,7 +116,18 @@ local function clampToIsland(animal: Animal, p: Vector3, limit: number?): Vector
 	return center + offset
 end
 
+local function setPose(animal: Animal, mode: string)
+	if animal.idleMode ~= mode then
+		animal.idleMode = mode
+		animal.model:SetAttribute("Pose", mode)
+	end
+end
+
 local function setState(animal: Animal, state: string, duration: number?, nextState: string?)
+	if state == "Idle" and animal.state ~= "Idle" then
+		setPose(animal, "wander")
+		animal.nextWander = 0
+	end
 	animal.state = state
 	animal.stateStarted = os.clock()
 	animal.stateEnds = if duration then os.clock() + duration else math.huge
@@ -133,6 +153,7 @@ local function spawnModel(animal: Animal)
 	animal.emote = built.emote
 	animal.mouthOffset = built.mouthOffset
 	animal.halfHeight = built.halfHeight
+	built.model:SetAttribute("Pose", animal.idleMode)
 	built.model.Parent = folder
 end
 
@@ -225,6 +246,22 @@ local function findEagerPlayer(animal: Animal): Vector3?
 	return bestPos
 end
 
+local function nearestCharacter(animal: Animal, radius: number): Vector3?
+	local bestPos: Vector3? = nil
+	local bestDist = radius
+	for _, player in ipairs(Players:GetPlayers()) do
+		local character = player.Character
+		local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if hrp then
+			local d = (flat(hrp.Position) - animal.pos).Magnitude
+			if d < bestDist then
+				bestPos, bestDist = hrp.Position, d
+			end
+		end
+	end
+	return bestPos
+end
+
 local function think(animal: Animal, now: number)
 	if animal.model.Parent == nil or animal.root.Parent == nil or not isFinite(animal.pos) then
 		resetAnimal(animal)
@@ -291,11 +328,54 @@ local function think(animal: Animal, now: number)
 	if state == "Anticipate" then
 		setState(animal, "Idle")
 	end
-	if not animal.moveTarget or now >= animal.nextWander then
-		local angle = random:NextNumber(0, math.pi * 2)
-		local dist = random:NextNumber(0.2, 1) * animal.wanderRadius
-		animal.moveTarget = clampToIsland(animal, animal.home + Vector3.new(math.cos(angle) * dist, 0, math.sin(angle) * dist))
-		animal.nextWander = now + random:NextNumber(Config.Animal.WanderMin, Config.Animal.WanderMax)
+	if now >= animal.nextWander or (animal.idleMode == "wander" and not animal.moveTarget) then
+		local watchTarget = nearestCharacter(animal, WATCH_RADIUS)
+		local choice = AnimalMotion.pickIdle(random:NextNumber(), animal.species.Archetype, watchTarget ~= nil)
+		setPose(animal, choice.mode)
+		animal.lookAt = if choice.mode == "watch" then watchTarget else nil
+		animal.moveTarget = nil
+		if choice.mode == "wander" then
+			local angle = random:NextNumber(0, math.pi * 2)
+			local dist = random:NextNumber(0.2, 1) * animal.wanderRadius
+			animal.moveTarget = clampToIsland(animal, animal.home + Vector3.new(math.cos(angle) * dist, 0, math.sin(angle) * dist))
+			animal.nextWander = now + random:NextNumber(Config.Animal.WanderMin, Config.Animal.WanderMax)
+		else
+			animal.nextWander = now + random:NextNumber(choice.min, choice.max)
+		end
+	elseif animal.idleMode == "watch" then
+		-- Keep following the player with its eyes; lose interest once they walk away.
+		animal.lookAt = nearestCharacter(animal, WATCH_RADIUS)
+		if not animal.lookAt then
+			animal.nextWander = now
+		end
+	end
+end
+
+-- Nudges animals on the same island apart so they never stand inside each other.
+local function separate()
+	local byHabitat: { [string]: { { number } } } = {}
+	for _, animal in ipairs(animals) do
+		local list = byHabitat[animal.habitat.Id]
+		if not list then
+			list = {}
+			byHabitat[animal.habitat.Id] = list
+		end
+		table.insert(list, { animal.pos.X, animal.pos.Z, animal.species.BodyRadius * 0.8 })
+	end
+	local cursor: { [string]: number } = {}
+	for _, animal in ipairs(animals) do
+		local id = animal.habitat.Id
+		local index = (cursor[id] or 0) + 1
+		cursor[id] = index
+		local list = byHabitat[id]
+		-- Hide this animal's own entry while measuring its neighbours.
+		local own = list[index]
+		list[index] = { math.huge, math.huge, 0 }
+		local dx, dz = AnimalMotion.separation(animal.pos.X, animal.pos.Z, own[3], list, SEPARATION_STEP)
+		list[index] = own
+		if dx ~= 0 or dz ~= 0 then
+			animal.pos = clampToIsland(animal, animal.pos + Vector3.new(dx, 0, dz), AnimalService.reachRadius(animal.habitat))
+		end
 	end
 end
 
@@ -335,7 +415,7 @@ local function move(animal: Animal, dt: number, now: number)
 			desiredYaw = yawToward(Vector3.zero, delta, animal.yaw)
 			moving = true
 		end
-	elseif animal.lookAt and (state == "Anticipate" or state == "Eat") then
+	elseif animal.lookAt and (state == "Anticipate" or state == "Eat" or (state == "Idle" and animal.idleMode == "watch")) then
 		desiredYaw = yawToward(animal.pos, animal.lookAt, animal.yaw)
 	end
 	animal.yaw = lerpAngle(animal.yaw, desiredYaw, dt * 8)
@@ -367,9 +447,18 @@ local function move(animal: Animal, dt: number, now: number)
 		y += math.abs(math.sin(t * 9)) * 1.2
 	elseif state == "Refuse" then
 		extraYaw = math.sin(t * 20) * 0.35
+	elseif animal.idleMode == "rest" then
+		y += math.sin(t * 1.2) * 0.04 -- slow breathing
+	elseif animal.idleMode == "sniff" then
+		pitch = -0.06
+		y += math.sin(t * 2) * 0.05
 	else
 		y += math.sin(t * 2) * 0.08
 	end
+
+	local resting = if state == "Idle" and animal.idleMode == "rest" then 1 else 0
+	animal.sink += (resting - animal.sink) * math.min(1, dt * 4)
+	y -= animal.halfHeight * REST_SINK * animal.sink
 
 	local cf = CFrame.new(animal.pos.X, y, animal.pos.Z) * CFrame.Angles(0, animal.yaw + extraYaw, 0) * CFrame.Angles(pitch, 0, roll)
 	animal.root.CFrame = cf
@@ -543,6 +632,8 @@ function AnimalService.init(dependencies: Deps)
 				bestDistance = math.huge,
 				lastProgressAt = 0,
 				phase = random:NextNumber(0, 10),
+				idleMode = "wander",
+				sink = 0,
 			}
 			spawnModel(animal)
 			animal.pos = clampToIsland(animal, home)
@@ -590,6 +681,8 @@ function AnimalService.init(dependencies: Deps)
 				bestDistance = math.huge,
 				lastProgressAt = 0,
 				phase = random:NextNumber(0, 10),
+				idleMode = "wander",
+				sink = 0,
 				slot = { habitat = habitatId, index = index, cursor = cursor, since = os.clock(), luredUntil = 0, lockedUntil = 0 },
 			}
 			spawnModel(animal)
@@ -615,6 +708,7 @@ function AnimalService.init(dependencies: Deps)
 					Guard.run("Animal reset " .. animal.id, resetAnimal, animal)
 				end
 			end
+			Guard.run("Animal separation", separate)
 		end
 		for _, animal in ipairs(animals) do
 			if animal.root.Parent then

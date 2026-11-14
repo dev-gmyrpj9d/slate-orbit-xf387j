@@ -1,2 +1,4 @@
 [tools]
 "github:lune-org/lune" = "0.11.1"
+"github:JohnnyMorganz/StyLua" = "2.6.0"
+"github:JohnnyMorganz/luau-lsp" = "1.70.1"

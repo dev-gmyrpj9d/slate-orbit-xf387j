@@ -8,6 +8,7 @@ local Config = require(Shared:WaitForChild("Config"))
 local Rng = require(Shared:WaitForChild("Rng"))
 
 local WorldBuilder = require(script.Parent.World.WorldBuilder)
+local Ambience = require(script.Parent.World.Ambience)
 local Services = script.Parent.Services
 local DataService = require(Services.DataService)
 local StateService = require(Services.StateService)
@@ -24,6 +25,7 @@ if not world then
 	world = WorldBuilder.build(workspace, Config, Rng)
 end
 assert(world, "world folder missing")
+Ambience.apply()
 
 local getProfile = DataService.getProfile
 local markDirty = StateService.markDirty

@@ -9,6 +9,7 @@ local Store = require(Controllers:WaitForChild("Store"))
 local Effects = require(Controllers:WaitForChild("Effects"))
 local ThrowController = require(Controllers:WaitForChild("ThrowController"))
 local WorldVisuals = require(Controllers:WaitForChild("WorldVisuals"))
+local AnimalAnimator = require(Controllers:WaitForChild("AnimalAnimator"))
 local Hud = require(Controllers:WaitForChild("Hud"))
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -21,6 +22,7 @@ Store.init()
 Effects.init()
 ThrowController.init()
 Hud.init()
+AnimalAnimator.init()
 task.spawn(WorldVisuals.init)
 
 -- The server sends one full snapshot and then numbered deltas. A delta that doesn't follow the

@@ -1,7 +1,8 @@
 --!strict
--- Client-only visuals and audio: renders thrown food along the server-broadcast arc, bursts,
--- floating reward text and sounds. Bounded by Config.Caps.ClientEffects and the reduced-effects
--- setting. Purely cosmetic: nothing here affects rewards.
+-- Client-only visuals and audio: renders thrown food along the server-broadcast arc (with a
+-- short trail), bursts, catch rings, hearts, floating reward text and sounds. Bounded by
+-- Config.Caps.ClientEffects and the reduced-effects setting. Purely cosmetic: nothing here
+-- affects rewards.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -17,14 +18,22 @@ local Ui = require(script.Parent.Ui)
 local Effects = {}
 
 -- Built-in engine content sounds (no uploaded assets). If a path is unavailable the sound is
--- silently skipped.
-local SOUNDS: { [string]: { id: string, speed: number, volume: number } } = {
-	throw = { id = "rbxasset://sounds/action_swim.mp3", speed = 1.6, volume = 0.35 },
-	eat = { id = "rbxasset://sounds/action_jump_land.mp3", speed = 1.5, volume = 0.5 },
-	splash = { id = "rbxasset://sounds/impact_water.mp3", speed = 1.2, volume = 0.35 },
-	reward = { id = "rbxasset://sounds/electronicpingshort.wav", speed = 1.2, volume = 0.35 },
-	click = { id = "rbxasset://sounds/electronicpingshort.wav", speed = 1.8, volume = 0.15 },
+-- silently skipped. Each cue gets a little random pitch (`jitter`) so repeats don't sound
+-- mechanical, and cues that share a file are pitched apart so they stay recognisable.
+type SoundDef = { id: string, speed: number, volume: number, jitter: number? }
+local SOUNDS: { [string]: SoundDef } = {
+	throw = { id = "rbxasset://sounds/swoosh.wav", speed = 1.25, volume = 0.3, jitter = 0.08 },
+	eat = { id = "rbxasset://sounds/action_jump_land.mp3", speed = 1.5, volume = 0.5, jitter = 0.1 },
+	refuse = { id = "rbxasset://sounds/action_jump_land.mp3", speed = 0.7, volume = 0.35, jitter = 0.05 },
+	splash = { id = "rbxasset://sounds/impact_water.mp3", speed = 1.2, volume = 0.35, jitter = 0.1 },
+	thud = { id = "rbxasset://sounds/action_jump_land.mp3", speed = 1.05, volume = 0.25, jitter = 0.1 },
+	reward = { id = "rbxasset://sounds/electronicpingshort.wav", speed = 1.2, volume = 0.3, jitter = 0.04 },
+	perfect = { id = "rbxasset://sounds/electronicpingshort.wav", speed = 1.6, volume = 0.4 },
+	click = { id = "rbxasset://sounds/clickfast.wav", speed = 1.1, volume = 0.3, jitter = 0.05 },
+	chime = { id = "rbxasset://sounds/electronicpingshort.wav", speed = 0.75, volume = 0.45 },
+	fanfare = { id = "rbxasset://sounds/victory.wav", speed = 1, volume = 0.3 },
 }
+local random = Random.new()
 
 local folder: Folder
 local sounds: { [string]: Sound } = {}
@@ -37,8 +46,20 @@ function Effects.play(name: string)
 		return
 	end
 	local sound = sounds[name]
-	if sound then
+	local def = SOUNDS[name]
+	if sound and def then
+		local jitter = def.jitter or 0
+		sound.PlaybackSpeed = def.speed * (1 + random:NextNumber(-jitter, jitter))
 		SoundService:PlayLocalSound(sound)
+	end
+end
+
+-- Shared impact sounds (everyone's throws) only play when they happen near this player's camera.
+local HEAR_DISTANCE = 80
+local function playNear(name: string, position: Vector3)
+	local camera = workspace.CurrentCamera
+	if camera and (camera.CFrame.Position - position).Magnitude <= HEAR_DISTANCE then
+		Effects.play(name)
 	end
 end
 
@@ -132,16 +153,116 @@ function Effects.burst(position: Vector3, color: Color3, count: number)
 	Debris:AddItem(anchor, 1.2)
 end
 
+-- Billboard glyphs that drift up and fade (hearts for a happy animal, a puff for a refusal).
+local function glyphs(position: Vector3, text: string, color: Color3, count: number, rise: number)
+	if reduced() or not transient(1.4) then
+		return
+	end
+	local anchor = Ui.new("Part", {
+		Anchored = true,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		Transparency = 1,
+		Size = Vector3.one * 0.2,
+		CFrame = CFrame.new(position),
+		Parent = folder,
+	})
+	local items = {}
+	for i = 1, count do
+		local gui = Ui.new("BillboardGui", {
+			Size = UDim2.fromOffset(34, 34),
+			StudsOffset = Vector3.new(random:NextNumber(-1.2, 1.2), 0, 0),
+			LightInfluence = 0,
+			MaxDistance = 120,
+			Parent = anchor,
+		})
+		local label = Ui.new("TextLabel", {
+			Size = UDim2.fromScale(1, 1),
+			BackgroundTransparency = 1,
+			Text = text,
+			TextScaled = true,
+			FontFace = Ui.TitleFont,
+			TextColor3 = color,
+			TextStrokeTransparency = 0.4,
+			TextStrokeColor3 = Color3.fromRGB(70, 40, 60),
+			Parent = gui,
+		})
+		items[i] = { gui = gui, label = label, delay = (i - 1) * 0.12, sway = random:NextNumber(0, math.pi * 2) }
+	end
+	local start = os.clock()
+	local connection
+	connection = RunService.RenderStepped:Connect(function()
+		local elapsed = os.clock() - start
+		if elapsed >= 1.3 or not anchor.Parent then
+			connection:Disconnect()
+			anchor:Destroy()
+			return
+		end
+		for _, item in ipairs(items) do
+			local alpha = math.clamp((elapsed - item.delay) / 1, 0, 1)
+			local offset = item.gui.StudsOffset
+			item.gui.StudsOffset = Vector3.new(offset.X, alpha * rise, math.sin(item.sway + elapsed * 5) * 0.3)
+			item.label.TextTransparency = if alpha <= 0 then 1 else math.max(0, alpha * 1.6 - 0.6)
+			item.label.TextStrokeTransparency = math.max(0.4, item.label.TextTransparency)
+		end
+	end)
+end
+
+function Effects.hearts(position: Vector3)
+	glyphs(position, "♥", Color3.fromRGB(255, 120, 160), 3, 3)
+end
+
+function Effects.puff(position: Vector3)
+	glyphs(position, "~", Color3.fromRGB(200, 200, 210), 2, 1.6)
+end
+
+-- A flat ring that widens and fades around the mouth on a perfect catch.
+function Effects.ring(position: Vector3, color: Color3)
+	if reduced() or not transient(0.6) then
+		return
+	end
+	local ring = Ui.new("Part", {
+		Shape = Enum.PartType.Cylinder,
+		Anchored = true,
+		CanCollide = false,
+		CanQuery = false,
+		CanTouch = false,
+		CastShadow = false,
+		Material = Enum.Material.Neon,
+		Color = color,
+		Transparency = 0.2,
+		Size = Vector3.new(0.15, 1, 1),
+		CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90)),
+		Parent = folder,
+	})
+	local start = os.clock()
+	local connection
+	connection = RunService.RenderStepped:Connect(function()
+		local alpha = (os.clock() - start) / 0.5
+		if alpha >= 1 or not ring.Parent then
+			connection:Disconnect()
+			ring:Destroy()
+			return
+		end
+		local eased = 1 - (1 - alpha) ^ 3
+		local diameter = 1 + eased * 7
+		ring.Size = Vector3.new(0.15, diameter, diameter)
+		ring.Transparency = 0.2 + alpha * 0.8
+	end)
+end
+
 local function foodPart(foodId: string): BasePart
 	local food = Config.Foods[foodId] or Config.Foods.sunberry
-	return Ui.new("Part", {
+	local color = Color3.fromRGB(food.Color[1], food.Color[2], food.Color[3])
+	local part = Ui.new("Part", {
 		Name = food.Name,
 		Shape = if food.Shape == "Ball"
 			then Enum.PartType.Ball
 			elseif food.Shape == "Cylinder" then Enum.PartType.Cylinder
 			else Enum.PartType.Block,
 		Size = Vector3.one * food.Size,
-		Color = Color3.fromRGB(food.Color[1], food.Color[2], food.Color[3]),
+		Color = color,
 		Material = Enum.Material.SmoothPlastic,
 		Anchored = true,
 		CanCollide = false,
@@ -149,6 +270,24 @@ local function foodPart(foodId: string): BasePart
 		CanTouch = false,
 		Parent = folder,
 	})
+	if not reduced() then
+		-- A short tapered streak in the food's colour makes the arc easy to follow.
+		local half = food.Size * 0.3
+		local a0 = Ui.new("Attachment", { Position = Vector3.new(0, half, 0), Parent = part })
+		local a1 = Ui.new("Attachment", { Position = Vector3.new(0, -half, 0), Parent = part })
+		Ui.new("Trail", {
+			Attachment0 = a0,
+			Attachment1 = a1,
+			Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.35)),
+			Transparency = NumberSequence.new(0.35, 1),
+			WidthScale = NumberSequence.new(1, 0),
+			Lifetime = 0.22,
+			LightEmission = 0.25,
+			FaceCamera = true,
+			Parent = part,
+		})
+	end
+	return part
 end
 
 local function removeProjectile(id: number)
@@ -184,16 +323,24 @@ local function onFx(payload: any)
 		removeProjectile(payload.id)
 		if payload.kind == "splash" then
 			Effects.burst(payload.pos, Color3.fromRGB(150, 220, 255), 10)
+			playNear("splash", payload.pos)
 		elseif payload.kind == "feast" then
 			Effects.burst(payload.pos, Color3.fromRGB(255, 220, 120), 20)
-			Effects.play("eat")
+			playNear("eat", payload.pos)
 		elseif payload.kind == "ground" then
 			Effects.burst(payload.pos, Color3.fromRGB(220, 200, 150), 6)
+			playNear("thud", payload.pos)
 		end
 	elseif kind == "fed" then
 		if payload.accepted then
-			Effects.burst(payload.pos, Color3.fromRGB(255, 130, 170), if payload.quality == "Perfect" then 18 else 10)
-			Effects.play("eat")
+			local perfect = payload.quality == "Perfect"
+			Effects.burst(payload.pos, Color3.fromRGB(255, 130, 170), if perfect then 18 else 10)
+			if perfect then
+				Effects.ring(payload.pos, QUALITY_COLORS.Perfect)
+			end
+			playNear("eat", payload.pos)
+		else
+			playNear("refuse", payload.pos)
 		end
 	elseif kind == "reward" then
 		local quality = Config.Quality[payload.quality]
@@ -208,7 +355,11 @@ local function onFx(payload: any)
 			table.insert(lines, string.format("+%d research", payload.research))
 		end
 		Effects.floatText(payload.pos, table.concat(lines, "\n"), QUALITY_COLORS[payload.quality] or Ui.Colors.White)
-		Effects.play("reward")
+		if payload.leveledUp or (payload.discovered and payload.preference == "favorite") then
+			Effects.play("fanfare")
+		elseif payload.accepted then
+			Effects.play(if payload.quality == "Perfect" then "perfect" else "reward")
+		end
 		Store.emit("reward", payload)
 	end
 end

@@ -181,13 +181,57 @@ Playtest request: polish every vehicle's 3D model, and add stronger vehicles tha
   - A locked vehicle never spawns, not even on respawn or from the pause-menu picker; a stock Sherman or P-51 is used instead.
 - **Enemy unchanged:** premium vehicles are excluded from `AI_GROUND` / `AI_AIR` and from Last Stand heavy waves, so the enemy never fields them. `ENEMY_AI` is unchanged. Flight stays unassisted, and the Talon flies the same flight model with different numbers.
 
+## Pass 9: VFX, SFX, UI and UX polish
+
+Playtest request: improve every aspect (VFX, SFX, UX, UI and the rest) so the game is more attractive. Gameplay, difficulty, saves, unlocks and the unassisted flight model are unchanged.
+
+**VFX**
+- **Particles:** every particle (smoke, dust, fire, flashes) is now drawn as a faceted low-poly ball instead of a cube. It is still one instanced draw, inside the same particle budget.
+- **Cannon fire:** a bright two-stage muzzle flash, plus a blast-dust ring kicked up from the ground in front of the gun.
+- **Explosions and kills:** a short emissive flash and an expanding ground dust ring.
+- **Impacts:** hot sparks and a smoke wisp for a penetration, and a fan of bright streaks for a ricochet or non-penetration.
+- **Camera shake:**
+  - when you fire, when you are hit, and from explosions nearby
+  - capped at a small amplitude and fading within a fraction of a second
+  - it moves only the camera, never the aim
+  - Off / Reduced / Full in Settings, and Off by default under `prefers-reduced-motion`
+- **Low integrity:** below 35% integrity a red edge glow pulses slowly (never a flash); it can be turned off. The damage flash is slightly softer.
+- **Hit confirmation:** tank crosshairs now show yellow ticks on every hit, as the aircraft sight already did.
+
+**SFX**
+- **Mixer:** separate buses for combat effects, engines/ambience and interface feed a master gain and a compressor, so many explosions at once don't clip.
+- **Gesture start:** the AudioContext starts on the first click or key press. Nothing is queued while the browser keeps audio suspended.
+- **Voice cap:** at most 48 voices; quiet sounds are dropped first.
+- **Positional sound:** guns and explosions are placed in stereo by screen direction and muffled with distance.
+- **Cannon:** a layered sub thump, a filtered-noise body and a close-range crack.
+- **Hits:** your hits clang on a penetration and whine on a ricochet. Being hit gives a heavy clank or a ricochet whine.
+- **Bombs and engines:** bombs reuse the positional explosion sound. Engines get a sub-octave growl.
+- **Ambience:** a soft wind bed and an occasional distant artillery rumble during battle.
+- **Interface:** soft ticks for buttons and for opening and closing windows.
+
+**UI and UX**
+- **Settings window** (hangar Menu, or the pause screen):
+  - master, effects, engine/ambience and interface volume, and mute
+  - mouse sensitivity, camera shake, the low-integrity glow, enemy markers and graphics quality
+  - saved in `steelfront.settings`, apart from the profile, so a progress reset keeps them; unreadable or out-of-range values are clamped or ignored
+- **New keys:** **N** mutes or unmutes anywhere. **H** shows a controls card for your current vehicle. A small hint line (`H controls · N mute · Esc pause & settings`) sits at the bottom of the battle HUD.
+- **Pause screen:** Resume, Settings and Leave now sit at the top instead of below a long scroll.
+- **Deploying:** fades in from black.
+- **Help:** the in-game help and the controls tables cover all of this.
+
+**Known limits**
+- **Particle style:** effects are low-poly particles rather than textured sprites, which keeps the game's look and needs no image assets.
+- **No 3D audio:** sounds are panned left/right, not run through HRTF panning.
+- **No music:** battles have no soundtrack; the intro keeps its own score.
+- **Test hook:** `steelFront.timeScale` (console only) slows the simulation to capture short effects in screenshots.
+
 ## Testing
 
 ```sh
 node steelfront/tests/run-selftest.mjs    # exits 0 on PASS; set CHROME=/path/to/chrome if it isn't on PATH
 ```
 
-You can also open `steelfront.html?selftest` in any browser. The page runs 164 seeded checks and shows the results on screen. The checks cover:
+You can also open `steelfront.html?selftest` in any browser. The page runs 185 seeded checks and shows the results on screen. The checks cover:
 
 - the armour lookup and damage model
 - each fix above, as a regression check
@@ -200,6 +244,7 @@ You can also open `steelfront.html?selftest` in any browser. The page runs 164 s
 - field objectives: scheduling, spot choice, the supply crate (not while landing, full repair, an enemy reaching it first), the relay (contested, reveal, tickets), the commander, the supply column (passive trucks, the bonus, no respawn, escaping), AI diverts, HUD drawing, rewards, the final push trigger and ticket costs, the Conquest momentum line, Breakthrough reinforcements, the Last Stand crate, and that `ENEMY_AI` is unchanged
 - match flow: every mode runs to a timed result with rewards, a final-push kill can win the battle, and a 90 s Air Superiority battle with a supply column runs clean
 - vehicle models and premium vehicles: every model builds (with low-detail copies, and a prop-less jet), the weathering pass, premium stats beat the stock line-up, premium vehicles never appear in AI slots or Last Stand waves, failed and two-step purchases, the exact deduction, no double buy, ownership through save and load (junk dropped, old saves fine), locked vehicles falling back to stock at spawn and respawn, a 20 s Talon flight, rendering every premium vehicle with the HUD, and the hangar's price, shortfall, locked TO BATTLE and owned states
+- audio, settings and effects: safe settings loading, the audio buses, nothing queued while suspended, stereo placement, shake off / capped / fading / reduced and never moving the aim, effect particles within budget and expiring, a clean start for each battle, the low-integrity glow and its setting, the H card, N mute, the pause bar, the settings window and live sliders, and that the enemy AI handicap is untouched
 - lock-on test setup: the lane must be visible from the rocket pods as well as the seeker, and the test aircraft flies at an altitude the seeker can see (both used to fail on some random maps)
 - two 150 s simulated battles (Conquest and Last Stand) checked for exceptions, NaNs and zombie crews
 
@@ -221,5 +266,6 @@ Run this in a real browser after changes to gameplay, HUD or input.
 10. Deploy the Hornet R-5, then the P-51D Kestrel. Hold an enemy inside the dashed circle: the yellow box turns red (LOCKED), R fires, and the rocket curves onto the target. A friendly unit never locks.
 11. Tab shows the scoreboard, P the FPS counter and Esc pauses. Leaving to the hangar pays no rewards.
 12. Wait about a minute in Conquest: a field objective is announced and the gold line under the clock tracks it. Drive into a supply crate (full repair), hold a relay for 12 s (enemies revealed, enemy −15 tickets), and in an aircraft find the gold trucks or the ★ commander. With 4 minutes left, FINAL PUSH appears and the line under the clock says so.
+15. Open Menu → Settings: move Master volume and Camera shake, reload the page, and they are kept. In battle, N mutes, H shows the controls card, firing gives a muzzle flash and a dust ring, and below 35% integrity the edges glow red.
 14. In the hangar, pick the Titan HX-9 with too few credits: the card shows 🔒 75,000 Cr, the panel shows the shortfall and TO BATTLE is disabled. With enough credits, Unlock → Confirm takes exactly the price, the card shows ★ owned, and the Titan deploys. Reload the page: it is still owned.
 13. Destroy two enemies within 12 s: the banner reads DOUBLE KILL, and the popups list the kill points and bonuses without covering the hit report. At the end of the battle the rewards screen shows the score, mastery stars and medals, and the hangar card shows the vehicle's stars.

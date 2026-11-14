@@ -60,6 +60,21 @@
   #hitmsg { position: fixed; left: 50%; top: 62%; transform: translateX(-50%); font: bold 20px system-ui, sans-serif; letter-spacing: 1px; text-shadow: 2px 2px 0 #000; pointer-events: none; text-align: center; white-space: pre; }
   #center { position: fixed; left: 50%; top: 28%; transform: translateX(-50%); font: bold 22px system-ui, sans-serif; text-shadow: 2px 2px 0 #000; pointer-events: none; text-align: center; white-space: pre; }
   #dmg { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 160px rgba(255,0,0,.75); opacity: 0; }
+  #pauseBar { display: none; gap: 8px; justify-content: center; margin: 0 0 12px; } #pauseBar button { margin: 0; }
+  #overlay.paused #pauseBar { display: flex; }
+  #lowhp { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 200px 30px rgba(170,10,0,.85); opacity: 0; }
+  #fade { position: fixed; inset: 0; pointer-events: none; background: #05070b; opacity: 0; transition: opacity .7s ease; z-index: 4; }
+  #fade.on { opacity: 1; transition: none; }
+  #keycard { position: fixed; left: 50%; bottom: 120px; transform: translateX(-50%); padding: 10px 14px; background: rgba(8,12,18,.82); border: 1px solid rgba(255,255,255,.22); border-radius: 8px; font: 12px/1.5 system-ui, sans-serif; pointer-events: none; z-index: 3; max-width: 720px; }
+  #keycard table td:nth-child(odd) { color: #ffcf5a; font: bold 11px ui-monospace, Menlo, Consolas, monospace; padding-right: 8px; white-space: nowrap; }
+  #keycard table td:nth-child(even) { padding-right: 18px; }
+  #keyHint { position: fixed; left: 300px; bottom: 16px; font: 11px system-ui, sans-serif; opacity: .65; pointer-events: none; text-shadow: 1px 1px 0 #000; }
+  .setrow { display: grid; grid-template-columns: 170px 1fr 52px; align-items: center; gap: 10px; margin: 4px 0; }
+  .setrow.ck { grid-template-columns: 22px 1fr; }
+  .setrow b { font: 11px ui-monospace, Menlo, Consolas, monospace; text-align: right; opacity: .8; }
+  .setrow input[type=range] { width: 100%; accent-color: #ffcf5a; }
+  .setrow select { background: #1b2430; color: #fff; border: 1px solid rgba(255,255,255,.25); border-radius: 4px; padding: 3px 6px; }
+  body.cine-on #lowhp, body.lobby-on #lowhp, body.lobby-on #keyHint, body.cine-on #keyHint, body.lobby-on #keycard { display: none; }
   #scoreboard { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); display: none; gap: 20px; padding: 16px 20px; background: rgba(10,14,24,.88); border: 1px solid rgba(255,255,255,.2); border-radius: 8px; font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; }
   #scoreboard table { border-collapse: collapse; min-width: 260px; }
   #scoreboard td { padding: 0 8px; }
@@ -258,7 +273,8 @@
 <canvas id="game"></canvas>
 <canvas id="hud2d"></canvas>
 <div id="vignette"></div>
-<div id="dmg"></div>
+<div id="dmg"></div><div id="lowhp"></div><div id="fade"></div>
+<div id="keycard" hidden></div><div id="keyHint">H controls · N mute · Esc pause &amp; settings</div>
 <div id="top">
   <div class="tickets" id="tkA"><i></i><span></span></div>
   <div id="mid"><div id="clock" role="timer" aria-label="Time remaining">20:00</div><div id="zones"></div><div id="modeLbl"></div><div id="evLbl" role="status" aria-live="polite"></div></div>
@@ -286,6 +302,7 @@
   <div id="panel">
     <h1 id="title">STEEL FRONT</h1>
     <p class="sub" id="sub">8 vs 8 combined-arms battle · tanks on the ground, fighters and attackers overhead · 20-minute battles: capture the zones, drain the enemy tickets</p>
+    <div id="pauseBar"><button data-p="play">&#9654; Resume</button><button data-p="settings" class="secondary">&#9881; Settings</button><button data-p="toHangar" class="secondary">Leave to hangar</button></div>
     <div id="tabs"><button id="tabGround" class="sel">Ground forces</button><button id="tabAir">Aircraft</button></div>
     <div id="cards"></div>
     <div id="detail"></div>
@@ -296,6 +313,7 @@
       <tr><td>F</td><td>Repair (10 s, tank stays put) · extinguish fire</td><td>Tab / Esc</td><td>Scoreboard / pause</td></tr>
       <tr><td>1 / 2 / 3</td><td>Load AP / APHE / HE</td><td>P</td><td>Frame-rate counter</td></tr>
       <tr><td>M</td><td>Enemy markers on / off</td><td>R</td><td>Fire lock-on rocket (Hornet R-5)</td></tr>
+      <tr><td>H</td><td>Controls card on / off</td><td>N</td><td>Mute / unmute sound</td></tr>
     </table>
     <table class="ctl" id="ctlAir" style="display:none">
       <tr><td>Mouse</td><td>Mouse-aim: the plane flies toward the circle</td><td>Left click</td><td>Fire guns</td></tr>
@@ -305,7 +323,7 @@
       <tr><td>C (hold)</td><td>Free look</td><td>Shift / RMB</td><td>Zoom</td></tr>
       <tr><td>T</td><td>Rearm all weapons (15 s)</td><td>F</td><td>Repair airframe (15 s)</td></tr>
       <tr><td>Tab</td><td>Scoreboard</td><td>Esc</td><td>Pause</td></tr>
-      <tr><td>M</td><td>Enemy markers on / off</td><td></td><td></td></tr>
+      <tr><td>M</td><td>Enemy markers on / off</td><td>H / N</td><td>Controls card / mute</td></tr>
       <tr><td>P</td><td>Frame-rate counter</td><td></td><td></td></tr>
     </table>
     <p class="hint" id="hintGround" style="margin:-4px 0 10px">Spotted enemies (seen by you or an ally, or just fired near your side) get a red marker with their range, a red arrow at the screen edge when off-screen and a red square on the minimap; a red arc around the crosshair points to whoever just hit you. The small circle shows where your gun is really pointed; over an enemy it turns green (shell gets through), yellow (maybe), red (no) or grey (ricochet). Angle your front armour, hit enemy sides &amp; rear, shoot tracks to immobilise. Penetrations knock out crew: lose all but one and the tank is lost. APHE wrecks crews, AP gets through thicker plate, HE is for open-topped vehicles. Lock-on rockets (Hornet R-5 tank, P-51D Kestrel plane): keep an enemy tank or aircraft inside the dashed circle; the yellow box closes in and turns red when LOCKED, then press R and the rocket steers itself to it.</p>
@@ -315,6 +333,7 @@
     <button id="restart" class="secondary" style="display:none">New battle</button>
     <button id="toHangar" class="secondary" style="display:none">Back to hangar</button>
     <button id="intro" class="secondary" title="Replay the cinematic intro">&#9654; Watch intro</button>
+    <button id="settings" class="secondary" title="Sound, camera shake, mouse sensitivity, markers and graphics">&#9881; Settings</button>
     <button id="gfx" class="secondary" title="Auto lowers or raises shadows, ground detail, anti-aliasing and render resolution to keep the game smooth">Graphics: Auto</button>
     <button id="download" class="download" title="Save steelfront.html to your computer">&#11015; Download game (play offline)</button>
     <p class="hint">Saves this single HTML file. Open it in any browser, no internet needed.</p>
@@ -332,6 +351,7 @@
   <div id="lbBattle"><button id="lbGo" type="button">TO BATTLE!</button><div id="lbGoSub"></div></div>
   <div id="lbMenu" class="pn" role="menu">
     <button id="lbIntro" role="menuitem">&#9654; Watch intro</button>
+    <button id="lbSettings" role="menuitem">&#9881; Settings (sound, camera, graphics)</button>
     <button id="lbGfx" role="menuitem">Graphics: Auto</button>
     <button id="lbHelp" role="menuitem">Controls &amp; rules</button>
     <button id="lbDownload" role="menuitem">&#11015; Download game (play offline)</button>
@@ -2134,6 +2154,13 @@ const broadleafLo = (() => {
 })();
 pineMesh.lo = pineLo; broadleafMesh.lo = broadleafLo;
 const TREE_LOD = 200;
+// particles: a 36-triangle faceted ball instead of a cube, so smoke, dust, fire and flashes read as soft puffs
+// (same unit size as the cube, still one instanced draw for every particle)
+const puffMesh = (() => {
+  const b = builder(), ring = (y, r, k) => { const o = []; for (let i = 0; i < 6; i++) { const a = (i + k * 0.5) / 6 * Math.PI * 2; o.push([Math.cos(a) * r, y, Math.sin(a) * r]); } return o; };
+  addLoft(b, [ring(-0.5, 0.0005, 0), ring(-0.2, 0.47, 1), ring(0.2, 0.47, 0), ring(0.5, 0.0005, 1)], [1, 1, 1], false, false);
+  return finish(b);
+})();
 const flagMesh = (() => { const b = builder(); addBox(b, chain(trans(1.6, 9, 0), scl(3, 1.8, 0.1)), [1, 1, 1]); return finish(b); })();
 
 // ---------------------------------------------------------------- world generation
@@ -2824,7 +2851,8 @@ function fire(t) {
   t.reloadT = t.reloadFull = T.reload * (t.breechT > 0 ? 1.6 : 1) * loaderK(t); t.recoil = 0.45;
   for (let i = 0; i < 7; i++) puff(vadd(m, vscale(d, rand(0, 1.5))), vadd(vscale(d, rand(4, 14)), [rand(-2, 2), rand(-2, 2), rand(-2, 2)]), [1, 0.75, 0.3], rand(0.4, 0.9), 0.12, 0, 1, -1);
   for (let i = 0; i < 8; i++) puff(vadd(m, vscale(d, rand(0, 3))), vadd(vscale(d, rand(1, 5)), [rand(-1.5, 1.5), rand(0, 2), rand(-1.5, 1.5)]), [0.72, 0.7, 0.66], rand(0.8, 1.6), rand(0.5, 1.0), 0, 0, 1.0, 0.45);
-  sfxBoom(t);
+  muzzleFx(t, m, d);
+  sfxCannon(t);
 }
 function hitPlane(t, a, b) {
   const T = t.type, H = T.hit, rel = p => { const q = vsub(p, t.pos); return [vdot(t.X, q), vdot(t.Y, q), vdot(t.Z, q)]; };
@@ -2945,6 +2973,7 @@ function impact(s, hit) {
     for (let i = 0; i < 8; i++) puff(p, [rand(-3, 3), rand(0, 5), rand(-3, 3)], [1, 0.6, 0.2], rand(0.3, 0.7), 0.25, 2, 1, -1);
   }
   if (result !== "PENETRATION") sparks(p, s.small ? 2 : 10);
+  if (!s.small) impactFx(p, result, s.v ? vnorm(s.v) : null);
   // HE that fails to get through still bursts on the plate (blast and fragments outside the armour)
   if (s.ammo === "he" && result !== "PENETRATION") explode(p, s.he, shooter, t, s, null);
   const crewOut = t.alive && t.crew && crewLeft(t) < 2;
@@ -2972,7 +3001,7 @@ function destroyTank(t, killer, crashed = false) {
   for (let i = 0; i < 30; i++) puff(p, [rand(-6, 6), rand(2, 14), rand(-6, 6)], [1, rand(0.4, 0.7), 0.15], rand(0.4, 1.0), rand(0.5, 1.5), 1, 1, 0.8);
   for (let i = 0; i < 18; i++) puff(p, [rand(-3, 3), rand(2, 7), rand(-3, 3)], [0.2, 0.2, 0.2], rand(1.5, 3), rand(2, 3), 0, 0, 1.3, 0.8);
   for (let i = 0; i < 10; i++) puff(p, [rand(-9, 9), rand(6, 14), rand(-9, 9)], [0.15, 0.15, 0.14], rand(1, 2), 0.35, 14, 0, 0);
-  sfxBoom(t, 1.6);
+  sfxBoom(t, 1.6); blastFx(p, t.type.air ? 1 : 1.3);
   const cls = x => x.isPlayer ? "me" : x.team === 0 ? "ally" : "enemy";
   feed(killer ? `<span class="${cls(killer)}">${killer.name}</span> &#10148; <span class="${cls(t)}">${t.name}</span>` : `<span class="${cls(t)}">${t.name}</span> ${crashed ? "crashed" : "destroyed"}`);
 }
@@ -3759,7 +3788,7 @@ function explode(p, he, owner, direct, s, hit) {
   for (let i = 0; i < (big ? 40 : 16); i++) puff(p, [rand(-1, 1) * he.R, rand(2, he.R * 1.2), rand(-1, 1) * he.R], [1, rand(0.4, 0.7), 0.15], rand(0.4, 1.0), rand(0.8, he.R * 0.18), 2, 1, 0.8);
   for (let i = 0; i < (big ? 26 : 10); i++) puff(p, [rand(-4, 4), rand(2, 8), rand(-4, 4)], [0.28, 0.25, 0.22], rand(2, 4), rand(1.5, he.R * 0.2), 0, 0, 1.6, 0.8);
   for (let i = 0; i < 14; i++) puff(p, [rand(-12, 12), rand(8, 22), rand(-12, 12)], [0.35, 0.3, 0.24], rand(1, 2), 0.3, 14, 0, 0);
-  noiseHit(volAt(p) * (big ? 1.6 : 0.9), 2200, 60, big ? 1.6 : 0.8); tone("sine", 55, volAt(p) * 0.8, 0.8, 25);
+  sfxBoom(p, big ? 1.7 : 1); blastFx(p, big ? 1.6 : 1);
   if (owner.isPlayer && (vlen(vsub(p, cam.pos)) < 300)) dmgFlash = Math.max(dmgFlash, 0.1);
   const msgs = [];
   if (he.dmg > 0) for (const t of tanks) { // a crash fireball (dmg 0) is effects only: no hits, no "Hit by bomb"
@@ -3990,41 +4019,198 @@ function updateAirAI(t, dt) {
 }
 
 // ---------------------------------------------------------------- audio (synthesised)
-let AC = null, master = null, noiseBuf = null, engOsc = null, engGain = null, engFilter = null;
+// ---- settings (saved in localStorage "steelfront.settings", separate from the profile so a progress reset keeps them)
+// vol: master · sfx: combat effects · eng: engines and ambience · ui: menu and HUD sounds · shake: camera shake
+// (0 off, 0.5 reduced, 1 full; off by default when the OS asks for reduced motion) · sens: mouse sensitivity ·
+// lowhp: the low-integrity edge glow
+const SET_KEY = "steelfront.settings";
+const SET_DEF = { vol: 0.8, sfx: 1, eng: 0.7, ui: 0.8, mute: false, shake: 1, sens: 1, lowhp: true };
+let SET = { ...SET_DEF };
+function loadSettings(raw = null) {
+  const s = { ...SET_DEF };
+  if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) s.shake = 0;
+  try {
+    const p = JSON.parse(raw !== null ? raw : localStorage.getItem(SET_KEY) || "null");
+    if (p && typeof p === "object") {
+      for (const k of ["vol", "sfx", "eng", "ui"]) if (typeof p[k] === "number" && isFinite(p[k])) s[k] = clamp(p[k], 0, 1);
+      if (typeof p.shake === "number" && [0, 0.5, 1].includes(p.shake)) s.shake = p.shake;
+      if (typeof p.sens === "number" && isFinite(p.sens)) s.sens = clamp(p.sens, 0.3, 2.5);
+      if (typeof p.mute === "boolean") s.mute = p.mute;
+      if (typeof p.lowhp === "boolean") s.lowhp = p.lowhp;
+    }
+  } catch (e) { /* unreadable: defaults */ }
+  SET = s; applyAudioSettings();
+}
+function saveSettings() { if (SELFTEST) return; try { localStorage.setItem(SET_KEY, JSON.stringify(SET)); } catch (e) { /* not persisted */ } }
+// ---- audio: one context created on the first user gesture (browsers block autoplay); buses per category feed a
+// master gain and a compressor so many explosions at once do not clip. Combat sounds are placed in stereo and
+// muffled with distance. A voice cap drops quiet sounds when too many play at once.
+let AC = null, master = null, comp = null, noiseBuf = null, engOsc = null, engSub = null, engGain = null, engFilter = null;
+let BUS = {}, voices = 0, ambSrc = null, ambGain = null, ambT = 0;
+const MAX_VOICES = 48;
+function applyAudioSettings() {
+  if (!AC) return;
+  const t = AC.currentTime, set = (g, v) => g && g.gain.setTargetAtTime(v, t, 0.03);
+  set(master, SET.mute ? 0 : SET.vol * 0.7); set(BUS.sfx, SET.sfx); set(BUS.eng, SET.eng); set(BUS.ui, SET.ui);
+}
 function initAudio() {
-  if (AC) { AC.resume(); return; }
+  if (AC) { if (AC.state === "suspended") AC.resume(); return; }
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
-    master = AC.createGain(); master.gain.value = 0.55; master.connect(AC.destination);
-    noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+    comp = AC.createDynamicsCompressor(); comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 5; comp.attack.value = 0.004; comp.release.value = 0.25;
+    master = AC.createGain(); master.connect(comp); comp.connect(AC.destination);
+    for (const k of ["sfx", "eng", "ui"]) { BUS[k] = AC.createGain(); BUS[k].connect(master); }
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
     const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
     engOsc = AC.createOscillator(); engOsc.type = "sawtooth"; engOsc.frequency.value = 40;
+    engSub = AC.createOscillator(); engSub.type = "square"; engSub.frequency.value = 20; // a sub-octave growl under the engine
+    const subG = AC.createGain(); subG.gain.value = 0.35;
     engFilter = AC.createBiquadFilter(); engFilter.type = "lowpass"; engFilter.frequency.value = 260;
     engGain = AC.createGain(); engGain.gain.value = 0;
-    engOsc.connect(engFilter); engFilter.connect(engGain); engGain.connect(master); engOsc.start();
+    engOsc.connect(engFilter); engSub.connect(subG); subG.connect(engFilter); engFilter.connect(engGain); engGain.connect(BUS.eng); engOsc.start(); engSub.start();
+    // ambience: a soft wind bed, only audible during battle (see audioStep)
+    ambSrc = AC.createBufferSource(); ambSrc.buffer = noiseBuf; ambSrc.loop = true;
+    const bp = AC.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 420; bp.Q.value = 0.6;
+    ambGain = AC.createGain(); ambGain.gain.value = 0;
+    ambSrc.connect(bp); bp.connect(ambGain); ambGain.connect(BUS.eng); ambSrc.start();
+    applyAudioSettings();
   } catch (e) { AC = null; }
 }
-function noiseHit(vol, f0, f1, dur, out = master) {
-  if (!AC || !out || vol < 0.01) return;
-  const t0 = AC.currentTime, src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
-  src.buffer = noiseBuf; f.type = "lowpass";
-  f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
-  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-  src.connect(f); f.connect(g); g.connect(out); src.start(t0); src.stop(t0 + dur);
+// a stereo position + distance muffling for a world point (null: centred, for your own sounds)
+function spat(p) {
+  if (!AC || !p) return BUS.sfx;
+  const r = screenDir(p), d = Math.hypot(r[0], r[1], r[2]) || 1;
+  const lp = AC.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 700 + 15000 / (1 + d / 90);
+  if (AC.createStereoPanner) { const pn = AC.createStereoPanner(); pn.pan.value = clamp(r[0] / (d + 8), -0.8, 0.8); pn.connect(lp); lp.connect(BUS.sfx); return pn; }
+  lp.connect(BUS.sfx); return lp;
 }
-function tone(type, freq, vol, dur, f1, out = master) {
-  if (!AC || !out) return;
-  const t0 = AC.currentTime, o = AC.createOscillator(), g = AC.createGain();
-  o.type = type; o.frequency.setValueAtTime(freq, t0); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+function voice(src, vol) { if (voices >= MAX_VOICES && vol < 0.2) return false; voices++; src.onended = () => { voices = Math.max(0, voices - 1); }; return true; }
+function noiseHit(vol, f0, f1, dur, out, type = "lowpass") {
+  if (!AC || AC.state !== "running" || vol < 0.01) return; // nothing queues up while the browser keeps audio suspended
+  out = out || BUS.sfx;
+  const t0 = AC.currentTime, src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+  if (!voice(src, vol)) return;
+  src.buffer = noiseBuf; f.type = type;
+  f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
   g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
-  o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + dur);
+  src.connect(f); f.connect(g); g.connect(out); src.start(t0, Math.random() * 1.5); src.stop(t0 + dur);
+}
+function tone(type, freq, vol, dur, f1, out) {
+  if (!AC || AC.state !== "running" || vol < 0.005) return;
+  out = out || BUS.sfx;
+  const t0 = AC.currentTime, o = AC.createOscillator(), g = AC.createGain();
+  if (!voice(o, vol)) return;
+  o.type = type; o.frequency.setValueAtTime(freq, t0); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.005); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + dur + 0.02);
 }
 const volAt = p => 1 / (1 + vlen(vsub(p, cam.pos)) / 60);
-function sfxBoom(t, k = 1) { const v = volAt(t.pos) * k; noiseHit(v * 0.9, 1800, 80, 0.9 * k); tone("sine", 70, v * 0.6, 0.5, 30); }
-function sfxThud(p) { noiseHit(volAt(p) * 0.35, 700, 60, 0.4); }
-function sfxPing(pen) { tone(pen ? "square" : "triangle", pen ? 520 : 1400, 0.12, 0.25, pen ? 260 : 900); }
-function sfxGun(t) { if (now - t.gunSnd < 0.07) return; t.gunSnd = now; noiseHit(volAt(t.pos) * (t.isPlayer ? 0.22 : 0.3), 2600, 300, 0.07); }
+// layered: a sub thump, a body of filtered noise and (close by) a sharp crack; far guns are muffled and placed
+function sfxCannon(t) {
+  const me = t.isPlayer, v = me ? 1 : volAt(t.pos) * 1.2, o = me ? null : spat(t.pos);
+  tone("sine", me ? 62 : 70, v * 0.55, me ? 0.45 : 0.35, 30, o);
+  noiseHit(v * 0.75, me ? 2400 : 1600, 90, me ? 0.8 : 0.6, o);
+  if (v > 0.25) noiseHit(v * 0.35, 6000, 1500, 0.09, o, "highpass");
+}
+function sfxBoom(t, k = 1) { const p = t.pos || t, v = volAt(p) * k, o = spat(p); noiseHit(v * 0.9, 1800, 60, 1.1 * k, o); tone("sine", 58, v * 0.7, 0.7, 24, o); if (k > 1.2) noiseHit(v * 0.3, 400, 40, 2.2, o); }
+function sfxThud(p) { const o = spat(p); noiseHit(volAt(p) * 0.35, 700, 60, 0.4, o); }
+// your shell hitting a target: a metallic clang on a penetration, a ricochet whine when it bounces off
+function sfxPing(pen) {
+  if (pen) { tone("triangle", 880, 0.09, 0.32, 600); tone("square", 1318, 0.035, 0.2, 990); noiseHit(0.12, 5000, 800, 0.18, null, "highpass"); }
+  else { tone("triangle", 2600, 0.06, 0.4, 900); tone("sine", 1500, 0.05, 0.25, 1100); }
+}
+function sfxGun(t) { if (now - t.gunSnd < 0.07) return; t.gunSnd = now; const o = t.isPlayer ? null : spat(t.pos); noiseHit((t.isPlayer ? 0.2 : volAt(t.pos) * 0.3), 3200, 300, 0.07, o); if (t.isPlayer) tone("square", 120, 0.03, 0.05, 70); }
 function sfxCrack() { noiseHit(0.15, 3000, 400, 0.25); }
+function sfxUi(kind = "tick") {
+  if (!AC || AC.state !== "running") return;
+  if (kind === "tick") tone("triangle", 1100, 0.035, 0.05, 900, BUS.ui);
+  else if (kind === "open") { tone("triangle", 520, 0.04, 0.09, 780, BUS.ui); }
+  else if (kind === "close") tone("triangle", 700, 0.035, 0.09, 460, BUS.ui);
+}
+// per-frame audio: battle ambience fades in and out, and a distant artillery rumble now and then
+function audioStep(dt) {
+  if (!AC || !ambGain) return;
+  const want = state === "playing" ? 0.05 : 0;
+  ambGain.gain.setTargetAtTime(want, AC.currentTime, 0.6);
+  if (state !== "playing") return;
+  ambT -= dt;
+  if (ambT <= 0) { ambT = rand(5, 12); noiseHit(rand(0.04, 0.09), 220, 35, 2.5, BUS.eng); }
+}
+
+
+// ---- combat VFX (pass 9): all particle-based, so they share the particle budget (Q.partCap) and need no cleanup
+// beyond the particle list, which newBattle() empties. Camera shake is capped, decays in a fraction of a second,
+// moves only the camera (never the aim) and follows the Camera shake setting (off for prefers-reduced-motion).
+let shakeA = 0;
+function addShake(k) { if (!SET.shake || state !== "playing") return; shakeA = Math.min(0.8, Math.max(shakeA, k * SET.shake)); }
+function applyShake(dt) {
+  if (shakeA < 0.002) { shakeA = 0; return; }
+  const a = shakeA * shakeA, o = [rand(-1, 1), rand(-1, 1), rand(-1, 1)];
+  cam.pos = vadd(cam.pos, vscale(o, a * 0.3)); cam.dir = vnorm(vadd(cam.dir, vscale(o, a * 0.01)));
+  shakeA *= Math.exp(-dt * 8);
+}
+// cannon: a bright muzzle flash, a blast-dust ring kicked up from the ground in front of the gun
+function muzzleFx(t, m, d) {
+  const T = t.type, big = clamp(T.dmg / 50, 0.6, 1.6);
+  puff(m, vscale(d, 4), [1, 0.9, 0.55], 0.07, 1.1 * big, 0, 1, 9, 1);
+  puff(vadd(m, vscale(d, 1.2)), vscale(d, 8), [1, 0.6, 0.2], 0.1, 0.7 * big, 0, 1, 5, 0.9);
+  if (!T.air && Q.partCap > 400) {
+    const g = [m[0] + d[0] * 2, heightAt(m[0] + d[0] * 2, m[2] + d[2] * 2) + 0.3, m[2] + d[2] * 2];
+    if (m[1] - g[1] < 3) for (let i = 0; i < 10; i++) { const a = i / 10 * 6.283; puff(g, [Math.sin(a) * 7 + d[0] * 4, rand(0.3, 1.2), Math.cos(a) * 7 + d[2] * 4], [0.62, 0.56, 0.45], rand(0.6, 0.9), 0.5, 0, 0, 1.1, 0.28); }
+  }
+  if (t.isPlayer) addShake(0.22 * big); else addShake(0.25 * big / (1 + vlen(vsub(m, cam.pos)) / 25) - 0.02);
+}
+// explosions: a short emissive flash and an expanding dust ring on the ground, plus shake when close
+function blastFx(p, k = 1) {
+  puff(p, [0, 1, 0], [1, 0.85, 0.5], 0.12, 2.5 * k, 0, 1, 26 * k, 1);
+  const g = [p[0], heightAt(p[0], p[2]) + 0.4, p[2]];
+  if (p[1] - g[1] < 6) for (let i = 0; i < 16; i++) { const a = i / 16 * 6.283; puff(g, [Math.sin(a) * 14 * k, rand(0.5, 2), Math.cos(a) * 14 * k], [0.55, 0.5, 0.42], rand(0.7, 1.1), 0.7 * k, 0, 0, 1.6, 0.4); }
+  addShake(0.6 * k / (1 + vlen(vsub(p, cam.pos)) / 30) - 0.03);
+}
+// shell impacts: hot sparks and a glowing wisp for a penetration, a fan of bright streaks for a ricochet
+function impactFx(p, result, dir) {
+  if (result === "PENETRATION") {
+    for (let i = 0; i < 12; i++) puff(p, [rand(-6, 6), rand(1, 8), rand(-6, 6)], [1, rand(0.55, 0.85), 0.25], rand(0.25, 0.5), 0.12, 9, 1, -0.1);
+    puff(p, [0, 1.5, 0], [1, 0.5, 0.15], 0.35, 0.6, 0, 1, 1.5, 0.9);
+    for (let i = 0; i < 3; i++) puff(p, [rand(-0.5, 0.5), rand(1.5, 3), rand(-0.5, 0.5)], [0.25, 0.24, 0.22], rand(1.2, 2), 0.5, -0.3, 0, 1, 0.6);
+  } else if (result === "RICOCHET" || result === "NON-PENETRATION") {
+    const r = dir ? vnorm([dir[0] * 0.6 + rand(-0.3, 0.3), Math.abs(dir[1]) + 0.5, dir[2] * 0.6 + rand(-0.3, 0.3)]) : [0, 1, 0];
+    for (let i = 0; i < 8; i++) puff(p, vadd(vscale(r, rand(14, 30)), [rand(-4, 4), rand(-2, 4), rand(-4, 4)]), [1, 0.95, 0.7], rand(0.12, 0.25), 0.08, 4, 1, -0.1);
+  }
+}
+// ---- settings window (hangar menu, pause screen, or N for a quick mute)
+function toggleMute() { SET.mute = !SET.mute; applyAudioSettings(); saveSettings(); if (state === "playing") centerMsg(`SOUND ${SET.mute ? "MUTED" : "ON"} (N)`, "#9fd4ff"); else toast(SET.mute ? "Sound muted (N)" : "Sound on (N)"); announce(SET.mute ? "Sound muted" : "Sound on"); }
+function toggleKeycard() {
+  const k = $("keycard"), air = player && player.type.air;
+  if (!k.hidden) { k.hidden = true; return; }
+  k.innerHTML = `<b style="color:#9fd4ff">${air ? "Aircraft" : "Ground"} controls</b> <span style="opacity:.6">· H to close</span>${$(air ? "ctlAir" : "ctlGround").outerHTML.replace(/ id="[^"]*"/, "").replace(/ style="[^"]*"/, "")}<div style="opacity:.75">G smoke · V toolkit · B artillery · X overboost · N mute · Esc pause &amp; settings</div>`;
+  k.hidden = false;
+}
+function openSettings() { initAudio(); openModal("settings", "Settings"); }
+function settingsHtml() {
+  const sl = (k, label, min = 0, max = 1, step = 0.05) => `<label class="setrow"><span>${label}</span><input type="range" data-set="${k}" min="${min}" max="${max}" step="${step}" value="${SET[k]}" aria-label="${label}"><b>${k === "sens" ? `${SET[k].toFixed(2)}×` : `${Math.round(SET[k] * 100)}%`}</b></label>`;
+  const ck = (k, label, on) => `<label class="setrow ck"><input type="checkbox" data-ck="${k}"${on ? " checked" : ""}><span>${label}</span></label>`;
+  return `<h3 style="color:#9fd4ff">Sound</h3>${ck("mute", "Mute all sound (N)", SET.mute)}${sl("vol", "Master volume")}${sl("sfx", "Combat effects")}${sl("eng", "Engines &amp; ambience")}${sl("ui", "Interface sounds")}
+    <div class="row"><button data-buy="set:test" class="secondary">&#9654; Test sound</button></div>
+    <h3 style="color:#9fd4ff">Camera &amp; controls</h3>${sl("sens", "Mouse sensitivity", 0.3, 2.5, 0.05)}
+    <label class="setrow"><span>Camera shake</span><select data-sel="shake" aria-label="Camera shake">${[[0, "Off"], [0.5, "Reduced"], [1, "Full"]].map(([v, n]) => `<option value="${v}"${SET.shake === v ? " selected" : ""}>${n}</option>`).join("")}</select><b></b></label>
+    ${ck("lowhp", "Red edge glow at low integrity", SET.lowhp)}${ck("markers", "Enemy markers and edge arrows (M)", markersOn)}
+    <h3 style="color:#9fd4ff">Graphics</h3><label class="setrow"><span>Quality</span><select data-sel="gfx" aria-label="Graphics quality">${GFX_MODES.map(m => `<option value="${m}"${gfxMode === m ? " selected" : ""}>${m === "auto" ? "Auto (keeps it smooth)" : m[0].toUpperCase() + m.slice(1)}</option>`).join("")}</select><b></b></label>
+    <p class="note" style="opacity:.75">Settings are saved in this browser and are kept when you reset progress. Camera shake starts off when your system asks for reduced motion.</p>
+    <div class="row"><button data-buy="set:reset" class="secondary">Restore defaults</button></div>`;
+}
+function bindSettings(body) {
+  for (const el of body.querySelectorAll("input[data-set]")) el.oninput = () => { const k = el.dataset.set; SET[k] = +el.value; applyAudioSettings(); saveSettings(); el.nextElementSibling.textContent = k === "sens" ? `${SET[k].toFixed(2)}×` : `${Math.round(SET[k] * 100)}%`; };
+  for (const el of body.querySelectorAll("input[data-ck]")) el.onchange = () => {
+    const k = el.dataset.ck;
+    if (k === "markers") { markersOn = el.checked; try { localStorage.setItem("steelfront.markers", markersOn ? "on" : "off"); } catch (e) { /* not persisted */ } }
+    else { SET[k] = el.checked; applyAudioSettings(); saveSettings(); }
+  };
+  for (const el of body.querySelectorAll("select[data-sel]")) el.onchange = () => {
+    if (el.dataset.sel === "shake") { SET.shake = +el.value; saveSettings(); }
+    else { gfxMode = el.value; try { localStorage.setItem("steelfront.gfx", gfxMode); } catch (e) { /* not persisted */ } perf.skip = 1; perf.good = 0; applyGfx(); }
+  };
+}
 
 // ---------------------------------------------------------------- UI helpers
 const $ = id => document.getElementById(id);
@@ -4044,8 +4230,9 @@ function feed(html) {
 }
 function playerHit(result, shooter, msgs = []) {
   markHitFrom(shooter);
-  if (result === "PENETRATION") { dmgFlash = 1; tone("sawtooth", 90, 0.25, 0.4, 40); }
-  else { dmgFlash = Math.max(dmgFlash, 0.35); tone("triangle", 1800, 0.12, 0.3, 1200); }
+  // you were hit: a heavy clank and a short (capped) camera kick on a penetration, a ricochet whine otherwise
+  if (result === "PENETRATION") { dmgFlash = 0.85; tone("sawtooth", 90, 0.22, 0.4, 40); noiseHit(0.4, 2600, 120, 0.45); addShake(0.55); }
+  else { dmgFlash = Math.max(dmgFlash, 0.3); tone("triangle", 1800, 0.1, 0.3, 1200); noiseHit(0.12, 6000, 2000, 0.12, null, "highpass"); addShake(0.2); }
   if (!player.alive) return;
   // damage report: what the hit actually broke on your side (crew, modules, fire)
   const rep = msgs.filter(m => m !== "TARGET DESTROYED").map(m => m.toLowerCase().replace(/^\w/, c => c.toUpperCase()));
@@ -4077,7 +4264,7 @@ function award(text, pts, col = "#ffe08a", key = null) {
 }
 function noteHit(t, shooter, s, crit) {
   if (!shooter || !shooter.isPlayer || t.team === shooter.team) return;
-  t.pDmgT = now; t.pGuided = !!(s && s.guided);
+  t.pDmgT = now; t.pGuided = !!(s && s.guided); hitMarkT = Math.max(hitMarkT, crit ? 0.35 : 0.22);
   if (crit) award("CRITICAL HIT", SCORE.crit, "#ffb15a", "crit" + t.name);
   else award("HIT", SCORE.hit, "#e6e6e6", "hit" + t.name);
 }
@@ -4238,6 +4425,7 @@ function endBattle(result, reason) {
 const fmtClock = sec => { const s = Math.max(0, Math.ceil(sec)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 function showMenu(mode) {
   state = mode === "start" ? "menu" : mode;
+  $("keycard").hidden = true;
   closeModal(); lobbyMenu(false);
   const lobby = mode === "start", paused = mode === "paused", over = mode === "over";
   $("lobby").hidden = !lobby; document.body.classList.toggle("lobby-on", lobby);
@@ -4254,6 +4442,7 @@ function showMenu(mode) {
   $("toHangar").style.display = "inline-block";
   $("toHangar").textContent = paused ? "Leave to hangar (no rewards)" : "Back to hangar";
   $("intro").style.display = "none"; // the intro is replayed from the hangar menu, never during a battle
+  overlay.classList.toggle("paused", paused);
   if (paused) { $("title").textContent = "PAUSED"; $("sub").textContent = `${M.name} · ${M.tag}\nVehicle choice applies to your next respawn.`; $("play").textContent = "Resume"; }
   if (over) {
     const o = outcome || { result: "draw", reason: "time", a: Math.round(tickets[0]), e: Math.round(tickets[1]) };
@@ -4276,6 +4465,7 @@ function startPlaying() {
   if (state === "menu" || state === "over") newBattle();
   closeModal(); lobbyMenu(false);
   state = "playing"; overlay.style.display = "none";
+  const fd = $("fade"); fd.classList.add("on"); requestAnimationFrame(() => requestAnimationFrame(() => fd.classList.remove("on"))); // fade in from black
   $("lobby").hidden = true; document.body.classList.remove("lobby-on");
   requestLock();
 }
@@ -4301,7 +4491,7 @@ $("download").addEventListener("click", () => {
 });
 document.addEventListener("mousemove", e => {
   if (state !== "playing" || (!locked() && !noLock)) return;
-  const s = 0.0022 * (cam.sniper ? cam.fov / 1.1 : 1);
+  const s = 0.0022 * SET.sens * (cam.sniper ? cam.fov / 1.1 : 1);
   cam.yaw = wrapA(cam.yaw - e.movementX * s);
   cam.pitch = player && player.type.air ? clamp(cam.pitch - e.movementY * s, -1.45, 1.45) : clamp(cam.pitch - e.movementY * s, -0.7, 0.55);
 });
@@ -4328,7 +4518,7 @@ document.addEventListener("keydown", e => {
     } else if (e.code !== "Tab") { initAudio(); cineAudio(); }
     return;
   }
-  if (state === "menu") { lobbyKey(e); return; }
+  if (state === "menu") { if (e.code === "KeyN" && !e.repeat && !/INPUT|SELECT|TEXTAREA/.test((e.target && e.target.tagName) || "")) toggleMute(); lobbyKey(e); return; }
   if (state !== "playing") return;
   if (e.code === "Space" || e.code.startsWith("Arrow")) e.preventDefault();
   keys.add(e.code);
@@ -4336,6 +4526,8 @@ document.addEventListener("keydown", e => {
   if (e.code === "ShiftLeft" || e.code === "ShiftRight") cam.sniper = !cam.sniper;
   if (e.code === "Escape" && noLock) showMenu("paused");
   if (e.code === "KeyF") toggleRepair(player);
+  if (e.code === "KeyN") toggleMute();
+  if (e.code === "KeyH") toggleKeycard();
   if (e.code === "KeyM") {
     markersOn = !markersOn; centerMsg(`ENEMY MARKERS ${markersOn ? "ON" : "OFF"} (M)`, "#9fd4ff"); announce(`Enemy markers ${markersOn ? "on" : "off"}`);
     try { localStorage.setItem("steelfront.markers", markersOn ? "on" : "off"); } catch (err) { /* not persisted */ }
@@ -4357,6 +4549,7 @@ document.addEventListener("keydown", e => {
 document.addEventListener("keyup", e => { keys.delete(e.code); if (e.code === cine.skipKey) cine.skipKey = null; if (e.code === "KeyC" && freeDir && player.type.air) { const d = freeDir; cam.yaw = Math.atan2(d[0], d[2]); cam.pitch = Math.asin(clamp(d[1], -1, 1)); freeDir = null; } });
 window.addEventListener("blur", () => { keys.clear(); mouseDown = false; cine.skipKey = null; });
 
+let timeScale = 1;
 let frozen = false; // paused / battle over: the scene behind the menu is drawn once, not every frame
 function resize() {
   const dpr = Math.min(window.devicePixelRatio || 1, Q.dprCap) * renderScale;
@@ -4407,6 +4600,10 @@ $("gfx").addEventListener("click", () => {
   perf.skip = 1; perf.good = 0; applyGfx();
 });
 applyGfx();
+loadSettings();
+// audio starts on the first click or key (browsers block sound until a user gesture); buttons give a soft tick
+document.addEventListener("pointerdown", () => initAudio(), true);
+document.addEventListener("click", e => { if (e.target.closest && e.target.closest("button") && !e.target.closest("#lbGo, #play, [data-buy]")) sfxUi("tick"); }, true);
 
 // ---------------------------------------------------------------- simulation step
 const lookDir = () => [Math.sin(cam.yaw) * Math.cos(cam.pitch), Math.sin(cam.pitch), Math.cos(cam.yaw) * Math.cos(cam.pitch)];
@@ -4521,6 +4718,7 @@ function step(dt) {
   eventStep(dt);
   updateConsumables(dt);
   updateCamera(dt);
+  applyShake(dt);
   for (const tr of trees) if (tr.falling && tr.fall < 1.45) {
     tr.fall = Math.min(1.45, tr.fall + dt * (0.6 + tr.fall * 2.5));
     tr.M = chain(trans(tr.x, tr.y, tr.z), rotY(tr.dir), rotX(tr.fall), scl(tr.s, tr.s, tr.s));
@@ -4531,11 +4729,11 @@ function step(dt) {
   // engine audio
   if (engGain) {
     if (p.type.air) {
-      engOsc.frequency.setTargetAtTime(55 + p.throttle * 40 + p.speed * 0.12, AC.currentTime, 0.1);
+      engOsc.frequency.setTargetAtTime(55 + p.throttle * 40 + p.speed * 0.12, AC.currentTime, 0.1); engSub.frequency.setTargetAtTime((55 + p.throttle * 40 + p.speed * 0.12) / 2, AC.currentTime, 0.1);
       engGain.gain.setTargetAtTime(p.alive ? 0.05 + p.throttle * 0.05 : 0, AC.currentTime, 0.1);
     } else {
       const k = p.alive ? Math.abs(p.speed) / p.type.speed : 0;
-      engOsc.frequency.setTargetAtTime(38 + k * 45, AC.currentTime, 0.1);
+      engOsc.frequency.setTargetAtTime(38 + k * 45, AC.currentTime, 0.1); engSub.frequency.setTargetAtTime((38 + k * 45) / 2, AC.currentTime, 0.1);
       engGain.gain.setTargetAtTime(p.alive ? 0.05 + k * 0.05 : 0, AC.currentTime, 0.1);
     }
   }
@@ -4750,7 +4948,7 @@ function render() {
     m[0] = c; m[1] = 0; m[2] = -sn; m[3] = 0; m[4] = 0; m[5] = sz; m[6] = 0; m[7] = 0; m[8] = sn; m[9] = 0; m[10] = c; m[11] = 0; m[12] = q.p[0]; m[13] = q.p[1]; m[14] = q.p[2]; m[15] = 1;
     pushInst(m, q.col[0], q.col[1], q.col[2], q.emis, a);
   }
-  flushInst(cubeMesh);
+  flushInst(puffMesh);
   gl.depthMask(true); gl.disable(gl.BLEND);
   if (msaa) {
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, msaa.fbo); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
@@ -4829,6 +5027,11 @@ function drawHud() {
       hx.textAlign = "center";
     } else {
       hx.beginPath(); hx.moveTo(cx - 10, cy); hx.lineTo(cx - 3, cy); hx.moveTo(cx + 3, cy); hx.lineTo(cx + 10, cy); hx.moveTo(cx, cy - 10); hx.lineTo(cx, cy - 3); hx.moveTo(cx, cy + 3); hx.lineTo(cx, cy + 10); hx.stroke();
+    }
+    if (hitMarkT > 0) { // hit confirmation: four diagonal ticks round the crosshair
+      hx.strokeStyle = `rgba(255,211,77,${clamp(hitMarkT * 4, 0, 1)})`; hx.lineWidth = 2.5; hx.beginPath();
+      for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { hx.moveTo(cx + a * 8, cy + b * 8); hx.lineTo(cx + a * 15, cy + b * 15); }
+      hx.stroke(); hx.lineWidth = 1.5;
     }
     // gun marker; over an enemy vehicle it shows whether the loaded shell gets through there (WT-style):
     // green likely · yellow maybe · red no · grey likely ricochet
@@ -5044,6 +5247,7 @@ function updateDom(dt) {
   centerTimer -= dt;
   hitTimer -= dt; css($("hitmsg"), "opacity", clamp(hitTimer, 0, 1));
   dmgFlash = Math.max(0, dmgFlash - dt * 1.5); css($("dmg"), "opacity", dmgFlash);
+  { const f = t.alive ? t.hp / t.type.hp : 1; css($("lowhp"), "opacity", SET.lowhp && state === "playing" && f < 0.35 ? ((0.35 - f) / 0.35 * (0.6 + 0.12 * Math.sin(now * 3))).toFixed(2) : 0); } // slow pulse, never a flash
   const sb = $("scoreboard");
   if (keys.has("Tab") && state === "playing") {
     css(sb, "display", "flex");
@@ -5715,6 +5919,9 @@ $("lbIntro").addEventListener("click", () => { lobbyMenu(false); playCinematic()
 $("lbGfx").addEventListener("click", () => $("gfx").click());
 $("lbDownload").addEventListener("click", () => { lobbyMenu(false); $("download").click(); });
 $("lbHelp").addEventListener("click", () => { lobbyMenu(false); openHelp(); });
+$("lbSettings").addEventListener("click", () => { lobbyMenu(false); openSettings(); });
+for (const b of document.querySelectorAll("#pauseBar button")) b.addEventListener("click", () => $(b.dataset.p).click());
+$("settings").addEventListener("click", openSettings);
 $("lbReset").addEventListener("click", () => { lobbyMenu(false); openReset(); });
 document.addEventListener("click", e => { if (!e.target.closest || !e.target.closest("#lbMenu, #lbMenuBtn")) lobbyMenu(false); });
 
@@ -5725,11 +5932,11 @@ function openModal(kind, title, tabs) {
   $("mTitle").textContent = title; $("mMsg").textContent = "";
   $("mTabs").innerHTML = (tabs || []).map(([k, n]) => `<button role="tab" data-t="${k}" aria-selected="${k === shopTab}">${n}</button>`).join("");
   for (const el of $("mTabs").querySelectorAll("button")) el.onclick = () => { shopTab = el.dataset.t; $("mMsg").textContent = ""; for (const b of $("mTabs").children) b.setAttribute("aria-selected", String(b === el)); renderModal(); };
-  $("modal").classList.add("open");
+  $("modal").classList.add("open"); sfxUi("open");
   renderModal();
   $("mClose").focus({ preventScroll: true });
 }
-function closeModal() { if (!$("modal").classList.contains("open")) return; $("modal").classList.remove("open"); modalKind = ""; if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true }); }
+function closeModal() { if (!$("modal").classList.contains("open")) return; $("modal").classList.remove("open"); sfxUi("close"); modalKind = ""; if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true }); }
 $("mClose").addEventListener("click", closeModal);
 $("modal").addEventListener("click", e => { if (e.target === $("modal")) closeModal(); });
 function openShop(tab) {
@@ -5800,6 +6007,13 @@ function renderModal() {
     h = `<h3 style="color:#9fd4ff">Ground vehicles</h3>${$("ctlGround").outerHTML.replace(/ id="[^"]*"/, "").replace(/ style="[^"]*"/, "")}
       <h3 style="color:#9fd4ff">Aircraft</h3>${$("ctlAir").outerHTML.replace(/ id="[^"]*"/, "").replace(/ style="[^"]*"/, "")}<p class="note" style="opacity:.9">${$("hintAir").innerHTML}</p>
       <h3 style="color:#9fd4ff">Consumables</h3><table class="ctl">${CONS.map(c => `<tr><td>${c.key}</td><td>${c.name}: ${c.d}</td></tr>`).join("")}</table>
+      <h3 style="color:#9fd4ff">Settings, sound and effects</h3><p class="note" style="opacity:.9">Open <b>&#9881; Settings</b> from the hangar Menu or the pause screen.
+        <ul style="margin:4px 0 0 16px;padding:0">
+          <li><b>Sound:</b> master, combat-effects, engine/ambience and interface volume, plus mute (<b>N</b> anywhere). Sound starts on your first click or key press, because browsers block it until then. Guns and explosions are placed left or right and muffled with distance.</li>
+          <li><b>Camera:</b> mouse sensitivity and camera shake (off / reduced / full). Shake is short and capped, never moves your aim, and starts off if your system asks for reduced motion.</li>
+          <li><b>Display:</b> the red edge glow at low integrity (a slow pulse, never a flash), the enemy markers (<b>M</b>) and graphics quality.</li>
+        </ul>
+        In battle, <b>H</b> shows a controls card for your current vehicle. Settings are saved in this browser and kept when you reset progress.</p>
       <h3 style="color:#9fd4ff">Field objectives and the final push</h3><p class="note" style="opacity:.9">About a minute into a battle, and again every minute or so after one ends, an optional <b>field objective</b> appears. It is announced on screen, shown in the gold line under the clock with its range, direction and time left, marked with coloured smoke in the world, a gold marker and a ring on the minimap. A couple of enemies (and sometimes allies) head for it too. Ignoring one costs nothing; completing it scores +${SCORE.obj} and pays ${fmtN(250)} Cr / 120 XP at the end.</p><table class="ctl">
         <tr><td>Supply drop</td><td>A crate parachutes down (green smoke). Be the first to drive into it: full repair, a fresh crew, instant reload, rockets refilled and consumable cooldowns reset. In Last Stand one lands near B after every destroyed wave.</td></tr>
         <tr><td>Radio relay</td><td>A mast (yellow smoke). Hold it alone for ${OBJ.relay.hold} s (enemies inside pause it): every enemy is revealed for 30 s and the enemy loses ${OBJ_PAY.relay} tickets.</td></tr>
@@ -5808,6 +6022,10 @@ function renderModal() {
       <p class="note" style="opacity:.9">In Breakthrough the bonus is extra reinforcements instead. In Conquest, Annihilation and Air Superiority the last ${FINAL_PUSH.left / 60} minutes, or the moment either side drops to ${FINAL_PUSH.frac * 100}% tickets, are the <b>final push</b>: both sides lose ×${FINAL_PUSH.kill} tickets per vehicle and Conquest zones bleed ×${FINAL_PUSH.bleed}, so a close battle ends with a real decision instead of running out the clock. The line under the clock shows the zone count and who is draining whom.</p>
       <h3 style="color:#9fd4ff">Credits, XP and unlocks</h3><p class="note" style="opacity:.9">Every finished battle pays credits (Cr) and XP: a base amount for the result, plus kills, zone captures, broken-through zones, destroyed Last Stand waves and time in battle. Boosters add 50%. XP raises your commander level; each level pays a credit bonus and unlocks some camouflage and crew training. Contracts in the hangar pay extra credits when completed. Leaving a battle early pays nothing. ${GROUND_LIST.length + AIR_LIST.length - PREMIUM_LIST.length} vehicles are free and always available. The ${PREMIUM_LIST.length} premium Steel Front vehicles (${PREMIUM_LIST.map(T => `${T.name} ${fmtN(T.price)} Cr`).join(", ")}) are unlocked once with earned credits from the hangar info panel and are then yours for good; the enemy never fields them. Credits also buy modifications (per vehicle), camouflage, consumables, crew training and boosters. There is no real-money shop. Progress is saved in this browser (localStorage).</p>
       <h3 style="color:#9fd4ff">Battle score, medals and mastery</h3><p class="note" style="opacity:.9">Your hits (+${SCORE.hit}, critical +${SCORE.crit}), kills (+${SCORE.kill}, aircraft +${SCORE.air}), assists (+${SCORE.assist}: an enemy you damaged in the last ${ASSIST_WINDOW} s is finished by someone else), captures (+${SCORE.cap}) and cleared waves (+${SCORE.wave}) pop up under the crosshair. Bonuses: first blood, long shots from ${LONG_SHOT} m, and double / triple kills within ${MULTI_WINDOW} s. Kill streaks (kills without being destroyed) get a callout at 3, 5 and 8. At the end of a battle you can earn medals (${MEDALS.length} to collect, +${MEDAL_PAY[0]} Cr / +${MEDAL_PAY[1]} XP each). Your score also counts toward that vehicle's mastery: ${MASTERY.length} stars, each paying a one-off credit bonus, plus personal bests per vehicle and overall. The score changes nothing in the fight, the enemy does not get harder, and nothing is lost if you take a break.</p>`;
+  } else if (modalKind === "settings") {
+    h = settingsHtml();
+    acts["set:test"] = () => { initAudio(); sfxCannon(player || { isPlayer: true }); setTimeout(() => sfxPing(true), 250); setTimeout(() => sfxUi("open"), 600); };
+    acts["set:reset"] = () => { const keepMute = false; SET = { ...SET_DEF, mute: keepMute }; if (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches) SET.shake = 0; applyAudioSettings(); saveSettings(); renderModal(); };
   } else if (modalKind === "reset") {
     h = `<p class="note" style="opacity:.9">This deletes your credits, level, purchases, contracts and career stats in this browser and starts again with 6,000 Cr. Graphics settings are kept.</p>`;
     acts["reset:yes"] = () => { profile = freshProfile(); ensureContracts(); saveProfile(); selectVehicle(TYPES.sherman); hv.key = ""; closeModal(); renderLobby(); toast("Progress reset", "good"); };
@@ -5816,6 +6034,7 @@ function renderModal() {
   }
   body.innerHTML = h;
   for (const el of body.querySelectorAll("[data-buy]")) el.onclick = () => { const f = acts[el.dataset.buy]; if (f) f(); };
+  if (modalKind === "settings") bindSettings(body);
 }
 // one place for every purchase: level gate, funds check, deduct, apply, save, refresh
 function purchase(price, what, apply, needLvl = 1) {
@@ -6307,7 +6526,7 @@ function frame(t) {
   if (state === "playing") {
     // below 20 fps one frame covers several 50 ms steps (up to 0.25 s), so the battle clock and the
     // 20-minute limit keep pace with real time instead of slowing down with the frame rate
-    let left = clamp(ms / 1000, 0, 0.25);
+    let left = clamp(ms / 1000, 0, 0.25) * timeScale; // timeScale: console-only slow motion for capturing effects (steelFront.timeScale)
     do {
       const h = Math.min(0.05, left), wasAlive = player.alive;
       step(h); left -= h;
@@ -6330,6 +6549,7 @@ function frame(t) {
   }
   if (state !== "cine" && state !== "menu") updateDom(dt);
   adaptQuality(ms, live);
+  audioStep(Math.min(dt, 0.1));
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
@@ -6839,6 +7059,52 @@ function runSelfTest() {
     ok("an owned premium vehicle shows as owned and can deploy", /premium · owned/.test($("lbInfo").innerHTML) && $("lbGo").getAttribute("aria-disabled") === "false");
     void sp; profile = freshProfile(); ensureContracts(); state = "playing";
   });
+  guard("audio, settings and effects", () => {
+    const keepSet = { ...SET }, AI0 = JSON.stringify(ENEMY_AI);
+    loadSettings(JSON.stringify({ vol: 7, sfx: -2, eng: "x", ui: 0.3, mute: "yes", shake: 0.7, sens: 99, lowhp: false }));
+    ok("saved settings are read safely (out-of-range values clamped, junk ignored)", SET.vol === 1 && SET.sfx === 0 && SET.eng === SET_DEF.eng && SET.ui === 0.3 && SET.mute === false && [0, 1].includes(SET.shake) && SET.sens === 2.5 && SET.lowhp === false, JSON.stringify(SET));
+    loadSettings("not json"); ok("an unreadable settings save falls back to the defaults", SET.vol === SET_DEF.vol && SET.sens === 1);
+    SET = { ...SET_DEF };
+    initAudio();
+    ok("audio has separate buses for effects, engines and interface behind a master gain and compressor", !AC || (BUS.sfx && BUS.eng && BUS.ui && master && comp));
+    const v0 = voices; noiseHit(0.5, 1000, 100, 0.2); tone("sine", 200, 0.3, 0.2);
+    ok("no sounds are queued while the browser keeps audio suspended", !AC || AC.state === "running" || voices === v0, `${AC && AC.state} ${voices}`);
+    if (AC) { battle("conquest"); cam.pos = [0, 10, 0]; cam.dir = [0, 0, 1]; const R = vnorm(vcross(cam.dir, [0, 1, 0])), n = spat(vadd([0, 10, 40], vscale(R, 50))), m = spat(vadd([0, 10, 40], vscale(R, -50))); // R: screen right
+      ok("combat sounds are placed in stereo by direction", !AC.createStereoPanner || (n.pan.value > 0.2 && m.pan.value < -0.2), n.pan && `${n.pan.value.toFixed(2)} ${m.pan.value.toFixed(2)}`); }
+    // shake
+    battle("conquest"); SET.shake = 0; shakeA = 0; addShake(1);
+    ok("camera shake off means none at all", shakeA === 0);
+    SET.shake = 1; addShake(5);
+    ok("camera shake is capped", shakeA <= 0.8 && shakeA > 0.5, shakeA);
+    const aim = cam.aim.slice(); for (let i = 0; i < 30; i++) applyShake(1 / 30);
+    ok("shake fades within a second and never moves the aim point", shakeA < 0.05 && cam.aim.every((v, i) => v === aim[i]), shakeA.toFixed(3));
+    SET.shake = 0.5; shakeA = 0; addShake(1); ok("reduced shake is half strength", Math.abs(shakeA - 0.5) < 1e-9);
+    // particles
+    parts = []; const p = vadd(player.pos, [0, 2, 20]);
+    muzzleFx(player, p, [0, 0, 1]); blastFx(p, 1.6); impactFx(p, "PENETRATION", [0, 0, 1]); impactFx(p, "RICOCHET", [0, 0, 1]);
+    const made = parts.length;
+    ok("muzzle flash, blast ring and impact sparks are particles", made > 30, made);
+    for (let i = 0; i < 40; i++) blastFx(p, 1.6); updateParticles(0.01);
+    ok("effects respect the particle budget", parts.length <= Q.partCap, `${parts.length}/${Q.partCap}`);
+    for (let i = 0; i < 120; i++) updateParticles(0.05);
+    ok("effect particles expire on their own", parts.length === 0, parts.length);
+    blastFx(p, 1); battle("conquest"); ok("a new battle starts with no leftover effects", parts.length === 0 && shakeA === 0 || parts.length === 0);
+    // HUD and UX
+    player.hp = player.type.hp * 0.1; SET.lowhp = true; updateDom(1 / 30);
+    ok("low integrity lights a soft red edge", +$("lowhp").style.opacity > 0.2, $("lowhp").style.opacity);
+    SET.lowhp = false; updateDom(1 / 30); ok("…and the setting turns it off", +$("lowhp").style.opacity === 0);
+    toggleKeycard(); const shown = !$("keycard").hidden && /Ground controls/.test($("keycard").innerHTML); toggleKeycard();
+    ok("H shows a controls card for the current vehicle and hides it again", shown && $("keycard").hidden);
+    const m0 = SET.mute; toggleMute(); const m1 = SET.mute; toggleMute();
+    ok("N toggles mute", m1 === !m0 && SET.mute === m0);
+    showMenu("paused"); ok("the pause screen has Resume / Settings / Leave at the top", overlay.classList.contains("paused") && document.querySelectorAll("#pauseBar button").length === 3);
+    openSettings(); const r = document.querySelector('#mBody input[data-set="vol"]');
+    ok("the settings window lists sound, camera and graphics options", r && document.querySelector('#mBody select[data-sel="shake"]') && document.querySelector('#mBody select[data-sel="gfx"]') && document.querySelector('#mBody input[data-ck="mute"]'));
+    r.value = 0.35; r.dispatchEvent(new Event("input")); ok("moving a slider changes the setting at once", SET.vol === 0.35);
+    closeModal(); state = "playing";
+    ok("effects and settings do not touch the enemy AI handicap", JSON.stringify(ENEMY_AI) === AI0);
+    SET = keepSet; applyAudioSettings();
+  });
   guard("battle soak", () => {
     for (const mode of ["conquest", "laststand"]) {
       battle(mode, mode === "laststand" ? HIST.tiger : HIST.sherman);
@@ -6874,6 +7140,7 @@ window.steelFront = { get player() { return player; }, get tanks() { return tank
   select: k => { const T = TYPES[k] || HIST[k] || AIR[k]; if (T) selectVehicle(T); }, // HIST/AIR keys used to throw (only TYPES was searched) TYPES, dropBomb: () => dropBomb(player), fireRockets: () => fireRockets(player),
   get profile() { return profile; }, set profile(p) { profile = p; }, get mode() { return M; }, get ms() { return ms; }, get zones() { return zones; }, get tickets() { return tickets; },
   MODES, endBattle, useCons, saveProfile, loadProfile, startPlaying, showMenu, openShop, renderLobby, selectVehicle, get outcome() { return outcome; }, get battleTime() { return battleTime; }, set battleTime(v) { battleTime = v; },
+  get timeScale() { return timeScale; }, set timeScale(v) { timeScale = clamp(+v || 1, 0.02, 1); },
   selftest: runSelfTest, selectAmmo: k => selectAmmo(player, k), AMMO,
   intro: { play: playCinematic, skip: () => endCinematic(false), deploy: () => endCinematic(true), get t() { return cine.t; }, seek: t => { while (state === "cine" && cine.t < t) updateCinematic(0.05); } } };
 </script>

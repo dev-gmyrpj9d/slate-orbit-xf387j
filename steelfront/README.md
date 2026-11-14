@@ -36,18 +36,43 @@ A single-file WebGL2 combined-arms battle game (tanks, SPAA, aircraft, 8 vs 8 ag
 - **Engine fires.** Penetrations into the engine bay can start a fire, which drains hull integrity. Press **F** to put it out; AI crews put theirs out after a few seconds.
 - **Penetration indicator.** Over an enemy vehicle, the gun marker turns green (likely penetration), yellow (maybe), red (no) or grey (likely ricochet) for the loaded shell. In the gunner sight it also shows penetration against effective armour in mm. It only appears when you are already aiming at the vehicle, so it doesn't reveal positions.
 
+## Pass 2: finding enemies, easier enemy AI
+
+This pass answers playtest feedback: it was hard to tell where the enemy was, and the enemy was too strong.
+
+**Enemy location cues**
+
+- **Spotting:** an enemy counts as spotted while you or an ally can see it, for 4 s after its main gun fires within 900 m of your side, and for 6 s after it hits you. You see an enemy if it is in line of sight and either within 650 m or in your view out to 1,200 m (1,800 m for aircraft). Before this pass only the AI and aircraft spotted anything, and only on the minimap.
+- **Markers:** a spotted enemy gets a red marker over it with its range in metres. When it is off-screen, a red arrow at the screen edge points to it (up to 8, nearest first). It also still shows on the minimap.
+- **Hit direction:** a red arc around the crosshair points to whoever just hit you, for 3 s.
+- **M** turns the markers and arrows on or off. The setting is saved; the hit arc always shows.
+
+**Enemy AI handicap.** All the numbers are in the `ENEMY_AI` table. Only team 1 AI is affected; allies, the player and the damage model are unchanged.
+
+| | Before | Now |
+| --- | --- | --- |
+| Range at which enemies spot targets | 520 m (flak 1,300 m) | ×0.85 |
+| Delay before the first shot at a new target | 0.8–2.0 s | ×1.8 |
+| Aim error (tanks, flak) | — | ×1.7 |
+| Pause after each shot | 0.2–1.0 s | 0.9–2.2 s |
+| Enemy pilots' aim error | — | ×1.5 |
+| Shell against armour | APHE or AP | AP (less spall) |
+
+Over 3 × 180 s simulated Conquest battles, the enemy used to out-kill your side 27 to 17. With the handicap your side leads 26 to 18.
+
 ## Testing
 
 ```sh
 node steelfront/tests/run-selftest.mjs    # exits 0 on PASS; set CHROME=/path/to/chrome if it isn't on PATH
 ```
 
-You can also open `steelfront.html?selftest` in any browser. The page runs 37 seeded checks and shows the results on screen. The checks cover:
+You can also open `steelfront.html?selftest` in any browser. The page runs 46 seeded checks and shows the results on screen. The checks cover:
 
 - the armour lookup and damage model
 - each fix above, as a regression check
 - crew effects, shell switching, HE and fire
 - the AI's zone and shell choices
+- spotting, the marker and arrow directions, and the enemy AI handicap
 - two 150 s simulated battles (Conquest and Last Stand) checked for exceptions, NaNs and zombie crews
 
 The self-test uses a throwaway profile and never writes your save. `?nointro` skips the intro.
@@ -64,4 +89,5 @@ Run this in a real browser after changes to gameplay, HUD or input.
 6. Catch fire: "ON FIRE — F to extinguish" appears. F puts the fire out without starting a repair. A second F starts the repair. During the repair the gun neither turns nor fires.
 7. Fly an aircraft: the ammo and crew rows are hidden. Rockets on a heavy tank's front no longer kill it outright, while bombs still do.
 8. Last Stand: let the timer run out with B neutral (console: `steelFront.battleTime = steelFront.mode.time`). The result is DEFEAT.
-9. Tab shows the scoreboard, P the FPS counter and Esc pauses. Leaving to the hangar pays no rewards.
+9. Spotted enemies show a red marker with their range. Turn away and an edge arrow points back at them; M toggles both. Get hit and a red arc points to the shooter.
+10. Tab shows the scoreboard, P the FPS counter and Esc pauses. Leaving to the hangar pays no rewards.

@@ -265,6 +265,7 @@
       <tr><td>Shift / RMB</td><td>Gunner sight</td><td>Wheel</td><td>Zoom</td></tr>
       <tr><td>F</td><td>Repair (10 s, tank stays put) · extinguish fire</td><td>Tab / Esc</td><td>Scoreboard / pause</td></tr>
       <tr><td>1 / 2 / 3</td><td>Load AP / APHE / HE</td><td>P</td><td>Frame-rate counter</td></tr>
+      <tr><td>M</td><td>Enemy markers on / off</td><td></td><td></td></tr>
     </table>
     <table class="ctl" id="ctlAir" style="display:none">
       <tr><td>Mouse</td><td>Mouse-aim: the plane flies toward the circle</td><td>Left click</td><td>Fire guns</td></tr>
@@ -273,9 +274,10 @@
       <tr><td>C (hold)</td><td>Free look</td><td>Shift / RMB</td><td>Zoom</td></tr>
       <tr><td>T</td><td>Rearm all weapons (15 s)</td><td>F</td><td>Repair airframe (15 s)</td></tr>
       <tr><td>Tab</td><td>Scoreboard</td><td>Esc</td><td>Pause</td></tr>
+      <tr><td>M</td><td>Enemy markers on / off</td><td></td><td></td></tr>
       <tr><td>P</td><td>Frame-rate counter</td><td></td><td></td></tr>
     </table>
-    <p class="hint" id="hintGround" style="margin:-4px 0 10px">The small circle shows where your gun is really pointed; over an enemy it turns green (shell gets through), yellow (maybe), red (no) or grey (ricochet). Angle your front armour, hit enemy sides &amp; rear, shoot tracks to immobilise. Penetrations knock out crew: lose all but one and the tank is lost. APHE wrecks crews, AP gets through thicker plate, HE is for open-topped vehicles.</p>
+    <p class="hint" id="hintGround" style="margin:-4px 0 10px">Spotted enemies (seen by you or an ally, or just fired near your side) get a red marker with their range, a red arrow at the screen edge when off-screen and a red square on the minimap; a red arc around the crosshair points to whoever just hit you. The small circle shows where your gun is really pointed; over an enemy it turns green (shell gets through), yellow (maybe), red (no) or grey (ricochet). Angle your front armour, hit enemy sides &amp; rear, shoot tracks to immobilise. Penetrations knock out crew: lose all but one and the tank is lost. APHE wrecks crews, AP gets through thicker plate, HE is for open-topped vehicles.</p>
     <p class="hint" id="hintAir" style="margin:-4px 0 10px;display:none">Aircraft spawn in the air behind your base. The cross is where your guns point; lead moving targets using the lead marker. The diamond on the ground is where a bomb would land.</p>
     <div id="rewards" aria-live="polite"></div>
     <button id="play">Deploy</button>
@@ -2475,6 +2477,7 @@ function aiAmmo(t, tgt) {
   if (!hasShells(t.type) || !tgt || tgt.type.air) return "aphe";
   const A = tgt.type.armor;
   if (A.tt === 0) return "he";
+  if (isFoeAI(t)) return ENEMY_AI.shell;
   return shellPen(t.type, "aphe") > Math.max(A.hf, A.tf) * 1.05 ? "aphe" : "ap";
 }
 // WT-style penetration chance for the sight: can the loaded shell get through where the gun points?
@@ -2487,6 +2490,84 @@ function penVerdict(t, target, hitPt) {
   const k = t.loaded || "ap", a = armorAt(target.type, h), pen = penAtRange(t.type.pen * AMMO[k].pen, vlen(vsub(hitPt, m)));
   if (a.cosA < AMMO[k].ric && a.eff > 0) return { v: "ric", eff: a.eff, pen };
   return { v: pen * 0.92 >= a.eff ? "pen" : pen * 1.08 >= a.eff ? "maybe" : "no", eff: a.eff, pen };
+}
+
+// ---------------------------------------------------------------- spotting & enemy cues
+// An enemy is "spotted" (spottedUntil > now) while you or an ally can see it, for a few seconds after its main gun
+// fires near your side, and after it hits you. Spotted enemies get a red marker over them, an arrow at the screen
+// edge when off-screen, and a square on the minimap. M toggles the in-view markers and arrows.
+let markersOn = true;
+try { markersOn = localStorage.getItem("steelfront.markers") !== "off"; } catch (e) { /* storage unavailable */ }
+const SPOT_VIEW = 1200, SPOT_NEAR = 650, SPOT_FLASH = 900;
+let hitFrom = null; // { p, t }: where the last shot that hit you came from
+function revealShooter(t) {
+  if (t.team !== 1) return;
+  for (const o of tanks) if (o.alive && o.team === 0 && vlen(vsub(o.pos, t.pos)) < SPOT_FLASH) { t.spottedUntil = Math.max(t.spottedUntil, now + 4); return; }
+}
+function markHitFrom(shooter) {
+  if (!shooter || shooter.team === player.team) return;
+  hitFrom = { p: shooter.pos.slice(), t: now };
+  if (shooter.alive) shooter.spottedUntil = Math.max(shooter.spottedUntil, now + 6);
+}
+// the player's own eyes: anything in line of sight close by, or in the view cone further out
+function playerSpots() {
+  const p = player;
+  if (!p.alive) return;
+  const eye = p.type.air ? p.pos : eyeOf(p), half = cam.fov * 0.75;
+  for (const e of tanks) {
+    if (!e.alive || e.team === p.team) continue;
+    const c = center(e), r = vsub(c, eye), d = vlen(r);
+    const range = e.type.air ? 1800 : SPOT_VIEW;
+    if (d > range) continue;
+    const inView = vdot(vscale(r, 1 / d), cam.dir) > Math.cos(half);
+    if ((d < SPOT_NEAR || inView) && (e.type.air || los(eye, c))) e.spottedUntil = Math.max(e.spottedUntil, now + 1.5);
+  }
+}
+// camera-space screen direction (x right, y up) of a world point
+function screenDir(q) {
+  const r = vsub(q, cam.pos), f = cam.dir, right = vnorm(vcross(f, [0, 1, 0])), up = vcross(right, f);
+  return [vdot(r, right), vdot(r, up), vdot(r, f)];
+}
+function drawEnemyCues(W, H) {
+  const cx = W / 2, cy = H / 2, list = [];
+  if (markersOn) for (const e of tanks) {
+    if (!e.alive || e.team === player.team || e.spottedUntil < now) continue;
+    list.push({ e, d: vlen(vsub(e.pos, player.pos)) });
+  }
+  list.sort((a, b) => a.d - b.d);
+  let arrows = 0;
+  for (const { e, d } of list) {
+    const top = e.type.air ? vadd(e.pos, [0, 3, 0]) : vadd(e.pos, vscale(e.Y, e.type.hullTop + 2.4));
+    const s = project(top), m = 30;
+    const fade = clamp((e.spottedUntil - now) / 0.6, 0.35, 1);
+    if (s && s[0] > m && s[0] < W - m && s[1] > m && s[1] < H - m) {
+      hx.globalAlpha = fade;
+      hx.fillStyle = "#ff3b2f"; hx.strokeStyle = "rgba(0,0,0,.8)"; hx.lineWidth = 2;
+      const k = clamp(1.3 - d / 1500, 0.75, 1.3);
+      hx.beginPath(); hx.moveTo(s[0] - 7 * k, s[1] - 10 * k); hx.lineTo(s[0] + 7 * k, s[1] - 10 * k); hx.lineTo(s[0], s[1]); hx.closePath(); hx.stroke(); hx.fill();
+      hx.font = "bold 11px ui-monospace, monospace"; hx.lineWidth = 3;
+      const lbl = `${Math.round(d)} m`;
+      hx.strokeText(lbl, s[0], s[1] - 14 * k); hx.fillStyle = "#ffd2cc"; hx.fillText(lbl, s[0], s[1] - 14 * k);
+      hx.globalAlpha = 1;
+    } else if (arrows < 8) {
+      arrows++;
+      const [x, y] = screenDir(top), a = Math.atan2(-y, x), rx = W * 0.44, ry = H * 0.4, ax = cx + Math.cos(a) * rx, ay = cy + Math.sin(a) * ry;
+      hx.save(); hx.globalAlpha = fade; hx.translate(ax, ay); hx.rotate(a);
+      hx.fillStyle = "#ff3b2f"; hx.strokeStyle = "rgba(0,0,0,.8)"; hx.lineWidth = 2;
+      hx.beginPath(); hx.moveTo(14, 0); hx.lineTo(-4, -9); hx.lineTo(0, 0); hx.lineTo(-4, 9); hx.closePath(); hx.stroke(); hx.fill();
+      hx.restore();
+      hx.globalAlpha = fade; hx.font = "bold 11px ui-monospace, monospace"; hx.lineWidth = 3; hx.strokeStyle = "rgba(0,0,0,.8)";
+      const lx = ax - Math.cos(a) * 26, ly = ay - Math.sin(a) * 22 + 4, lbl = `${Math.round(d)} m`;
+      hx.strokeText(lbl, lx, ly); hx.fillStyle = "#ffd2cc"; hx.fillText(lbl, lx, ly); hx.globalAlpha = 1;
+    }
+  }
+  // damage direction: a red arc around the crosshair pointing at whoever just hit you (always shown)
+  if (hitFrom && now - hitFrom.t < 3 && player.alive) {
+    const [x, y] = screenDir(hitFrom.p), a = Math.atan2(-y, x), al = clamp(1 - (now - hitFrom.t) / 3, 0, 1);
+    hx.strokeStyle = `rgba(255,60,40,${0.85 * al})`; hx.lineWidth = 7;
+    hx.beginPath(); hx.arc(cx, cy, 95, a - 0.38, a + 0.38); hx.stroke();
+    hx.lineWidth = 1.5;
+  }
 }
 
 // ---------------------------------------------------------------- projectiles & hits
@@ -2504,6 +2585,7 @@ function fire(t) {
     sfxGun(t);
     return;
   }
+  revealShooter(t);
   const m = muzzle(t), d = gunDir(t), k = t.loaded || "ap", A = AMMO[k];
   shells.push({ kind: "shell", ammo: k, p: m, v: vscale(d, T.v0 * A.v), owner: t, pen: T.pen * A.pen, dmg: T.dmg * A.dmg, he: k === "he" ? heBurst(T) : null, life: 4, start: m });
   t.loaded = t.ammo || k; // the next round rammed is the selected one
@@ -2952,21 +3034,27 @@ function updateConsumables(dt) {
 }
 
 // ---------------------------------------------------------------- AI
+// ---- difficulty: enemy AI handicap (playtest: "the enemy is too op"). Only team 1 AI is affected; allies, the
+// player and the damage model are unchanged. see: spotting range ×, react: delay before the first shot at a new
+// target ×, aim: aim error ×, cadence: pause after each shot (s, was 0.2-1.0), air: enemy pilots' aim error ×,
+// shell: what enemy tanks load against armour (AP spalls less than APHE, so a penetration is less often lethal)
+const ENEMY_AI = { see: 0.85, react: 1.8, aim: 1.7, cadence: [0.9, 2.2], air: 1.5, shell: "ap" };
+const isFoeAI = t => !!t.ai && t.team === 1;
 function updateAI(t, dt, now) {
-  const ai = t.ai, T = t.type;
+  const ai = t.ai, T = t.type, foe = isFoeAI(t), aimK = foe ? ENEMY_AI.aim : 1;
   ai.think -= dt; ai.fireDelay -= dt;
   if (ai.think <= 0) {
     ai.think = rand(0.35, 0.6);
     const eye = eyeOf(t);
-    let best = null, bd = 520;
+    let best = null, bd = 520 * (foe ? ENEMY_AI.see : 1);
     if (T.auto) {
-      let ba = 1300;
+      let ba = 1300 * (foe ? ENEMY_AI.see : 1);
       for (const e of tanks) {
         if (e.team === t.team || !e.alive || !e.type.air) continue;
         const d = vlen(vsub(e.pos, t.pos));
         if (d < ba && los(eye, e.pos)) { best = e; ba = d; }
       }
-      bd = best ? 0 : 450;
+      bd = best ? 0 : 450 * (foe ? ENEMY_AI.see : 1);
     }
     if (!best) for (const e of tanks) {
       if (e.team === t.team || !e.alive || e.type.air) continue;
@@ -2977,12 +3065,12 @@ function updateAI(t, dt, now) {
       best.spottedUntil = now + 2.5;
       const d = vlen(vsub(best.pos, t.pos));
       if (best !== ai.target) {
-        ai.fireDelay = Math.max(ai.fireDelay, rand(0.8, 2.0));
+        ai.fireDelay = Math.max(ai.fireDelay, rand(0.8, 2.0) * (foe ? ENEMY_AI.react : 1));
         // the first shot at a new target is a ranging shot, not a guaranteed hit
-        if (!T.auto || !best.type.air) { ai.err = [rand(-1, 1) * d * 0.012, rand(-0.6, 1) * d * 0.008, rand(-1, 1) * d * 0.012]; ai.leadK = 1; }
+        if (!T.auto || !best.type.air) { ai.err = vscale([rand(-1, 1) * d * 0.012, rand(-0.6, 1) * d * 0.008, rand(-1, 1) * d * 0.012], aimK); ai.leadK = 1; }
       }
       // flak gunners re-estimate the deflection continuously and get it somewhat wrong
-      if (T.auto && best.type.air) { ai.err = [rand(-1, 1) * d * 0.02, rand(-1, 1) * d * 0.015, rand(-1, 1) * d * 0.02]; ai.leadK = rand(0.7, 1.25); }
+      if (T.auto && best.type.air) { ai.err = vscale([rand(-1, 1) * d * 0.02, rand(-1, 1) * d * 0.015, rand(-1, 1) * d * 0.02], aimK); ai.leadK = rand(0.7, 1.25); }
     }
     ai.target = best;
     if (best && hasShells(T)) t.ammo = aiAmmo(t, best); // takes effect with the next reload
@@ -3009,8 +3097,8 @@ function updateAI(t, dt, now) {
   else if (tgt && t.reloadT <= 0 && ai.fireDelay <= 0 && err < 0.025) {
     fire(t);
     const d = vlen(vsub(tgt.pos, t.pos));
-    ai.err = [rand(-1, 1) * d * 0.009, rand(-0.6, 1) * d * 0.006, rand(-1, 1) * d * 0.009];
-    ai.fireDelay = rand(0.2, 1.0);
+    ai.err = vscale([rand(-1, 1) * d * 0.009, rand(-0.6, 1) * d * 0.006, rand(-1, 1) * d * 0.009], aimK);
+    ai.fireDelay = foe ? rand(...ENEMY_AI.cadence) : rand(0.2, 1.0);
   }
   // driving
   // Last Stand attackers that stop gaining on B (wedged in the pocket beside the church, grinding for whole
@@ -3189,7 +3277,7 @@ function explode(p, he, owner, direct, s, hit) {
       if (d < he.kill * 1.8 && t.trackT <= 0) { t.trackT = 7; msgs.push("TRACK DESTROYED"); }
     }
     t.hp -= dmg; t.lastHitBy = owner; t.lastHitT = now;
-    if (t.isPlayer) { dmgFlash = 1; showHit(`Hit by ${!s ? "artillery" : s.kind === "rocket" ? "rocket" : s.kind === "bomb" ? "bomb" : s.ammo === "he" ? "HE shell" : "artillery"} — ${owner.name}`, "#ff7a6e"); }
+    if (t.isPlayer) { markHitFrom(owner); dmgFlash = 1; showHit(`Hit by ${!s ? "artillery" : s.kind === "rocket" ? "rocket" : s.kind === "bomb" ? "bomb" : s.ammo === "he" ? "HE shell" : "artillery"} — ${owner.name}`, "#ff7a6e"); }
     const crewOut = t.crew && crewLeft(t) < 2;
     if (t.hp <= 0 || crewOut) { destroyTank(t, owner); msgs.unshift(crewOut ? "CREW KNOCKED OUT" : "TARGET DESTROYED"); }
     else if (owner.isPlayer && dmg > 5 && !msgs.length) msgs.push("HIT");
@@ -3208,7 +3296,7 @@ function planeImpact(s, hit) {
   else if (Math.random() < (s.small ? 0.01 : 0.1) * (t.type.armorK || 1)) { dmg = 999; msgs.push("PILOT KNOCKED OUT"); }
   t.hp -= dmg; t.lastHitBy = shooter; t.lastHitT = now;
   sparks(p, 3);
-  if (t.isPlayer) { dmgFlash = Math.max(dmgFlash, s.small ? 0.25 : 1); if (msgs.length) showHit(msgs.join("\n") + ` — ${shooter.name}`, "#ff7a6e"); }
+  if (t.isPlayer) { markHitFrom(shooter); dmgFlash = Math.max(dmgFlash, s.small ? 0.25 : 1); if (msgs.length) showHit(msgs.join("\n") + ` — ${shooter.name}`, "#ff7a6e"); }
   if (shooter.isPlayer) hitMarkT = 0.12;
   if (t.hp <= 0) { destroyTank(t, shooter); msgs.unshift("AIRCRAFT DESTROYED"); }
   if (shooter.isPlayer && msgs.length) showHit(msgs.join("\n"), "#ffd34d");
@@ -3347,7 +3435,7 @@ function updateAirAI(t, dt) {
     }
     // pilots misjudge range and deflection: a distance-scaled aim error and lead factor re-rolled each
     // think and eased in (below), so the aim point wanders around the target instead of locking onto it
-    const ed = ai.air ? clamp(vlen(vsub(ai.air.pos, t.pos)), 80, 900) * 0.014 : 2;
+    const ed = (ai.air ? clamp(vlen(vsub(ai.air.pos, t.pos)), 80, 900) * 0.014 : 2) * (isFoeAI(t) ? ENEMY_AI.air : 1);
     ai.errT = [rand(-1, 1) * ed, rand(-1, 1) * ed * 0.8, rand(-1, 1) * ed];
     ai.leadK = rand(0.7, 1.2);
   }
@@ -3448,6 +3536,7 @@ function feed(html) {
   setTimeout(() => d.remove(), 9000);
 }
 function playerHit(result, shooter, msgs = []) {
+  markHitFrom(shooter);
   if (result === "PENETRATION") { dmgFlash = 1; tone("sawtooth", 90, 0.25, 0.4, 40); }
   else { dmgFlash = Math.max(dmgFlash, 0.35); tone("triangle", 1800, 0.12, 0.3, 1200); }
   if (!player.alive) return;
@@ -3640,6 +3729,10 @@ document.addEventListener("keydown", e => {
   if (e.code === "ShiftLeft" || e.code === "ShiftRight") cam.sniper = !cam.sniper;
   if (e.code === "Escape" && noLock) showMenu("paused");
   if (e.code === "KeyF") toggleRepair(player);
+  if (e.code === "KeyM") {
+    markersOn = !markersOn; centerMsg(`ENEMY MARKERS ${markersOn ? "ON" : "OFF"} (M)`, "#9fd4ff"); announce(`Enemy markers ${markersOn ? "on" : "off"}`);
+    try { localStorage.setItem("steelfront.markers", markersOn ? "on" : "off"); } catch (err) { /* not persisted */ }
+  }
   const ak = { Digit1: "ap", Digit2: "aphe", Digit3: "he", Numpad1: "ap", Numpad2: "aphe", Numpad3: "he" }[e.code];
   if (ak && player.alive && hasShells(player.type)) selectAmmo(player, ak);
   const ck = { KeyG: "smoke", KeyV: "toolkit", KeyB: "arty", KeyX: "boost" }[e.code];
@@ -3805,6 +3898,7 @@ function step(dt) {
   spotT -= dt;
   if (spotT <= 0) {
     spotT = 0.5;
+    playerSpots();
     for (const a of tanks) if (a.alive && a.type.air) for (const e of tanks) {
       if (!e.alive || e.team === a.team) continue;
       const d = vlen(vsub(e.pos, a.pos));
@@ -4088,7 +4182,8 @@ function drawHud() {
   hx.clearRect(0, 0, W, H);
   if (state === "menu" || state === "cine") return;
   hx.font = "bold 12px system-ui, sans-serif"; hx.textAlign = "center";
-  // no floating nameplates or zone/capture-point markers: targets and objectives are found by eye
+  // spotted enemies get a marker / edge arrow (drawEnemyCues); zones stay unmarked and are found by eye
+  if (state === "playing" || state === "paused") drawEnemyCues(W, H);
   if (player.alive && player.type.air) { drawAirHud(W, H); return; }
   if (player.alive) {
     // crosshair at camera aim
@@ -5615,6 +5710,35 @@ function runSelfTest() {
     ok("time out with B neutral is a defeat (was: victory)", outcome && outcome.result === "loss" && outcome.reason === "neutral", outcome && `${outcome.result}/${outcome.reason}`);
     battle("laststand"); zones[0].owner = 0; checkEnd(0);
     ok("time out holding B is a victory", outcome && outcome.result === "win");
+  });
+  guard("enemy cues", () => {
+    battle("conquest");
+    const p = player, keep = tanks; p.pos = [0, heightAt(0, 200), 200]; p.yaw = 0; updateTankMatrices(p);
+    const e = unit(HIST.panther, 1, 0, 200 + 300); e.spottedUntil = -99; tanks = [p, e];
+    cam.yaw = 0; cam.pitch = 0; cam.dir = [0, 0, 1]; cam.fov = 1.1; cam.pos = eyeOf(p);
+    playerSpots();
+    ok("an enemy in view and in line of sight is spotted by the player", e.spottedUntil > now || !los(eyeOf(p), center(e)), los(eyeOf(p), center(e)) ? "los" : "no los");
+    const far = unit(HIST.panther, 1, 0, 200 + 1600); far.spottedUntil = -99; tanks = [p, far]; playerSpots();
+    ok("an enemy beyond spotting range is not", far.spottedUntil < now);
+    const sh = unit(HIST.tiger, 1, 500, 200); sh.spottedUntil = -99; tanks = [p, sh]; revealShooter(sh);
+    ok("an enemy firing within 900 m of your side is revealed", sh.spottedUntil > now);
+    const hid = unit(HIST.tiger, 1, 1400, 200); hid.spottedUntil = -99; tanks = [p, hid]; revealShooter(hid);
+    ok("…one firing far from everyone is not", hid.spottedUntil < now);
+    hitFrom = null; markHitFrom(hid);
+    ok("being hit records the direction and spots the shooter", hitFrom && hitFrom.p[0] === hid.pos[0] && hid.spottedUntil > now + 5);
+    // the edge-arrow maths agrees with the renderer's projection: a point to the camera's right is on the right
+    VP = mul(perspective(cam.fov, hud.width / hud.height, 0.5, 5000), lookAt(cam.pos, vadd(cam.pos, cam.dir), [0, 1, 0]));
+    const q = vadd(cam.pos, [0, 0, 50]), rq = vadd(q, vscale(vnorm(vcross(cam.dir, [0, 1, 0])), 20)), sp = project(rq);
+    ok("edge arrows point the same way as the screen", sp && screenDir(rq)[0] > 0 && sp[0] > hud.width / 2, sp && sp[0].toFixed(0));
+    hitFrom = null; tanks = keep;
+  });
+  guard("enemy AI handicap", () => {
+    battle("conquest");
+    const foe = tanks.find(t => t.ai && t.team === 1 && !t.type.air), ally = tanks.find(t => t.ai && t.team === 0 && !t.type.air);
+    ok("only enemy AI is handicapped", isFoeAI(foe) && !isFoeAI(ally) && !isFoeAI(player));
+    ok("handicap values make enemies slower and less accurate, never better", ENEMY_AI.see <= 1 && ENEMY_AI.react >= 1 && ENEMY_AI.aim >= 1 && ENEMY_AI.air >= 1 && ENEMY_AI.cadence[0] >= 0.2);
+    const sh = unit(HIST.sherman, 0, 0, 0);
+    ok("enemy tanks load AP (less spall) against armour, allies still pick APHE when it works", aiAmmo(foe, sh) === "ap" && aiAmmo(ally, unit(HIST.sherman, 1, 40, 0)) === "aphe");
   });
   guard("battle soak", () => {
     for (const mode of ["conquest", "laststand"]) {

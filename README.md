@@ -10,6 +10,8 @@ Source and build tooling for the Roblox place **Wild Feast Islands**.
 | `tools/` | Lune scripts: `extract`, `build`, `roundtrip` (proves no original instance was lost), `sourcemap`, `mapview` (top-down SVG of the built place), `check.sh`. |
 | `tests/` | Offline Lune tests (`lune run tests/run.luau`). |
 
+`steelfront/` holds a separate, unrelated single-file HTML game (Steel Front, a WebGL tank battle game). See [`steelfront/README.md`](steelfront/README.md).
+
 Tools are pinned in `mise.toml` (`mise install`). `tools/check.sh` runs StyLua, the tests, the build, the round-trip check and a strict `luau-lsp analyze` with Roblox definitions.
 
 To go back to the original, open `place/WildFeastIslands.original.rbxl`. To go back to the first pass, run `git checkout a4246c5 -- src` and rebuild.

@@ -252,7 +252,18 @@ function Effects.ring(position: Vector3, color: Color3)
 	end)
 end
 
-local function foodPart(foodId: string): BasePart
+local function rgb(c: { number }): Color3
+	return Color3.fromRGB(c[1], c[2], c[3])
+end
+
+-- The thrower's Painter's Kit trail, if the server published one for them.
+local function trailOf(ownerUserId: any): any
+	local owner = if type(ownerUserId) == "number" then Players:GetPlayerByUserId(ownerUserId) else nil
+	local id = owner and owner:GetAttribute("Trail")
+	return if type(id) == "string" then Config.Trails[id] else nil
+end
+
+local function foodPart(foodId: string, ownerUserId: any): BasePart
 	local food = Config.Foods[foodId] or Config.Foods.sunberry
 	local color = Color3.fromRGB(food.Color[1], food.Color[2], food.Color[3])
 	local part = Ui.new("Part", {
@@ -272,17 +283,21 @@ local function foodPart(foodId: string): BasePart
 	})
 	if not reduced() then
 		-- A short tapered streak in the food's colour makes the arc easy to follow.
-		local half = food.Size * 0.3
+		-- A Painter's Kit trail replaces it with a longer one in the trail's own colours.
+		local style = trailOf(ownerUserId)
+		local half = food.Size * 0.3 * (if style then style.Width * 1.6 else 1)
 		local a0 = Ui.new("Attachment", { Position = Vector3.new(0, half, 0), Parent = part })
 		local a1 = Ui.new("Attachment", { Position = Vector3.new(0, -half, 0), Parent = part })
 		Ui.new("Trail", {
 			Attachment0 = a0,
 			Attachment1 = a1,
-			Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.35)),
-			Transparency = NumberSequence.new(0.35, 1),
+			Color = if style
+				then ColorSequence.new(rgb(style.Colors[1]), rgb(style.Colors[2]))
+				else ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.35)),
+			Transparency = NumberSequence.new(if style then 0.1 else 0.35, 1),
 			WidthScale = NumberSequence.new(1, 0),
-			Lifetime = 0.22,
-			LightEmission = 0.25,
+			Lifetime = if style then style.Lifetime else 0.22,
+			LightEmission = if style then 0 else 0.25,
 			FaceCamera = true,
 			Parent = part,
 		})
@@ -315,7 +330,8 @@ local function onFx(payload: any)
 			return
 		end
 		activeCount += 1
-		active[payload.id] = { part = foodPart(payload.food), origin = payload.origin, velocity = payload.velocity, started = os.clock() }
+		active[payload.id] =
+			{ part = foodPart(payload.food, payload.owner), origin = payload.origin, velocity = payload.velocity, started = os.clock() }
 		if payload.owner == Players.LocalPlayer.UserId then
 			Effects.play("throw")
 		end
@@ -349,7 +365,7 @@ local function onFx(payload: any)
 			table.insert(lines, (quality and (quality.Icon .. " " .. quality.Label)) or "")
 			table.insert(lines, string.format("+%d coins", payload.coins))
 		else
-			table.insert(lines, "✕ Not a fan of that!")
+			table.insert(lines, "✕ Not interested")
 		end
 		if payload.research > 0 then
 			table.insert(lines, string.format("+%d research", payload.research))

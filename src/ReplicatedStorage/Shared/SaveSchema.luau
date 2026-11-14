@@ -41,6 +41,15 @@ export type Profile = {
 	decorPlaced: { [string]: { [string]: string } }, -- habitatId -> "p<slot>" -> decorationId
 	questsClaimed: { [string]: boolean },
 	pinned: { string }, -- foods pinned to the HUD food bar, in order
+	-- v4 (passes)
+	passes: { [string]: boolean }, -- pass key -> confirmed owned (written only by PassService)
+	cosmetics: Cosmetics,
+}
+
+export type Cosmetics = {
+	companion: string?, -- shown companion id
+	trail: string?, -- equipped throw trail id
+	hatched: { [string]: boolean }, -- companion id -> hatched from its egg
 }
 
 local function finiteNonNegative(value: any, cap: number): number
@@ -94,6 +103,8 @@ function SaveSchema.default(config: any): Profile
 		decorPlaced = {},
 		questsClaimed = {},
 		pinned = {},
+		passes = {},
+		cosmetics = { hatched = {} },
 	}
 end
 
@@ -141,6 +152,17 @@ local MIGRATIONS: { [number]: (any) -> any } = {
 			data.pinned = {}
 		end
 		data.schemaVersion = 3
+		return data
+	end,
+	-- v3 had no passes or cosmetics; both start empty (ownership is checked with Roblox at join).
+	[3] = function(data: any): any
+		if type(data.passes) ~= "table" then
+			data.passes = {}
+		end
+		if type(data.cosmetics) ~= "table" then
+			data.cosmetics = { hatched = {} }
+		end
+		data.schemaVersion = 4
 		return data
 	end,
 }
@@ -329,7 +351,12 @@ function SaveSchema.sanitize(config: any, data: any): Profile
 		profile.decorPlaced = placed
 		local pinned = {}
 		if type(data.pinned) == "table" then
-			for i = 1, math.min(#data.pinned, config.FoodBar.MaxPinned) do
+			-- The pass bonus is re-checked at join (Passes.applyOwnership trims extra pins).
+			local ceiling = config.FoodBar.MaxPinned
+			for _, def in pairs(config.Passes or {}) do
+				ceiling += def.ExtraPins or 0
+			end
+			for i = 1, math.min(#data.pinned, ceiling) do
 				local id = data.pinned[i]
 				local food = type(id) == "string" and config.Foods[id]
 				if food and not food.Free and profile.unlockedFoods[id] and not table.find(pinned, id) then
@@ -338,6 +365,22 @@ function SaveSchema.sanitize(config: any, data: any): Profile
 			end
 		end
 		profile.pinned = pinned
+	end
+	-- v4: passes and cosmetics. Only known keys survive; ownership is re-confirmed at join.
+	if config.Passes then
+		profile.passes = readMap(data.passes, config.Passes, function(value)
+			return if value == true then true else nil
+		end)
+		local source = if type(data.cosmetics) == "table" then data.cosmetics else {}
+		profile.cosmetics.hatched = readMap(source.hatched, config.Companions, function(value)
+			return if value == true then true else nil
+		end)
+		if type(source.companion) == "string" and profile.cosmetics.hatched[source.companion] then
+			profile.cosmetics.companion = source.companion
+		end
+		if type(source.trail) == "string" and config.Trails[source.trail] then
+			profile.cosmetics.trail = source.trail
+		end
 	end
 	if type(data.selectedFood) == "string" and profile.unlockedFoods[data.selectedFood] then
 		profile.selectedFood = data.selectedFood

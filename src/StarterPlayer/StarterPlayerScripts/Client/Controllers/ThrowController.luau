@@ -161,8 +161,16 @@ local function updatePreview()
 			if root and typeof(offset) == "Vector3" and (state == "Idle" or state == "Anticipate" or state == "Approach") then
 				local mouth = root.CFrame * offset
 				if (mouth - start).Magnitude < 160 then
+					-- Same catch test as the server (FeedingService): mouth radius, anticipation,
+					-- the Mouth Reading upgrades for this archetype, plus the food's own radius.
+					local species = Config.Species[model:GetAttribute("Species") :: any]
+					local bonusPct = if species and Store.profile
+						then Economy.modifier(Config, Store.profile, "catchArchetype", species.Archetype)
+						else 0
 					local radius = (model:GetAttribute("CatchRadius") :: number? or 2)
-						* (if state == "Anticipate" then Config.Animal.AnticipateCatchBonus else 1)
+							* (if state == "Anticipate" then Config.Animal.AnticipateCatchBonus else 1)
+							* (1 + math.min(bonusPct, Config.Bonus.MaxCatchPct) / 100)
+						+ Config.Throw.ProjectileRadius
 					for i = 2, visibleCount do
 						if Trajectory.distanceToSegment(points[i - 1], points[i], mouth) <= radius then
 							catchTarget = root
@@ -265,7 +273,7 @@ function ThrowController.init()
 		Ui.new("TextLabel", {
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
-			Text = "◎ CATCH!",
+			Text = "◎ Catch",
 			TextScaled = true,
 			FontFace = Ui.TitleFont,
 			TextColor3 = Color3.fromRGB(255, 240, 120),

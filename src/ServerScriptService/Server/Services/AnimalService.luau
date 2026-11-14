@@ -532,8 +532,9 @@ function AnimalService.summon(speciesId: string, _player: Player?): (boolean, st
 		local slot = animal.slot :: any
 		if slot.habitat == species.Habitat then
 			if animal.species.Id == speciesId then
-				slot.luredUntil = math.max(slot.luredUntil, now + Config.Visitors.LuredStaySeconds)
-				return false, species.Name .. " is already visiting " .. animal.habitat.Name .. ". Go say hi!"
+				-- No lure is spent here, so the stay is not extended either (that was a free,
+				-- repeatable way to pin a visitor in place).
+				return false, species.Name .. " is already at " .. animal.habitat.Name .. ". Your lure is kept."
 			end
 			if now >= slot.lockedUntil and (candidate == nil or slot.since < (candidate.slot :: any).since) then
 				candidate = animal
@@ -548,7 +549,7 @@ function AnimalService.summon(speciesId: string, _player: Player?): (boolean, st
 	slot.since = now
 	slot.luredUntil = now + Config.Visitors.LuredStaySeconds
 	slot.lockedUntil = now + Config.Visitors.LureLockSeconds
-	return true, string.format("A %s is on its way to %s!", species.Name, Config.Habitats[species.Habitat].Name)
+	return true, string.format("A %s is on its way to %s.", species.Name, Config.Habitats[species.Habitat].Name)
 end
 
 local function rotateVisitors(now: number)

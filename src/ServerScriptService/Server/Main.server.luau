@@ -18,6 +18,7 @@ local FeastService = require(Services.FeastService)
 local ActionService = require(Services.ActionService)
 local SafetyService = require(Services.SafetyService)
 local DecorService = require(Services.DecorService)
+local PassService = require(Services.PassService)
 
 -- The world is baked into the place file; rebuild it only if it is missing (e.g. `rojo serve`).
 local world = workspace:FindFirstChild(Config.World.FolderName)
@@ -51,6 +52,16 @@ DecorService.init({ getProfile = getProfile, notify = notify }, function(callbac
 		callback(player)
 	end)
 end)
+PassService.init({
+	getProfile = getProfile,
+	markDirty = markDirty,
+	notify = notify,
+	onLoaded = function(callback)
+		DataService.onLoaded(function(player)
+			callback(player)
+		end)
+	end,
+})
 ActionService.init({
 	getProfile = getProfile,
 	markDirty = markDirty,
@@ -59,6 +70,8 @@ ActionService.init({
 	summon = AnimalService.summon,
 	resync = StateService.requestFull,
 	decorChanged = DecorService.sync,
+	requestPass = PassService.requestPurchase,
+	cosmeticsChanged = PassService.publish,
 })
 SafetyService.init({ getProfile = getProfile, notify = notify })
 

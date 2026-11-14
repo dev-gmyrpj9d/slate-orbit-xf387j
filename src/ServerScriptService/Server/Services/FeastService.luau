@@ -83,13 +83,13 @@ local function broadcast()
 		if state == "Waiting" then
 			statusLabel.Text = string.format("Next feast in %ds", remaining)
 		elseif state == "Ready" then
-			statusLabel.Text = "Feast ready!\nRing the bell"
+			statusLabel.Text = "Feast ready\nRing the bell"
 		elseif state == "Active" then
-			statusLabel.Text = string.format("Feed me! %d / %d", progress, goal)
+			statusLabel.Text = string.format("Fed %d of %d", progress, goal)
 		elseif state == "Arriving" then
-			statusLabel.Text = feastConfig.GiantName .. " is coming!"
+			statusLabel.Text = feastConfig.GiantName .. " is coming"
 		else
-			statusLabel.Text = "Thank you, friends!"
+			statusLabel.Text = "Thank you"
 		end
 	end
 end
@@ -113,8 +113,8 @@ function FeastService.start(byPlayer: Player?): boolean
 	progress = 0
 	contributions = {}
 	setState("Arriving", feastConfig.ArriveSeconds)
-	local who = if byPlayer then byPlayer.DisplayName .. " rang the bell! " else ""
-	deps.notifyAll(who .. "The " .. feastConfig.GiantName .. " is surfacing at Feast Cove!", "success")
+	local who = if byPlayer then byPlayer.DisplayName .. " rang the bell. " else ""
+	deps.notifyAll(who .. "The " .. feastConfig.GiantName .. " is surfacing at Feast Cove.", "success")
 	return true
 end
 
@@ -153,9 +153,9 @@ local function finish(success: boolean)
 		end
 	end
 	if success then
-		deps.notifyAll("The " .. feastConfig.GiantName .. " is full and happy! Thank you, islanders!", "success")
+		deps.notifyAll("The " .. feastConfig.GiantName .. " is full. Rewards are shared out.", "success")
 	else
-		deps.notifyAll("The " .. feastConfig.GiantName .. " swims off, still a little peckish. Rewards shared anyway!", "info")
+		deps.notifyAll("The " .. feastConfig.GiantName .. " swims off still a little hungry. A smaller reward is shared out.", "info")
 	end
 	contributions = {}
 	setState("Leaving", feastConfig.LeaveSeconds)
@@ -225,7 +225,7 @@ local function update(dt: number)
 	giantPhase += dt
 	if state == "Waiting" and now >= stateEnds then
 		setState("Ready", feastConfig.AutoStartAfterReady)
-		deps.notifyAll("A Grand Feast is ready at Feast Cove. Ring the bell on the pier!", "info")
+		deps.notifyAll("A feast is ready at Feast Cove. Ring the bell on the south pier.", "info")
 	elseif state == "Ready" and now >= stateEnds then
 		if #Players:GetPlayers() > 0 then
 			FeastService.start(nil)

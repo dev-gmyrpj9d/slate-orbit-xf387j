@@ -56,7 +56,7 @@ local LADDERS: { { any } } = {
 		{ "Bullseye", "Sharp Eye", "Mouth Marksman", "Catch Artist", "Perfect Pitcher", "Arc Master", "Golden Arm", "Legendary Lobber" },
 		{ 5, 15, 30, 60, 100, 175, 275, 400 },
 		30,
-		"Make %d Perfect mouth catches.",
+		"Make %d clean catches (straight into the mouth).",
 	},
 	{
 		"feeds",

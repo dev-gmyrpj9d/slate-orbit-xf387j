@@ -76,11 +76,27 @@ The left panel also shows the presets (the current one highlighted) and `THR n%�
 **Easy flight** is on by default. Press **L** in an aircraft to toggle it; the setting is saved. It only helps the player's plane; AI planes fly the normal model.
 
 - **Stall protection:** when you get slow, it limits how hard the nose pulls, stops further climbing and adds power. The extra power shows as orange on the bar, with `+AUTO` and "STALL PROTECTION".
-- **Auto pull-up:** it looks up to 4 s ahead along your flight path and climbs away if that path comes within 45 m of the ground ("AUTO PULL-UP").
 - **Gentler climbs and dives:** they're capped at about 40°, so a big mouse swing can't put the plane into a vertical dive or loop.
 - **Steadier nose:** the mouse-aim target is smoothed slightly so the nose doesn't overshoot.
 
 With it off, the plane flies exactly as before.
+
+## Pass 4: lock-on rockets, no auto pull-up
+
+**Auto pull-up removed.** Playtest feedback asked for it to go. Easy flight no longer flies the plane for you: holding a dive takes you into the ground. The HUD still flashes PULL UP. Stall protection, the 40° climb/dive cap, nose smoothing and the throttle controls are unchanged. The dive cap also had a bug: aiming almost straight down slipped past it, because only the vertical component was clamped. It now caps the angle itself.
+
+**Lock-on rockets (arcade, game-only).** Two new player vehicles carry SF-G rockets that steer themselves:
+
+- **Hornet R-5** (Ground forces, Steel Front): a light rocket tank with a 50 mm gun and two turret pods of 4 rockets. The pods reload one rocket every 8 s.
+- **P-51D Kestrel** (Aircraft, Steel Front): a Mustang-airframe variant with six .50 cal guns and 6 lock-on rockets instead of bombs. T rearms them as usual.
+
+How it works:
+
+1. A dashed seeker circle sits round the crosshair. Keep an enemy tank or aircraft inside it, in range (1,000 m for tanks, 1,400 m for aircraft) and in clear view. The seeker picks the enemy nearest the crosshair by itself.
+2. A yellow box closes in on the target (`LOCKING n%`). After 0.6 s it turns into a red `LOCKED TANK/AIR · range` box with `R: FIRE`.
+3. Press **R**. The rocket steers to the target, leading it, and flies a shallow loft against tanks so it clears crests. It bursts next to aircraft (proximity fuse), and has to beat the armour it hits on tanks (150 mm penetration). Without a lock, R fires the rocket straight ahead.
+
+Friendly units, wrecks, targets out of range and targets behind terrain or smoke never lock. AI units never use these vehicles, and an AI launcher could not home, so enemy difficulty is unchanged.
 
 ## Testing
 
@@ -88,14 +104,15 @@ With it off, the plane flies exactly as before.
 node steelfront/tests/run-selftest.mjs    # exits 0 on PASS; set CHROME=/path/to/chrome if it isn't on PATH
 ```
 
-You can also open `steelfront.html?selftest` in any browser. The page runs 56 seeded checks and shows the results on screen. The checks cover:
+You can also open `steelfront.html?selftest` in any browser. The page runs 80 seeded checks and shows the results on screen. The checks cover:
 
 - the armour lookup and damage model
 - each fix above, as a regression check
 - crew effects, shell switching, HE and fire
 - the AI's zone and shell choices
 - spotting, the marker and arrow directions, and the enemy AI handicap
-- easy flight (pull-up, stall protection, player only), throttle keys and level-flight speed per throttle
+- easy flight (no auto pull-up, 40° dive cap, stall protection, player only), throttle keys and level-flight speed per throttle
+- lock-on rockets: which units can lock (friendly, out of range, outside the circle, destroyed), lock timing, tank→tank (moving), tank→aircraft, plane→aircraft and plane→tank hits, unguided fire without a lock, AI never homing, pod reload, the R key and the lock HUD
 - two 150 s simulated battles (Conquest and Last Stand) checked for exceptions, NaNs and zombie crews
 
 The self-test uses a throwaway profile and never writes your save. `?nointro` skips the intro.
@@ -110,7 +127,8 @@ Run this in a real browser after changes to gameplay, HUD or input.
 4. Aim at an enemy: the marker turns green, yellow, red or grey. In the sight it shows `pen/effective mm`. A Panther's front hull is red for the Sherman and its side is green.
 5. Get penetrated, or use the console. Crew chips cross out, the hit message lists the knocked-out crew, and "New gunner in Ns" appears and resolves.
 6. Catch fire: "ON FIRE — F to extinguish" appears. F puts the fire out without starting a repair. A second F starts the repair. During the repair the gun neither turns nor fires.
-7. Fly an aircraft: the panel shows throttle presets 1–4 and the easy-flight chip, not shells or crew. W/S and 1–4 change the throttle bar and the speed settles at the blue tick. Aim straight down and the plane pulls up by itself; L turns that off. Rockets on a heavy tank's front no longer kill it outright, while bombs still do.
+7. Fly an aircraft: the panel shows throttle presets 1–4 and the easy-flight chip, not shells or crew. W/S and 1–4 change the throttle bar and the speed settles at the blue tick. Aim straight down: the dive stays at about 40° but the plane does not pull up by itself. Rockets on a heavy tank's front no longer kill it outright, while bombs still do.
 8. Last Stand: let the timer run out with B neutral (console: `steelFront.battleTime = steelFront.mode.time`). The result is DEFEAT.
 9. Spotted enemies show a red marker with their range. Turn away and an edge arrow points back at them; M toggles both. Get hit and a red arc points to the shooter.
-10. Tab shows the scoreboard, P the FPS counter and Esc pauses. Leaving to the hangar pays no rewards.
+10. Deploy the Hornet R-5, then the P-51D Kestrel. Hold an enemy inside the dashed circle: the yellow box turns red (LOCKED), R fires, and the rocket curves onto the target. A friendly unit never locks.
+11. Tab shows the scoreboard, P the FPS counter and Esc pauses. Leaving to the hangar pays no rewards.

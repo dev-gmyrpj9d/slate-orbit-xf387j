@@ -266,21 +266,21 @@
       <tr><td>Shift / RMB</td><td>Gunner sight</td><td>Wheel</td><td>Zoom</td></tr>
       <tr><td>F</td><td>Repair (10 s, tank stays put) · extinguish fire</td><td>Tab / Esc</td><td>Scoreboard / pause</td></tr>
       <tr><td>1 / 2 / 3</td><td>Load AP / APHE / HE</td><td>P</td><td>Frame-rate counter</td></tr>
-      <tr><td>M</td><td>Enemy markers on / off</td><td></td><td></td></tr>
+      <tr><td>M</td><td>Enemy markers on / off</td><td>R</td><td>Fire lock-on rocket (Hornet R-5)</td></tr>
     </table>
     <table class="ctl" id="ctlAir" style="display:none">
       <tr><td>Mouse</td><td>Mouse-aim: the plane flies toward the circle</td><td>Left click</td><td>Fire guns</td></tr>
       <tr><td>W / S</td><td>Throttle up / down (speed)</td><td>Space</td><td>Drop bomb</td></tr>
       <tr><td>1 / 2 / 3 / 4</td><td>Throttle 25 / 50 / 75 / 100%</td><td>L</td><td>Easy flight on / off</td></tr>
-      <tr><td>A / D</td><td>Manual roll</td><td>R</td><td>Fire rockets</td></tr>
+      <tr><td>A / D</td><td>Manual roll</td><td>R</td><td>Fire rockets (lock-on on the P-51D Kestrel)</td></tr>
       <tr><td>C (hold)</td><td>Free look</td><td>Shift / RMB</td><td>Zoom</td></tr>
       <tr><td>T</td><td>Rearm all weapons (15 s)</td><td>F</td><td>Repair airframe (15 s)</td></tr>
       <tr><td>Tab</td><td>Scoreboard</td><td>Esc</td><td>Pause</td></tr>
       <tr><td>M</td><td>Enemy markers on / off</td><td></td><td></td></tr>
       <tr><td>P</td><td>Frame-rate counter</td><td></td><td></td></tr>
     </table>
-    <p class="hint" id="hintGround" style="margin:-4px 0 10px">Spotted enemies (seen by you or an ally, or just fired near your side) get a red marker with their range, a red arrow at the screen edge when off-screen and a red square on the minimap; a red arc around the crosshair points to whoever just hit you. The small circle shows where your gun is really pointed; over an enemy it turns green (shell gets through), yellow (maybe), red (no) or grey (ricochet). Angle your front armour, hit enemy sides &amp; rear, shoot tracks to immobilise. Penetrations knock out crew: lose all but one and the tank is lost. APHE wrecks crews, AP gets through thicker plate, HE is for open-topped vehicles.</p>
-    <p class="hint" id="hintAir" style="margin:-4px 0 10px;display:none">Aircraft spawn in the air behind your base. Point the mouse where you want to go and the plane follows. Easy flight (on by default, L toggles) stops stalls, pulls up before the ground and keeps climbs and dives gentle. Set your speed with W/S or the 1–4 presets; the throttle bar shows the setting, the blue tick the speed it settles at and the red tick the stall speed. The cross is where your guns point; lead moving targets using the lead marker. The diamond on the ground is where a bomb would land.</p>
+    <p class="hint" id="hintGround" style="margin:-4px 0 10px">Spotted enemies (seen by you or an ally, or just fired near your side) get a red marker with their range, a red arrow at the screen edge when off-screen and a red square on the minimap; a red arc around the crosshair points to whoever just hit you. The small circle shows where your gun is really pointed; over an enemy it turns green (shell gets through), yellow (maybe), red (no) or grey (ricochet). Angle your front armour, hit enemy sides &amp; rear, shoot tracks to immobilise. Penetrations knock out crew: lose all but one and the tank is lost. APHE wrecks crews, AP gets through thicker plate, HE is for open-topped vehicles. Lock-on rockets (Hornet R-5 tank, P-51D Kestrel plane): keep an enemy tank or aircraft inside the dashed circle; the yellow box closes in and turns red when LOCKED, then press R and the rocket steers itself to it.</p>
+    <p class="hint" id="hintAir" style="margin:-4px 0 10px;display:none">Aircraft spawn in the air behind your base. Point the mouse where you want to go and the plane follows. Easy flight (on by default, L toggles) stops stalls and keeps climbs and dives gentle; it does not pull up for you, so watch the AGL readout and the PULL UP warning. Set your speed with W/S or the 1–4 presets; the throttle bar shows the setting, the blue tick the speed it settles at and the red tick the stall speed. The cross is where your guns point; lead moving targets using the lead marker. The diamond on the ground is where a bomb would land. The P-51D Kestrel's rockets lock on by themselves: hold an enemy plane or tank inside the dashed circle until the box turns red, then press R.</p>
     <div id="rewards" aria-live="polite"></div>
     <button id="play">Deploy</button>
     <button id="restart" class="secondary" style="display:none">New battle</button>
@@ -1171,11 +1171,18 @@ const TYPES = {
     tur: { w: 2.5, h: 1.0, l: 2.8, z: -0.1 }, bar: { len: 5.0, r: 0.1 },
     speed: 9, rev: 3.5, accel: 3, turn: 0.5, traverse: 0.34, elevRate: 0.3,
     armor: { hf: 150, hs: 85, hr: 55, ht: 30, tf: 175, ts: 95, tr: 70 }, pen: 225, dmg: 58, reload: 7.0, v0: 650, hp: 125 },
+  // fictional arcade rocket tank: a light gun plus two turret pods of lock-on SF-G rockets (see LOCK below)
+  hornet: { key: "hornet", name: "Hornet R-5", cls: "Rocket tank", W: 3.0, L: 5.6, Hh: 0.9, tw: 0.56,
+    tur: { w: 1.9, h: 0.76, l: 2.1, z: 0.1 }, bar: { len: 3.2, r: 0.06 },
+    speed: 15, rev: 5.5, accel: 6, turn: 0.95, traverse: 0.8, elevRate: 0.5,
+    armor: { hf: 45, hs: 30, hr: 20, ht: 12, tf: 50, ts: 30, tr: 20 }, pen: 110, dmg: 30, reload: 3.8, v0: 780, hp: 100,
+    rockets: { n: 4, kind: "SF-G", regen: 8, pts: [[1.17, 0.5, 0.25], [-1.17, 0.5, 0.25], [1.17, 0.26, 0.25], [-1.17, 0.26, 0.25]] } },
 };
-const TYPE_LIST = [TYPES.light, TYPES.medium, TYPES.heavy];
+const TYPE_LIST = [TYPES.light, TYPES.medium, TYPES.heavy, TYPES.hornet];
 Object.assign(TYPES.light, { role: "light", nation: "Steel Front", gun: "57 mm L/60", crew: 3, desc: "Original Steel Front design: a nimble scout with a quick-firing gun. Use speed and flanking shots." });
 Object.assign(TYPES.medium, { role: "medium", nation: "Steel Front", gun: "76 mm L/55", crew: 4, desc: "Original Steel Front design: the balanced all-rounder." });
 Object.assign(TYPES.heavy, { role: "heavy", nation: "Steel Front", gun: "100 mm L/56", crew: 5, desc: "Original Steel Front design: thick frontal armour and a hard-hitting gun, but slow." });
+Object.assign(TYPES.hornet, { role: "light", nation: "Steel Front", gun: "50 mm L/50", crew: 3, desc: "Original Steel Front arcade design: a light tank with two turret pods of lock-on SF-G rockets. Keep an enemy tank or aircraft near the crosshair until the box turns red (LOCKED), then press R: the rocket steers itself to the target. Four rockets; the pods reload one every 8 s." });
 for (const T of TYPE_LIST) {
   T.hullY0 = 0.35; T.hullTop = 0.35 + T.Hh; T.rad = (T.W + T.L) / 4;
   T.gunPivot = [0, T.tur.h * 0.5, T.tur.l / 2 + 0.15];
@@ -1201,6 +1208,10 @@ for (const T of TYPE_LIST) {
   addBox(t, chain(trans(0, U.h * 0.55, -U.l / 2 - 0.25), scl(U.w * 0.8, U.h * 0.6, 0.5)), body);
   addCyl(t, chain(trans(-U.w * 0.25, U.h + 0.12, -U.l * 0.15), scl(0.55, 0.25, 0.55)), body);
   addBox(t, chain(trans(U.w * 0.36, U.h + 1.0, -U.l * 0.38), scl(0.03, 2.0, 0.03)), black);
+  if (T.rockets) for (const s of [-1, 1]) { // rocket pods on the turret sides, open at the front
+    addBox(t, chain(trans(s * (U.w / 2 + 0.22), 0.38, -0.05), scl(0.4, 0.58, 1.6)), dark);
+    for (const y of [0.26, 0.5]) addCyl(t, chain(trans(s * (U.w / 2 + 0.22), y, 0.76), rotX(Math.PI / 2), scl(0.17, 0.02, 0.17)), black, 8);
+  }
   T.turMesh = finish(t);
   const g = builder(), B = T.bar;
   addCyl(g, chain(trans(0, 0, B.len / 2), rotX(Math.PI / 2), scl(B.r * 2, B.len, B.r * 2)), body, 8);
@@ -1678,7 +1689,10 @@ for (const k in HIST) {
 
 // ---------------------------------------------------------------- aircraft
 const BOMBS = { 100: { R: 14, kill: 4.5, dmg: 110 }, 227: { R: 19, kill: 6, dmg: 160 }, 250: { R: 19, kill: 6, dmg: 165 }, 500: { R: 26, kill: 8.5, dmg: 230 } };
-const ROCKETS = { HVAR: { v: 420, pen: 50, he: { R: 8, kill: 1.6, dmg: 75 } }, "RS-82": { v: 350, pen: 25, he: { R: 5, kill: 1.0, dmg: 40 } } };
+const ROCKETS = { HVAR: { v: 420, pen: 50, he: { R: 8, kill: 1.6, dmg: 75 } }, "RS-82": { v: 350, pen: 25, he: { R: 5, kill: 1.0, dmg: 40 } },
+  // arcade lock-on rocket (Hornet R-5 / P-51D Kestrel): steers itself to the locked target, proximity fuse against aircraft
+  "SF-G": { v: 240, vmax: 330, pen: 150, he: { R: 6, kill: 1.2, dmg: 40 }, guided: true, gap: 0.7, life: 7 } };
+const lockOnType = T => !!(T && T.rockets && ROCKETS[T.rockets.kind].guided);
 const TRACER = { USA: [1, 0.7, 0.35], UK: [1, 0.55, 0.4], Germany: [1, 0.95, 0.65], USSR: [0.55, 1, 0.5] };
 const AIR = {};
 AIR.p51 = { key: "p51", air: true, name: "P-51D-20 Mustang", nation: "USA", cls: "Fighter", role: "fighter",
@@ -1716,6 +1730,10 @@ AIR.il2 = { key: "il2", air: true, name: "Il-2M3 Shturmovik", nation: "USSR", cl
   hit: { fw: 1.15, fh: 1.5, nose: 4.45, tail: -7.2, wz: 1.35, chord: 2.8, wy: -0.5, ts: 4.8, tz: -6.2 }, propPos: [0, 0.1, 3.85], propR: 1.8,
   engine: "Mikulin AM-38F V12, 1,720 hp", topSpeed: "414 km/h at sea level", weight: "6.4 t loaded", crew: 2,
   desc: "The armoured 'flying tank': an armoured nose bathtub protecting engine and crew, swept outer wings, wheels half-exposed in under-wing gondolas, a rear gunner with a 12.7 mm UBT, two 23 mm VYa cannon, eight RS-82 rockets and 400 kg of bombs. Slow but very tough." };
+// fictional arcade variant on the Mustang airframe: the bombs give way to six lock-on SF-G rockets
+AIR.kestrel = { ...AIR.p51, key: "kestrel", name: "P-51D Kestrel", nation: "Steel Front", cls: "Rocket fighter", role: "fighter", bombs: null,
+  rockets: { ...AIR.p51.rockets, kind: "SF-G" }, topSpeed: AIR.p51.topSpeed,
+  desc: "Steel Front arcade variant of the Mustang airframe: six .50 cal guns and six lock-on SF-G rockets instead of bombs. Keep an enemy aircraft or tank near the crosshair until the box turns red (LOCKED), then press R: the rocket steers itself to the target. Game-only fantasy weapon." };
 
 function fuselage(b, st, col, n = 16) { addLoft(b, st.map(([z, cy, rx, ry, p = 2]) => ringXY(0, cy, z, rx, ry, n, p)), col); }
 function canopy(hd, st) { addLoft(hd, st.map(([z, cy, rx, ry]) => ringXY(0, cy, z, rx, ry, 14, 2)), C.glass); }
@@ -1863,17 +1881,19 @@ function buildIl2(T) {
   addBox(h, chain(trans(0, 0.98, 0.95), rotX(-0.2), scl(0.03, 0.3, 0.08)), C.bodyDark);
   T.planeMesh = finish(h); T.planeDetail = finish(hd); T.propMesh = buildProp(T, 3, 0.3, 0.6, C.dark, 0.3);
 }
-const AIR_BUILDERS = { p51: buildP51, spitfire: buildSpitfire, bf109: buildBf109, fw190: buildFw190, il2: buildIl2 };
+const AIR_BUILDERS = { p51: buildP51, spitfire: buildSpitfire, bf109: buildBf109, fw190: buildFw190, il2: buildIl2, kestrel: buildP51 };
 for (const k in AIR) {
   const T = AIR[k];
   AIR_BUILDERS[k](T);
-  T.rad = T.span / 2 + 1; T.W = T.span; T.tracer = TRACER[T.nation];
+  T.rad = T.span / 2 + 1; T.W = T.span; T.tracer = TRACER[T.nation] || TRACER.USA;
   T.reload = REARM_TIME; // time to rearm every weapon (guns, bombs, rockets) in flight
   for (const g of T.guns) g.ammo = g.ammo || Math.round(g.rate * 18); // ~18 s of trigger time per gun group
   TYPES[k] = T;
 }
 const AIR_LIST = Object.values(AIR);
-const GROUND_LIST = [TYPES.light, TYPES.medium, TYPES.heavy, ...Object.values(HIST)];
+const GROUND_LIST = [TYPES.light, TYPES.medium, TYPES.heavy, TYPES.hornet, ...Object.values(HIST)];
+// the arcade lock-on vehicles are for the player only: AI line-ups (and so enemy difficulty) are unchanged
+const AI_AIR = AIR_LIST.filter(T => !lockOnType(T)), AI_GROUND = GROUND_LIST.filter(T => !lockOnType(T));
 // stores and shared air meshes
 const bombMesh = (() => {
   const b = builder(), col = [0.36, 0.4, 0.32];
@@ -2263,6 +2283,7 @@ function spawnTank(t) {
   t.turretYaw = 0; t.gunElev = 0; t.hp = t.type.hp; t.alive = true; t.deadT = 0; t.trackT = 0; t.engineT = 0;
   t.reloadT = 1; t.pop = 0; t.popV = 0; t.recoil = 0; t.lastHitBy = null; t.fireT = 0; t.wingDmg = 0; t.crashed = false;
   t.mag = t.type.auto ? t.type.auto.mag : 0; t.repairT = 0; t.repairCd = 0; t.breechT = 0; t.boostT = 0; t.reloadFull = 1; t.rg = null;
+  t.rockets = t.type.rockets ? t.type.rockets.n : 0; t.rocketT = 0; t.rockRel = 0; t.lock = null; t.lockT = 0;
   setupCrew(t); t.extT = 0; if (!AMMO[t.ammo]) t.ammo = t.ai ? "aphe" : "ap"; t.loaded = t.ammo; // the player keeps their last shell choice across respawns
   if (t.type.air) spawnPlane(t);
   if (t.ai) { t.ai.target = null; t.ai.goal = null; t.ai.rev = 0; t.ai.stuck = 0; t.ai.fireDelay = 1.5; t.ai.pref = ZONE_POS.map(() => rand(0, 250)); }
@@ -2658,10 +2679,13 @@ function trace(a, b, ignore) {
 function updateShells(dt) {
   for (let i = shells.length - 1; i >= 0; i--) {
     const s = shells[i], p0 = s.p;
-    s.v[1] -= G * dt * (s.kind === "rocket" ? 0.25 : 1);
+    if (s.guided) guideRocket(s, dt); else s.v[1] -= G * dt * (s.kind === "rocket" ? 0.25 : 1);
     if (s.kind === "rocket" && Math.random() < 0.7) puff(p0, [rand(-0.5, 0.5), rand(0, 1), rand(-0.5, 0.5)], [0.85, 0.85, 0.82], rand(0.8, 1.4), 0.5, 0, 0, 1.2, 0.5);
     const p1 = vadd(p0, vscale(s.v, dt));
     s.life -= dt;
+    // proximity fuse: a lock-on rocket bursts next to the aircraft it is chasing
+    const tg = s.guided && s.target;
+    if (tg && tg.alive && tg.type.air && segSphere(p0, p1, center(tg), LOCK.fuse)) { explode(center(tg), s.he, s.owner, tg, s, null); shells.splice(i, 1); continue; }
     const hit = trace(p0, p1, s.owner);
     if (hit) { impact(s, hit); shells.splice(i, 1); continue; }
     s.p = p1;
@@ -2895,11 +2919,11 @@ const waveSize = n => Math.min(8, 2 + n);
 function spawnWave() {
   ms.wave++; ms.waveT = 0;
   const n = waveSize(ms.wave), airN = ms.wave >= 6 ? 2 : ms.wave >= 3 ? 1 : 0;
-  const pool = GROUND_LIST.filter(T => T.role !== "spaa" && (ms.wave >= 4 || T.role !== "heavy"));
+  const pool = AI_GROUND.filter(T => T.role !== "spaa" && (ms.wave >= 4 || T.role !== "heavy"));
   const heavy = GROUND_LIST.filter(T => T.role === "heavy"), pick = a => a[(Math.random() * a.length) | 0];
   ms.waveBase = [[-230, 0, 560], [0, 0, 590], [230, 0, 560]][ms.wave % 3];
   for (let i = 0; i < n; i++) {
-    const T = i < airN ? (i === 0 && ms.wave >= 5 ? AIR.il2 : pick(AIR_LIST)) : ms.wave >= 7 && i === airN ? pick(heavy) : pick(pool);
+    const T = i < airN ? (i === 0 && ms.wave >= 5 ? AIR.il2 : pick(AI_AIR)) : ms.wave >= 7 && i === airN ? pick(heavy) : pick(pool);
     const u = makeTank(1, T, `${NAMES[ms.nameI++ % NAMES.length]}-${ms.wave}`, false, i);
     u.wave = ms.wave; spawnTank(u); tanks.push(u);
   }
@@ -3210,9 +3234,10 @@ function flySubsteps(t, D, dt, manRoll = 0) {
 }
 // ---------------------------------------------------------------- player flight assist & throttle
 // Easy flight (L, on by default, saved) only ever helps the player's own aircraft (t.assist); AI planes fly the
-// normal model. It caps climb and dive angles, pulls up before the ground, stops the plane stalling by limiting
-// the pull and adding throttle when slow, and smooths the mouse-aim target so the nose doesn't overshoot.
-const FLIGHT = { climb: 0.64, dive: -0.64, floor: 45, look: [0.5, 1, 1.5, 2, 3, 4], slow: 1.3, smooth: 6, rate: 0.6, presets: [0.25, 0.5, 0.75, 1] };
+// normal model. It caps climb and dive angles, stops the plane stalling by limiting the pull and adding throttle
+// when slow, and smooths the mouse-aim target so the nose doesn't overshoot. It never flies the plane by itself:
+// there is no automatic pull-up, so keeping clear of the ground is up to the pilot (the HUD still warns PULL UP).
+const FLIGHT = { climb: 0.64, dive: -0.64, slow: 1.3, smooth: 6, rate: 0.6, presets: [0.25, 0.5, 0.75, 1] };
 let easyFlight = true;
 try { easyFlight = localStorage.getItem("steelfront.easyflight") !== "off"; } catch (e) { /* storage blocked: default on */ }
 // throttle the engine actually gets: with the assist, a slow plane gets extra power so it can't stall
@@ -3229,18 +3254,13 @@ function cruiseSpeed(t, thr = t.throttle) {
 }
 function setThrottle(t, v) { t.throttle = clamp(v, 0, 1); }
 function assistDir(t, D, dt) {
-  const T = t.type; let d = D.slice(); t.assistNote = "";
-  d[1] = clamp(d[1], FLIGHT.dive, FLIGHT.climb);
-  if (t.speed < T.stall * FLIGHT.slow) { d[1] = Math.min(d[1], 0.02); t.assistNote = "STALL PROTECTION"; }
-  // ground avoidance: sample the flight path ahead; pull up if any point is too close to the terrain
-  let danger = t.pos[1] - heightAt(t.pos[0], t.pos[2]) < FLIGHT.floor && t.vel[1] < 0;
-  for (const k of FLIGHT.look) { if (danger) break; const q = vadd(t.pos, vscale(t.vel, k)); danger = q[1] < heightAt(q[0], q[2]) + FLIGHT.floor; }
-  if (danger) {
-    let h = [d[0], 0, d[2]]; if (vlen(h) < 0.2) h = [t.Z[0], 0, t.Z[2]]; if (vlen(h) < 0.05) h = [0, 0, 1];
-    h = vnorm(h); d = [h[0] * 0.8, 0.6, h[2] * 0.8]; t.assistNote = "AUTO PULL-UP";
-  }
-  d = vnorm(d);
-  t.dS = t.dS && !danger ? vnorm(vlerp(t.dS, d, 1 - Math.exp(-FLIGHT.smooth * dt))) : d;
+  const T = t.type; t.assistNote = ""; D = vnorm(D);
+  // cap the climb / dive angle (clamping only the y component let a near-vertical aim through once normalised)
+  let a = clamp(Math.asin(clamp(D[1], -1, 1)), Math.asin(FLIGHT.dive), Math.asin(FLIGHT.climb));
+  if (t.speed < T.stall * FLIGHT.slow) { a = Math.min(a, 0.02); t.assistNote = "STALL PROTECTION"; }
+  let h = [D[0], 0, D[2]]; if (vlen(h) < 0.02) h = [t.Z[0], 0, t.Z[2]]; if (vlen(h) < 0.02) h = [0, 0, 1]; h = vnorm(h);
+  const d = [h[0] * Math.cos(a), Math.sin(a), h[2] * Math.cos(a)];
+  t.dS = t.dS ? vnorm(vlerp(t.dS, d, 1 - Math.exp(-FLIGHT.smooth * dt))) : d;
   return t.dS;
 }
 // the player's per-frame flight input: W/S throttle, A/D roll, mouse-aim direction, guns
@@ -3288,13 +3308,83 @@ function dropBomb(t) {
 }
 function fireRockets(t) {
   const T = t.type; if (!T.rockets || t.rockets <= 0 || t.rocketT > 0 || !t.alive || t.rearmT > 0) return;
-  const R = ROCKETS[T.rockets.kind]; t.rocketT = 0.3;
+  const R = ROCKETS[T.rockets.kind];
+  if (R.guided) return fireGuided(t, R);
+  t.rocketT = 0.3;
   for (let k = 0; k < 2 && t.rockets > 0; k++) {
     const p = tp(t.M, T.rockets.pts[(t.rockets - 1) % T.rockets.pts.length]); t.rockets--;
     const d = vnorm(vadd(t.Z, [rand(-1, 1) * 0.006, rand(-1, 1) * 0.006, rand(-1, 1) * 0.006]));
     shells.push({ kind: "rocket", p, v: vadd(vscale(d, R.v), vscale(t.vel, 0.5)), owner: t, pen: R.pen, he: R.he, life: 6, start: p });
   }
   noiseHit(volAt(t.pos) * 0.4, 3000, 500, 0.5);
+}
+// ---------------------------------------------------------------- arcade lock-on rockets (SF-G)
+// Game-only fantasy weapon on the Hornet R-5 tank and the P-51D Kestrel. The player's seeker locks by itself onto
+// the enemy tank or aircraft nearest the crosshair (inside the seeker circle, in range, in line of sight) after
+// LOCK.time; R then fires a rocket that steers to it. AI units never get the seeker, so they fire them unguided.
+const LOCK = { cone: 0.2, keep: 0.3, range: 1000, airRange: 1400, time: 0.6, turn: 2.4, airTurn: 3.4, fuse: 7, scan: 0.1 };
+const rocketBase = t => t.type.air ? t.M : t.TM;
+const seekerFrom = t => t.type.air ? t.pos : tp(t.TM, [0, t.type.tur.h, 0]);
+const isLocked = t => !!(t.lock && t.lockT >= LOCK.time);
+const unitVel = e => e.type.air ? e.vel : [Math.sin(e.yaw) * e.speed, 0, Math.cos(e.yaw) * e.speed];
+// can `t`'s seeker hold `e`: an enemy alive, in range, within `cone` rad of the aim direction, with a clear view
+function lockValid(t, e, aim, cone, from = seekerFrom(t)) {
+  if (!e || !e.alive || e === t || e.team === t.team) return false;
+  const r = vsub(center(e), from), d = vlen(r);
+  if (d < 20 || d > (e.type.air ? LOCK.airRange : LOCK.range) || vdot(aim, r) / d < Math.cos(cone)) return false;
+  // a tank counts as seen if its turret shows over a crest (as the player sees it), not only its hull centre
+  return los(from, e.type.air ? e.pos : tp(e.TM, [0, e.type.tur.h * 0.7, 0])) || los(from, center(e));
+}
+function updateLock(t, dt, aim) {
+  if (!t.alive || !lockOnType(t.type) || t.rockets <= 0 || t.repairT > 0) { t.lock = null; t.lockT = 0; return; }
+  const from = seekerFrom(t);
+  if (t.lock && !lockValid(t, t.lock, aim, LOCK.keep, from)) { t.lock = null; t.lockT = 0; }
+  t.lockScan = (t.lockScan || 0) - dt;
+  if (!t.lock && t.lockScan <= 0) {
+    t.lockScan = LOCK.scan; let best = null, bc = Math.cos(LOCK.cone);
+    for (const e of tanks) {
+      if (!e.alive || e.team === t.team) continue;
+      const r = vsub(center(e), from), c = vdot(aim, r) / (vlen(r) || 1);
+      if (c > bc && lockValid(t, e, aim, LOCK.cone, from)) { bc = c; best = e; }
+    }
+    if (best) { t.lock = best; t.lockT = 0; }
+  }
+  if (t.lock) {
+    const was = isLocked(t); t.lockT += dt;
+    if (!was && isLocked(t) && t.isPlayer) { tone("square", 1320, 0.05, 0.09); announce(`Locked on ${t.lock.name}`); }
+  }
+}
+function fireGuided(t, R) {
+  const T = t.type, tgt = t.isPlayer && isLocked(t) ? t.lock : null;
+  const p = tp(rocketBase(t), T.rockets.pts[(t.rockets - 1) % T.rockets.pts.length]); t.rockets--; t.rocketT = R.gap;
+  const aim = T.air ? t.Z : t.isPlayer ? cam.dir : gunDir(t);
+  let d = tgt ? vnorm(vsub(center(tgt), p)) : aim;
+  if (!T.air) d = vnorm(vadd(d, [0, 0.04, 0])); // leave the pod slightly nose-up so it clears the ground in front
+  shells.push({ kind: "rocket", guided: true, target: tgt, turn: tgt && tgt.type.air ? LOCK.airTurn : LOCK.turn, vmax: R.vmax,
+    p, v: vadd(vscale(d, R.v), T.air ? vscale(t.vel, 0.5) : [0, 0, 0]), owner: t, pen: R.pen, he: R.he, life: R.life, start: p });
+  if (!T.air) { t.rockRel = 0; puff(p, [rand(-1, 1), rand(0, 1), rand(-1, 1)], [0.8, 0.78, 0.74], rand(1, 1.6), 0.8, 0, 0, 1.2, 0.6); }
+  noiseHit(volAt(t.pos) * 0.4, 3000, 500, 0.5);
+  if (t.isPlayer) centerMsg(tgt ? `ROCKET AWAY — homing on ${tgt.name}` : "ROCKET AWAY — no lock, flying straight", tgt ? "#ff8a6e" : "#ffd479");
+  return true;
+}
+// steer a guided rocket toward where its target will be, turning at most s.turn rad/s
+function guideRocket(s, dt) {
+  const e = s.target;
+  if (!e || !e.alive) { s.v[1] -= G * dt * 0.25; return; }
+  const c = center(e), sp = vlen(s.v), dist = vlen(vsub(c, s.p)), tgo = dist / Math.max(sp, 1);
+  // against tanks the rocket flies a shallow loft (aim point raised up to 8 m, less as it closes) to clear crests
+  const loft = e.type.air ? 0 : clamp((dist - 40) * 0.03, 0, 8);
+  const want = vnorm(vsub(vadd(c, vadd(vscale(unitVel(e), tgo), [0, loft, 0])), s.p)), cur = vscale(s.v, 1 / sp);
+  const ang = Math.acos(clamp(vdot(cur, want), -1, 1)), max = s.turn * dt;
+  const nd = ang <= max ? want : vnorm(vadd(vscale(cur, Math.sin(ang - max)), vscale(want, Math.sin(max))));
+  s.v = vscale(nd, Math.min(s.vmax, sp + 150 * dt));
+}
+// tank pods reload one rocket at a time
+function tankRockets(t, dt) {
+  const T = t.type; t.rocketT = Math.max(0, t.rocketT - dt);
+  if (t.rockets >= T.rockets.n) { t.rockRel = 0; return; }
+  t.rockRel = (t.rockRel || 0) + dt;
+  if (t.rockRel >= T.rockets.regen) { t.rockets++; t.rockRel = 0; }
 }
 function bombImpact(p, v) {
   p = p.slice(); v = v.slice();
@@ -3622,11 +3712,12 @@ function buildCards() {
 function vehicleRows(T) {
   return T.air ? [
     ["Top speed", `${T.topSpeed} (in game ${Math.round(T.vmax * 3.6)} km/h low level)`], ["Engine", T.engine],
-    ["Guns", T.guns.map(g => `${g.name} (${g.ammo} rds)`).join(" + ")], ["Payload", [T.bombs ? `${T.bombs.n} × ${T.bombs.kg} kg bomb${T.bombs.n > 1 ? "s" : ""}` : "", T.rockets ? `${T.rockets.n} × ${T.rockets.kind} rockets` : "", T.rearGunner ? "rear gunner 12.7 mm UBT" : ""].filter(Boolean).join(", ") || "—"],
+    ["Guns", T.guns.map(g => `${g.name} (${g.ammo} rds)`).join(" + ")], ["Payload", [T.bombs ? `${T.bombs.n} × ${T.bombs.kg} kg bomb${T.bombs.n > 1 ? "s" : ""}` : "", T.rockets ? `${T.rockets.n} × ${T.rockets.kind}${lockOnType(T) ? " lock-on" : ""} rockets` : "", T.rearGunner ? "rear gunner 12.7 mm UBT" : ""].filter(Boolean).join(", ") || "—"],
     ["Rearm · repair", `all weapons ${T.reload} s · field repair ${REPAIR_TIME.air} s`],
     ["Roll / turn", `${Math.round(T.rollRate * 57)}°/s · ${Math.round(T.pitchRate * 57)}°/s`], ["Span · length", `${T.span} m · ${T.L} m · ${T.weight}`]]
     : [["Main gun", `${T.gun || "—"} · pen ${T.pen} mm · ${T.auto ? `${T.auto.rate * 60} rpm, ${T.auto.mag}-round load` : `reload ${T.reload.toFixed(1)} s`}`],
       ...(hasShells(T) ? [["Shells", AMMO_KEYS.map(k => `${AMMO[k].name} ${shellPen(T, k)} mm`).join(" · ")]] : []),
+      ...(lockOnType(T) ? [["Lock-on rockets", `${T.rockets.n} × ${T.rockets.kind} · pen ${ROCKETS[T.rockets.kind].pen} mm · locks tanks and aircraft · R to fire · pods reload 1 every ${T.rockets.regen} s`]] : []),
       ["Armour", `hull ${T.armor.hf}/${T.armor.hs}/${T.armor.hr} · turret ${T.armor.tf}/${T.armor.ts}/${T.armor.tr} mm (front/side/rear, effective)${T.armor.tt === 0 ? " · open top" : ""}`],
       ["Mobility", `${Math.round(T.speed * 3.6)} km/h · turret ${Math.round(T.traverse * 57)}°/s${T.engine ? " · " + T.engine : ""}`], ["Crew · weight", `${T.crew || "—"}${T.weight ? " · " + T.weight : ""}`],
       ["Field repair", `${REPAIR_TIME.ground} s (tank immobile), then ${REPAIR_COOLDOWN} s before the next`]];
@@ -3642,10 +3733,10 @@ let VP = mat();
 
 // line-up slot -> vehicle type for the current mode (player is always team 0, slot 3)
 function slotType(team, s) {
-  const pool = GROUND_LIST.filter(T => T.role !== "spaa"), pick = a => a[(Math.random() * a.length) | 0];
+  const pool = AI_GROUND.filter(T => T.role !== "spaa"), pick = a => a[(Math.random() * a.length) | 0];
   if (M.key === "annihilation") return pick(pool);
-  if (M.key === "air") return s < 6 ? pick(AIR_LIST) : s === 7 ? TYPES.wirbelwind : pick(pool);
-  return s === 0 || s === 6 ? pick(AIR_LIST) : s === 5 ? TYPES.wirbelwind : pick(pool);
+  if (M.key === "air") return s < 6 ? pick(AI_AIR) : s === 7 ? TYPES.wirbelwind : pick(pool);
+  return s === 0 || s === 6 ? pick(AI_AIR) : s === 5 ? TYPES.wirbelwind : pick(pool);
 }
 function newBattle() {
   M = MODES[profile.mode] || MODES.conquest;
@@ -3792,6 +3883,7 @@ document.addEventListener("keydown", e => {
   const tk = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3 }[e.code];
   if (tk !== undefined && player.alive && player.type.air) { setThrottle(player, FLIGHT.presets[tk]); centerMsg(`THROTTLE ${Math.round(player.throttle * 100)}%`, "#9fd4ff"); }
   if (e.code === "KeyL" && player.type.air) toggleEasyFlight();
+  if (e.code === "KeyR" && !player.type.air && player.alive && player.repairT <= 0 && lockOnType(player.type)) fireRockets(player);
   const ck = { KeyG: "smoke", KeyV: "toolkit", KeyB: "arty", KeyX: "boost" }[e.code];
   if (ck) useCons(ck);
   if (player.type.air && player.alive) {
@@ -3897,11 +3989,13 @@ function step(dt) {
   updateRepair(p, dt);
   if (p.alive && p.type.air) {
     playerFlight(p, dt);
+    updateLock(p, dt, cam.dir);
   } else if (p.alive) {
     const thr = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
     const st = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
     driveTank(p, p.repairT > 0 ? 0 : thr, p.repairT > 0 ? 0 : st, dt); // crew is outside fixing the tank
     if (p.repairT <= 0) { aimTurret(p, cam.aim, dt); if (mouseDown) fire(p); } // ...so nobody is at the gun either
+    updateLock(p, dt, cam.dir);
   } else {
     respawnT -= dt;
     if (respawnT <= 0) {
@@ -3923,6 +4017,7 @@ function step(dt) {
     }
     if (t.alive) {
       if (t.ai) updateAI(t, dt, now);
+      if (t.type.rockets) tankRockets(t, dt);
       updateCrew(t, dt); updateFire(t, dt);
       if (!t.alive) { updateTankMatrices(t); continue; }
       t.dustT -= dt;
@@ -4212,6 +4307,7 @@ function drawUnit(t, discs) {
   draw(lo ? T.turLo : T.turMesh, t.TM, tint, 0, 1, sp);
   if (T.turDecal && !lo) draw(T.turDecal, t.TM, plain, 0, 1, sp);
   draw(lo ? T.barLo : T.barMesh, t.recoil > 0 ? mul(t.GM, trans(0, 0, -t.recoil * 0.9)) : t.GM, tint, 0, 1, sp);
+  if (T.rockets && !dead && d < 300) for (let i = 0; i < t.rockets; i++) draw(rocketMesh, chain(t.TM, trans(...T.rockets.pts[i])), plain);
 }
 function project(p) {
   const m = VP, x = m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12], y = m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13], w = m[3] * p[0] + m[7] * p[1] + m[11] * p[2] + m[15];
@@ -4276,7 +4372,38 @@ function drawHud() {
     const ix = W / 2, iy = H - 70, rel = wrapA(player.yaw - cam.yaw), trel = wrapA(player.yaw + player.turretYaw - cam.yaw);
     hx.save(); hx.translate(ix, iy); hx.rotate(rel); hx.strokeStyle = "rgba(255,255,255,.8)"; hx.lineWidth = 2; hx.strokeRect(-9, -15, 18, 30); hx.restore();
     hx.save(); hx.translate(ix, iy); hx.rotate(trel); hx.fillStyle = "rgba(255,255,255,.8)"; hx.fillRect(-1.5, -24, 3, 20); hx.beginPath(); hx.arc(0, 0, 6, 0, Math.PI * 2); hx.fill(); hx.restore();
+    drawLockHud(player, W, H);
   }
+}
+// lock-on rockets: dashed seeker circle round the crosshair; a yellow box closes in on the target while locking
+// and turns into a red LOCKED box; rockets in flight toward a target are ringed
+function drawLockHud(p, W, H) {
+  if (!lockOnType(p.type)) return;
+  const cx = W / 2, cy = H / 2, r = Math.tan(LOCK.cone) / Math.tan(cam.fov / 2) * H / 2, locked = isLocked(p);
+  hx.save(); hx.lineWidth = 1.5; hx.setLineDash([6, 6]); hx.strokeStyle = p.lock ? "rgba(255,210,80,.55)" : "rgba(255,255,255,.35)";
+  hx.beginPath(); hx.arc(cx, cy, r, 0, Math.PI * 2); hx.stroke(); hx.setLineDash([]);
+  hx.font = "bold 12px ui-monospace, monospace"; hx.textAlign = "center"; hx.lineWidth = 3; hx.strokeStyle = "rgba(0,0,0,.85)";
+  const label = (t, x, y, col) => { hx.strokeText(t, x, y); hx.fillStyle = col; hx.fillText(t, x, y); };
+  const ammo = `ROCKETS ${p.rockets}/${p.type.rockets.n}`;
+  if (p.lock) {
+    const q = project(center(p.lock));
+    if (q) {
+      const k = clamp(p.lockT / LOCK.time, 0, 1), sz = locked ? 16 : 16 + (1 - k) * 26, col = locked ? "#ff4b3e" : "#ffd23d";
+      hx.strokeStyle = col; hx.lineWidth = locked ? 3 : 2;
+      hx.beginPath();
+      for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const x = q[0] + a * sz, y = q[1] + b * sz; hx.moveTo(x - a * 8, y); hx.lineTo(x, y); hx.lineTo(x, y - b * 8); }
+      hx.stroke();
+      if (locked) { hx.beginPath(); hx.moveTo(q[0], q[1] - 7); hx.lineTo(q[0] + 7, q[1]); hx.lineTo(q[0], q[1] + 7); hx.lineTo(q[0] - 7, q[1]); hx.closePath(); hx.stroke(); }
+      hx.lineWidth = 3; hx.strokeStyle = "rgba(0,0,0,.85)";
+      const dist = Math.round(vlen(vsub(center(p.lock), p.pos)));
+      label(locked ? `LOCKED ${p.lock.type.air ? "AIR" : "TANK"} · ${dist} m` : `LOCKING ${Math.round(k * 100)}%`, q[0], q[1] - sz - 26, col);
+      if (locked) label(p.rockets > 0 && p.rocketT <= 0 ? "R: FIRE" : "RELOADING", q[0], q[1] + sz + 18, col);
+    }
+  }
+  hx.lineWidth = 3; hx.strokeStyle = "rgba(0,0,0,.85)";
+  label(`${ammo} · ${locked ? "LOCKED — R to fire" : p.lock ? "locking…" : p.rockets > 0 ? "aim near an enemy to lock" : "pods reloading"}`, cx, cy + r + 18, locked ? "#ff8a6e" : "rgba(232,255,224,.85)");
+  for (const s of shells) if (s.guided && s.owner === p && s.target && s.target.alive) { const q = project(s.p); if (q) { hx.strokeStyle = "#ff8a6e"; hx.lineWidth = 1.5; hx.beginPath(); hx.arc(q[0], q[1], 5, 0, Math.PI * 2); hx.stroke(); } }
+  hx.restore();
 }
 function drawAirHud(W, H) {
   const p = player, cx = W / 2, cy = H / 2;
@@ -4317,6 +4444,7 @@ function drawAirHud(W, H) {
   if (p.assistNote) warn.push(p.assistNote);
   if (freeDir) warn.push("FREE LOOK");
   if (warn.length && (now * 3) % 1 < 0.7) { hx.fillStyle = "#ff6a5a"; warn.forEach((w, i) => hx.fillText(w, cx, cy + 70 + i * 20)); }
+  drawLockHud(p, W, H);
   // bank indicator
   const bank = Math.atan2(-p.X[1], p.Y[1]);
   hx.save(); hx.translate(cx, H - 70); hx.rotate(bank); hx.strokeStyle = "rgba(255,255,255,.8)"; hx.lineWidth = 2;
@@ -4382,18 +4510,19 @@ function updateDom(dt) {
     css($("hpbar").firstChild, "width", `${Math.max(0, t.hp / t.type.hp * 100)}%`);
     const T = t.type, rearm = t.rearmT > 0;
     const guns = T.guns.map((g, i) => t.gunAmmo[i]).join("/");
-    txt($("rltext"), rearm ? `Rearming all weapons — ${Math.ceil(t.rearmT)} s${now - (t.shotT ?? -1) <= 0.25 ? " (paused while firing)" : ""}` : [`Guns ${guns}`, T.bombs ? `Bombs ${t.bombs}×${T.bombs.kg} kg` : "", T.rockets ? `Rockets ${t.rockets}` : "", fullyArmed(t) ? "" : "T: rearm"].filter(Boolean).join(" · "));
+    txt($("rltext"), rearm ? `Rearming all weapons — ${Math.ceil(t.rearmT)} s${now - (t.shotT ?? -1) <= 0.25 ? " (paused while firing)" : ""}` : [`Guns ${guns}`, T.bombs ? `Bombs ${t.bombs}×${T.bombs.kg} kg` : "", T.rockets ? `${lockOnType(T) ? "Lock-on rockets" : "Rockets"} ${t.rockets} (R)` : "", fullyArmed(t) ? "" : "T: rearm"].filter(Boolean).join(" · "));
     css($("rlbar").firstChild, "width", `${rearm ? (1 - t.rearmT / T.reload) * 100 : armedFrac(t) * 100}%`);
     txt($("spd"), `IAS ${Math.round(t.speed * 3.6)} km/h  THR ${Math.round(t.throttle * 100)}%→${Math.round(cruiseSpeed(t) * 3.6)}  Alt ${Math.round(t.pos[1])} m   Kills ${t.kills}  Deaths ${t.deaths}`);
     txt($("status"), [t.repairT > 0 ? "Repairing airframe" : "", t.engineT > 0 ? "Engine damaged" : "", t.fireT > 0 ? "ON FIRE" : "", t.wingDmg > 0 ? "Wing damaged" : ""].filter(Boolean).join(" · "));
     setHtml($("ammoRow"), FLIGHT.presets.map((v, i) => `<span class="${Math.abs(t.throttle - v) < 0.02 ? "sel" : ""}" title="Throttle ${Math.round(v * 100)}% (cruise about ${Math.round(cruiseSpeed(t, v) * 3.6)} km/h)"><b>${i + 1}</b>${Math.round(v * 100)}%</span>`).join("") + `<span class="tip">W/S throttle</span>`);
-    setHtml($("crewRow"), `<span class="${easyFlight ? "" : "ko"}" title="Easy flight: stall protection, auto pull-up, gentler climbs and dives. Press L to toggle.">L</span><span class="tip">Easy flight ${easyFlight ? "ON" : "OFF"}</span>`);
+    setHtml($("crewRow"), `<span class="${easyFlight ? "" : "ko"}" title="Easy flight: stall protection, gentler climbs and dives, steadier nose. No automatic pull-up. Press L to toggle.">L</span><span class="tip">Easy flight ${easyFlight ? "ON" : "OFF"}</span>`);
   } else {
   txt($("hpbar").previousSibling, "Hull integrity");
   css($("hpbar").firstChild, "width", `${Math.max(0, t.hp / t.type.hp * 100)}%`);
   css($("rlbar").firstChild, "width", `${t.alive ? clamp(1 - t.reloadT / (t.reloadFull || t.type.reload), 0, 1) * 100 : 0}%`);
   const shell = hasShells(t.type) ? ` ${AMMO[t.loaded || "ap"].name}` : "";
-  txt($("rltext"), !seatManned(t, "gunner") ? "No gunner — gun silent" : t.reloadT > 0 ? `Loading${shell} ${t.reloadT.toFixed(1)} s` : `${shell ? shell.trim() + " loaded" : "Gun ready"}`);
+  const rk = lockOnType(t.type) ? ` · Rockets ${t.rockets}/${t.type.rockets.n} (R)${t.rockets < t.type.rockets.n ? ` +1 in ${Math.ceil(t.type.rockets.regen - (t.rockRel || 0))} s` : ""}` : "";
+  txt($("rltext"), (!seatManned(t, "gunner") ? "No gunner — gun silent" : t.reloadT > 0 ? `Loading${shell} ${t.reloadT.toFixed(1)} s` : `${shell ? shell.trim() + " loaded" : "Gun ready"}`) + rk);
   setHtml($("ammoRow"), hasShells(t.type) ? AMMO_KEYS.map((k, i) => `<span class="${k === t.ammo ? "sel" : ""}${k === t.loaded ? " ld" : ""}" title="${AMMO[k].long}"><b>${i + 1}</b>${AMMO[k].name} ${shellPen(t.type, k)}</span>`).join("") : "");
   setHtml($("crewRow"), t.crew ? t.crew.map(c => `<span class="${c.ko ? "ko" : c.seat !== c.role ? "mv" : ""}" title="${c.role}${c.seat !== c.role ? " as " + c.seat : ""}${c.ko ? " (knocked out)" : ""}">${SEAT_INFO[c.ko ? c.role : c.seat][0]}</span>`).join("") : "");
   txt($("spd"), `Speed ${Math.round(Math.abs(t.speed) * 3.6)} km/h${t.speed < -0.3 ? " (R)" : ""}   Kills ${t.kills}  Deaths ${t.deaths}`);
@@ -4447,7 +4576,7 @@ function updateDom(dt) {
 // credits buy modifications, camouflage, consumables, crew training and reward boosters.
 const SAVE_KEY = "steelfront.profile.v1";
 const fmtN = n => Math.round(n).toLocaleString("en-US");
-const TIER = { light: 1, medium: 1, heavy: 1, sherman: 2, t34: 2, hellcat: 2, wirbelwind: 2, panther: 3, tiger: 3, is2: 3, spitfire: 2, bf109: 2, p51: 2, il2: 2, fw190: 3 };
+const TIER = { light: 1, medium: 1, heavy: 1, sherman: 2, t34: 2, hellcat: 2, wirbelwind: 2, panther: 3, tiger: 3, is2: 3, hornet: 2, kestrel: 2, spitfire: 2, bf109: 2, p51: 2, il2: 2, fw190: 3 };
 const TIER_K = [1, 1, 1.35, 1.75];
 const MODS = {
   ground: [
@@ -4638,7 +4767,7 @@ const HSPOT = { ground: [0, 0, 0], air: [200, 0, 0] };
 const APRON_Y = 0.08;
 let hangarMesh = null, hangarGround = null, hangarTrees = [];
 // landing gear for parked aircraft (the flight models have it retracted): [half track, z offset]
-const GEAR = { p51: [1.8, 0], spitfire: [0.95, 0.15], bf109: [1.0, 0.2], fw190: [1.75, 0.1], il2: [2.05, 0.3] };
+const GEAR = { p51: [1.8, 0], kestrel: [1.8, 0], spitfire: [0.95, 0.15], bf109: [1.0, 0.2], fw190: [1.75, 0.1], il2: [2.05, 0.3] };
 function gearGeom(T) {
   const H = T.hit, k = clamp(T.span / 11, 0.9, 1.3), gg = GEAR[T.key] || [1.6, 0];
   return { gx: gg[0], zM: H.wz - 0.35 + gg[1], yW: H.wy - 1.45 * k, r: 0.36 * k, zT: H.tail + 0.75, yT: -0.75, rT: 0.17 };
@@ -4800,7 +4929,7 @@ function stageUnit(T, x, z, yaw, tint) {
   const u = makeTank(0, T, "hangar", false, 3);
   u.tint = tint; u.alive = true;
   if (T.air) { parkPlane(u, x, z, yaw); u.bombs = T.bombs ? T.bombs.n : 0; u.rockets = T.rockets ? T.rockets.n : 0; u.propA = 0.35; }
-  else { u.pos = [x, x === HSPOT.ground[0] && z === HSPOT.ground[2] ? APRON_Y + 0.09 : APRON_Y, z]; u.yaw = yaw; u.up = [0, 1, 0]; u.turretYaw = 0.22; u.gunElev = 0.04; updateTankMatrices(u); }
+  else { u.rockets = T.rockets ? T.rockets.n : 0; u.pos = [x, x === HSPOT.ground[0] && z === HSPOT.ground[2] ? APRON_Y + 0.09 : APRON_Y, z]; u.yaw = yaw; u.up = [0, 1, 0]; u.turretYaw = 0.22; u.gunElev = 0.04; updateTankMatrices(u); }
   return u;
 }
 function hangarUnits() {
@@ -5820,17 +5949,19 @@ function runSelfTest() {
       u.pos = [x, heightAt(x, z) + alt, z]; u.speed = T.vmax * 0.85; u.vel = vscale(u.Z, u.speed); u.throttle = thr; updateTankMatrices(u); return u;
     };
     const sim = (u, assist, D, secs) => {
-      u.assist = assist; u.dS = null; let agl = Infinity, vmin = Infinity; const dt = 1 / 60;
+      u.assist = assist; u.dS = null; let agl = Infinity, vmin = Infinity, dive = 0; const notes = new Set(), dt = 1 / 60;
       for (let i = 0; i < secs / dt; i++) {
-        const d = assist ? assistDir(u, D, dt) : D; flySubsteps(u, d, dt);
+        const d = assist ? assistDir(u, D, dt) : D; flySubsteps(u, d, dt); notes.add(u.assistNote || "");
         agl = Math.min(agl, u.pos[1] - heightAt(u.pos[0], u.pos[2])); if (i * dt > 3) vmin = Math.min(vmin, u.speed);
+        if (agl > 30) dive = Math.min(dive, u.Z[1]);
+        if (agl < 1) break;
       }
-      return { agl, vmin };
+      return { agl, vmin, dive, notes };
     };
     const P = AIR.p51, DOWN = [0, -1, 0.05], UP = [0, 0.9, 0.44];
     const d1 = sim(flyer(P, 300, -200, 250, [0, 0, 1]), true, DOWN, 14), d0 = sim(flyer(P, 300, -200, 250, [0, 0, 1]), false, DOWN, 14);
-    ok("easy flight: mouse-aiming straight down pulls up before the ground", d1.agl > 15, `lowest ${d1.agl.toFixed(0)} m AGL`);
-    ok("…without it the same input flies into the ground", d0.agl < 1.2, `lowest ${d0.agl.toFixed(0)} m AGL`);
+    ok("easy flight has no auto pull-up: a held dive reaches the ground", d1.agl < 1.2 && !d1.notes.has("AUTO PULL-UP"), `lowest ${d1.agl.toFixed(0)} m AGL`);
+    ok("…but it still keeps the dive gentle (about 40° at most, vs vertical without it)", d1.dive > -0.75 && d0.dive < -0.9, `steepest nose ${(Math.asin(d1.dive) * 57).toFixed(0)}° vs ${(Math.asin(d0.dive) * 57).toFixed(0)}°`);
     const s1 = sim(flyer(P, 0, 0, 1200, [0, 0, 1], 0), true, UP, 25), s0 = sim(flyer(P, 0, 0, 1200, [0, 0, 1], 0), false, UP, 25);
     ok("easy flight: a steep climb at idle throttle never stalls", s1.vmin > P.stall, `min ${(s1.vmin * 3.6).toFixed(0)} km/h, stall ${(P.stall * 3.6).toFixed(0)}`);
     ok("…without it the plane stalls", s0.vmin < P.stall, `min ${(s0.vmin * 3.6).toFixed(0)} km/h`);
@@ -5850,6 +5981,87 @@ function runSelfTest() {
     ok("only the player's aircraft gets the assist", tanks.every(t => !t.type.air || t.isPlayer || !t.assist) && player.assist === easyFlight);
     battle("conquest"); key("Digit3"); key("Digit3", true);
     ok("in a tank 1-3 still pick shells", player.ammo === "he", player.ammo);
+  });
+  guard("lock-on rockets", () => {
+    const H = TYPES.hornet, K = AIR.kestrel;
+    ok("Hornet R-5 (tank) and P-51D Kestrel (plane) are playable with lock-on rockets", lockOnType(H) && lockOnType(K) && GROUND_LIST.includes(H) && AIR_LIST.includes(K) && !lockOnType(HIST.sherman) && !lockOnType(AIR.il2));
+    ok("…and never appear in AI line-ups (enemy difficulty unchanged)", !AI_GROUND.some(lockOnType) && !AI_AIR.some(lockOnType) && AI_AIR.length === AIR_LIST.length - 1);
+    const aimAt = (t, e) => vnorm(vsub(center(e), seekerFrom(t)));
+    const hold = (t, aim, secs) => { for (let i = 0; i < secs * 30; i++) updateLock(t, 1 / 30, typeof aim === "function" ? aim() : aim); };
+    // tank vs tank, with the target driving sideways so only a steering rocket hits it
+    // a lane with a clear view over 320 m (the map is hilly)
+    const lx = [-900, -700, -500, -300, -100, 100, 300, 500, 700, 900].find(x => los([x, heightAt(x, 0) + 2.1, 0], [x, heightAt(x, 320) + 1.5, 320]) && los([x, heightAt(x, 0) + 2.1, 0], [x + 40, heightAt(x + 40, 200) + 1.5, 200])) ?? 0;
+    const hn = unit(H, 0, lx, 0), foe = unit(HIST.sherman, 1, lx, 320, Math.PI / 2), mate = unit(HIST.sherman, 0, lx + 40, 200), far = unit(HIST.sherman, 1, lx, 1300);
+    hn.isPlayer = true; shells = [];
+    ok("a new Hornet has 4 rockets", hn.rockets === 4, hn.rockets);
+    tanks = [hn, mate]; hold(hn, aimAt(hn, mate), 1);
+    ok("no lock on a friendly vehicle", !hn.lock, hn.lock && hn.lock.name);
+    tanks = [hn, far]; hold(hn, aimAt(hn, far), 1);
+    ok("no lock beyond seeker range", !hn.lock, hn.lock && hn.lock.name);
+    tanks = [hn, foe, mate, far]; hold(hn, vnorm([1, 0, -0.2]), 1);
+    ok("no lock on an enemy outside the seeker circle", !hn.lock);
+    const off = vnorm(vadd(aimAt(hn, foe), [0.12, 0, 0])); // about 7° to one side: still inside the circle
+    hold(hn, off, LOCK.time * 0.5);
+    ok("lock builds up over time (LOCKING, not yet LOCKED)", hn.lock === foe && !isLocked(hn), hn.lockT.toFixed(2));
+    hold(hn, off, LOCK.time);
+    ok("tank auto-locks the enemy tank nearest the crosshair", isLocked(hn) && hn.lock === foe);
+    const hp0 = foe.hp; foe.speed = 12;
+    fireRockets(hn);
+    const rk = shells.find(s => s.guided && s.owner === hn);
+    ok("R fires one guided rocket at the locked target", rk && rk.target === foe && hn.rockets === 3, hn.rockets);
+    let hitT = -1;
+    for (let i = 0; i < 300 && shells.includes(rk); i++) {
+      foe.pos[0] += foe.speed / 60; foe.pos[1] = heightAt(foe.pos[0], foe.pos[2]); updateTankMatrices(foe); updateShells(1 / 60); hitT = i / 60;
+    }
+    ok("the rocket steers onto a tank driving sideways and damages it", foe.hp < hp0 || !foe.alive, `hp ${hp0.toFixed(0)} → ${foe.hp.toFixed(0)} after ${hitT.toFixed(1)} s, moved ${(foe.pos[0] - lx).toFixed(0)} m`);
+    // tank vs aircraft
+    const air = unit(AIR.bf109, 1, 0, 0); spawnPlane(air); air.ai = null;
+    air.pos = [lx - 250, heightAt(lx, 500) + 180, 500]; air.Z = [1, 0, 0]; air.Y = [0, 1, 0]; air.X = vcross(air.Y, air.Z); air.speed = 120; air.vel = vscale(air.Z, 120); updateTankMatrices(air);
+    hn.lock = null; hn.lockT = 0; hn.rocketT = 0; tanks = [hn, air]; shells = [];
+    const flyOn = () => { flySubsteps(air, [1, 0, 0], 1 / 30); updateTankMatrices(air); };
+    for (let i = 0; i < 30; i++) { flyOn(); updateLock(hn, 1 / 30, aimAt(hn, air)); }
+    ok("tank auto-locks an aircraft", isLocked(hn) && hn.lock === air);
+    fireRockets(hn);
+    for (let i = 0; i < 240 && air.alive && shells.length; i++) { flyOn(); updateShells(1 / 30); }
+    ok("the tank's rocket chases and downs a crossing aircraft", !air.alive, `alive=${air.alive}`);
+    // plane vs plane and plane vs tank
+    const kp = unit(K, 0, 0, 0); spawnPlane(kp); kp.ai = null; kp.isPlayer = true; kp.pos = [0, 600, -400]; kp.Z = [0, 0, 1]; kp.Y = [0, 1, 0]; kp.X = [1, 0, 0]; kp.vel = vscale(kp.Z, kp.speed); updateTankMatrices(kp);
+    const bandit = unit(AIR.fw190, 1, 0, 0); spawnPlane(bandit); bandit.ai = null; bandit.pos = [0, 640, 300]; bandit.Z = vnorm([0.6, 0, 0.8]); bandit.Y = [0, 1, 0]; bandit.X = vcross(bandit.Y, bandit.Z); bandit.vel = vscale(bandit.Z, bandit.speed); updateTankMatrices(bandit);
+    tanks = [kp, bandit]; shells = [];
+    ok("the Kestrel carries 6 lock-on rockets and no bombs", kp.rockets === 6 && kp.bombs === 0, `${kp.rockets}/${kp.bombs}`);
+    const both = () => { for (const u of [kp, bandit]) { flySubsteps(u, u.Z, 1 / 30); updateTankMatrices(u); } };
+    for (let i = 0; i < 30; i++) { both(); updateLock(kp, 1 / 30, aimAt(kp, bandit)); }
+    ok("plane auto-locks an enemy aircraft", isLocked(kp) && kp.lock === bandit);
+    fireRockets(kp);
+    for (let i = 0; i < 240 && bandit.alive && shells.length; i++) { both(); updateShells(1 / 30); }
+    ok("the Kestrel's rocket downs the turning-away fighter", !bandit.alive);
+    const tk = unit(HIST.panther, 1, 0, 300, Math.PI / 2); tk.isPlayer = false; kp.pos = [0, heightAt(0, 0) + 260, -150]; kp.Z = vnorm([0, -0.5, 1]); kp.Y = vnorm(vcross(kp.Z, [1, 0, 0])); kp.X = vcross(kp.Y, kp.Z); kp.vel = vscale(kp.Z, kp.speed); updateTankMatrices(kp);
+    kp.lock = null; kp.lockT = 0; kp.rocketT = 0; tanks = [kp, tk]; shells = [];
+    hold(kp, () => aimAt(kp, tk), 1);
+    ok("plane auto-locks a ground tank", isLocked(kp) && kp.lock === tk);
+    const thp = tk.hp; fireRockets(kp);
+    for (let i = 0; i < 300 && shells.length; i++) updateShells(1 / 60);
+    ok("…and the rocket hits it (side armour penetrated)", tk.hp < thp || !tk.alive, `hp ${thp.toFixed(0)} → ${tk.hp.toFixed(0)}`);
+    // no lock: fired straight; AI never homes; a dead target drops the lock
+    kp.lock = null; kp.lockT = 0; kp.rocketT = 0; shells = []; const n0 = kp.rockets;
+    fireRockets(kp);
+    ok("without a lock R still fires, unguided", shells.length === 1 && !shells[0].target && kp.rockets === n0 - 1);
+    const ai = unit(H, 1, 0, 0); ai.ai = {}; const pl = unit(HIST.sherman, 0, 0, 200); tanks = [ai, pl]; shells = [];
+    ai.lock = pl; ai.lockT = 9; fireRockets(ai);
+    ok("an AI-owned launcher never fires a homing rocket", shells.length === 1 && !shells[0].target);
+    hn.lock = foe; hn.lockT = 9; foe.alive = false; tanks = [hn, foe]; updateLock(hn, 1 / 30, aimAt(hn, foe));
+    ok("a destroyed target drops the lock", !hn.lock);
+    hn.rockets = 1; hn.rockRel = 0; for (let i = 0; i < (H.rockets.regen + 0.5) * 10; i++) tankRockets(hn, 0.1);
+    ok("tank pods reload one rocket every 8 s", hn.rockets === 2, hn.rockets);
+    // in a battle: R in the Hornet fires, the HUD draws the lock
+    battle("conquest", H); shells = [];
+    ok("the Hornet deploys with 4 rockets", player.type.base === H || player.type === H ? player.rockets === 4 : false, `${player.type.name} ${player.rockets}`);
+    const enemy = tanks.find(t => t.team !== player.team && !t.type.air);
+    player.lock = enemy; player.lockT = 9; const key = (code, up) => document.dispatchEvent(new KeyboardEvent(up ? "keyup" : "keydown", { code }));
+    key("KeyR"); key("KeyR", true);
+    ok("R key in the Hornet fires a lock-on rocket", player.rockets === 3 && shells.some(s => s.guided && s.owner === player), player.rockets);
+    let hudOk = true; try { drawHud(); } catch (e) { hudOk = String(e); }
+    ok("lock HUD draws", hudOk === true, hudOk);
   });
   guard("battle soak", () => {
     for (const mode of ["conquest", "laststand"]) {

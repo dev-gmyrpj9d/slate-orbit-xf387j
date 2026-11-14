@@ -121,13 +121,28 @@ A polish pass to make each battle more rewarding and give reasons to play again.
 - **Saves:** medals, mastery and bests are part of the existing profile and are read field by field, so old saves load unchanged.
 - **Readability:** clustered enemy markers no longer print their distances on top of each other. The nearest label wins, and every marker is still drawn.
 
+## Pass 7: field objectives and the final push
+
+Playtest request: make the matches themselves more engaging. Battles were 20-minute zone and ticket grinds with nothing changing mid-match. This pass adds optional side events that start skirmishes in new places, and a closing phase so close battles end decisively. Enemy accuracy, spotting and reactions (`ENEMY_AI`) are unchanged, and no objective makes an enemy unit stronger.
+
+- **Field objectives.** About 60 s in, then 40–65 s after each one ends, one optional event starts. It is announced on screen and in the kill feed, and a gold line under the clock shows its range, compass direction and time left. Completing one scores +150 and pays 250 Cr / 120 XP at the end. Losing one, or ignoring it, only loses the bonus.
+  - **Supply drop** (ground): a crate parachutes down with a green smoke column. The first vehicle to drive into it gets a full repair, a fresh crew, an instant reload, refilled rockets and reset consumable cooldowns. The nearest enemy tank races you for it. The spot is picked so that no enemy tank is clearly closer than you.
+  - **Radio relay** (ground): a mast with yellow smoke. Hold it alone for 12 s; any enemy inside pauses the capture. Taking it reveals every enemy for 30 s and costs the enemy 15 tickets. Two enemies head there to contest it, and one ally comes to help.
+  - **Enemy commander**: one enemy (an aircraft if you are flying) gets a gold ★ marker and stays spotted. Destroying it within 100 s costs the enemy 20 tickets. The marked vehicle itself is not buffed.
+  - **Supply column**: three unarmed trucks drive across behind the enemy line, marked gold. Destroying all of them costs the enemy 15 tickets on top of the usual losses. Two allies move to intercept, and the trucks make good targets for aircraft. Trucks that get through leave the map and never respawn.
+  - **Where they run:** pilots only get the commander and the column. In Breakthrough the bonus is reinforcements instead of enemy tickets. Last Stand has no timed events; instead a supply crate lands 80–150 m from B after every destroyed wave and lasts 32 s.
+  - **Markers:** gold objective markers show even when M has hidden the enemy markers. The minimap shows a ring at the objective, and the relay's ring fills with the hold progress.
+- **Final push.** In Conquest, Annihilation and Air Superiority, the last 4 minutes, or the moment either side drops to 25% tickets, start the final push. Vehicle losses cost ×1.5 tickets and Conquest zone bleed doubles, for both sides equally. The objective line then reads FINAL PUSH. Last Stand's eighth wave is announced as the FINAL WAVE.
+- **Momentum readout.** The Conquest line under the clock now gives the zone count and who is draining whom, for example `zones 2–1 · enemy losing 0.3/s`.
+- **End screen:** it adds an objectives count and a "field objectives" reward row.
+
 ## Testing
 
 ```sh
 node steelfront/tests/run-selftest.mjs    # exits 0 on PASS; set CHROME=/path/to/chrome if it isn't on PATH
 ```
 
-You can also open `steelfront.html?selftest` in any browser. The page runs 101 seeded checks and shows the results on screen. The checks cover:
+You can also open `steelfront.html?selftest` in any browser. The page runs 140 seeded checks and shows the results on screen. The checks cover:
 
 - the armour lookup and damage model
 - each fix above, as a regression check
@@ -137,6 +152,9 @@ You can also open `steelfront.html?selftest` in any browser. The page runs 101 s
 - unassisted flight: no assist code or saved setting is left. A straight-down aim dives steeply into the ground, an idle-throttle climb stalls and the throttle stays put. The player's input path matches the raw flight model exactly. Also checked: the throttle keys, level-flight speed per throttle, and that L does nothing
 - lock-on rockets: which units can lock (friendly, out of range, outside the circle, destroyed), lock timing, tank→tank (moving), tank→aircraft, plane→aircraft and plane→tank hits, unguided fire without a lock, AI never homing, pod reload, the R key and the lock HUD
 - battle score: merged hit popups, kill / first blood / long-shot scoring, double kills, assists, streak reset on death, HUD drawing, medals, mastery stars and their one-off bonus, personal bests, the rewards screen and hangar, safe loading of medal and mastery data from a save, and that the enemy AI handicap is unchanged
+- field objectives: scheduling, spot choice, the supply crate (not while landing, full repair, an enemy reaching it first), the relay (contested, reveal, tickets), the commander, the supply column (passive trucks, the bonus, no respawn, escaping), AI diverts, HUD drawing, rewards, the final push trigger and ticket costs, the Conquest momentum line, Breakthrough reinforcements, the Last Stand crate, and that `ENEMY_AI` is unchanged
+- match flow: every mode runs to a timed result with rewards, a final-push kill can win the battle, and a 90 s Air Superiority battle with a supply column runs clean
+- lock-on test setup: the lane must be visible from the rocket pods as well as the seeker, and the test aircraft flies at an altitude the seeker can see (both used to fail on some random maps)
 - two 150 s simulated battles (Conquest and Last Stand) checked for exceptions, NaNs and zombie crews
 
 The self-test uses a throwaway profile and never writes your save. `?nointro` skips the intro.
@@ -156,4 +174,5 @@ Run this in a real browser after changes to gameplay, HUD or input.
 9. Spotted enemies show a red marker with their range. Turn away and an edge arrow points back at them; M toggles both. Get hit and a red arc points to the shooter.
 10. Deploy the Hornet R-5, then the P-51D Kestrel. Hold an enemy inside the dashed circle: the yellow box turns red (LOCKED), R fires, and the rocket curves onto the target. A friendly unit never locks.
 11. Tab shows the scoreboard, P the FPS counter and Esc pauses. Leaving to the hangar pays no rewards.
-11. Destroy two enemies within 12 s: the banner reads DOUBLE KILL, and the popups list the kill points and bonuses without covering the hit report. At the end of the battle the rewards screen shows the score, mastery stars and medals, and the hangar card shows the vehicle's stars.
+12. Wait about a minute in Conquest: a field objective is announced and the gold line under the clock tracks it. Drive into a supply crate (full repair), hold a relay for 12 s (enemies revealed, enemy −15 tickets), and in an aircraft find the gold trucks or the ★ commander. With 4 minutes left, FINAL PUSH appears and the line under the clock says so.
+13. Destroy two enemies within 12 s: the banner reads DOUBLE KILL, and the popups list the kill points and bonuses without covering the hit report. At the end of the battle the rewards screen shows the score, mastery stars and medals, and the hangar card shows the vehicle's stars.

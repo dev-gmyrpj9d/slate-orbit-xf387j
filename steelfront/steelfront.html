@@ -17,7 +17,7 @@
   #tkE i { left: 0; background: #e2483c; }
   .tickets span { position: absolute; inset: 0; text-align: center; font: bold 12px/18px ui-monospace, Menlo, Consolas, monospace; }
   #zones { display: flex; gap: 5px; }
-  #mid { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  #mid { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; }
   #clock { font: bold 15px/1 ui-monospace, Menlo, Consolas, monospace; padding: 2px 8px; background: rgba(0,0,0,.45); border-radius: 3px; letter-spacing: 1px; }
   #clock.late { color: #ffd34d; }
   #clock.final { color: #ff6a5a; }
@@ -126,6 +126,8 @@
   @media (prefers-reduced-motion: reduce) { #cine .lb, #cineCap, #cineTitle h1 { transition: opacity .8s ease; } #cineTitle h1 { transform: none; letter-spacing: .3em; } }
   /* battle HUD additions: mode objective line, consumables */
   #modeLbl { font: 600 11px/1.3 system-ui, sans-serif; padding: 2px 8px; background: rgba(0,0,0,.45); border-radius: 3px; text-align: center; max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #evLbl { font: 700 12px/1.3 system-ui, sans-serif; padding: 3px 10px; background: rgba(40,30,0,.6); border: 1px solid rgba(255,207,90,.55); border-radius: 3px; color: #ffcf5a; max-width: 600px; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #evLbl:empty { display: none; }
   .zone.locked { opacity: .55; } .zone.next { opacity: .35; border-style: dashed; } .zone.active { box-shadow: 0 0 0 2px #ffd34d; }
   #consBar { position: fixed; right: 250px; bottom: 14px; display: flex; gap: 6px; pointer-events: none; }
   #consBar .cs { position: relative; width: 58px; padding: 4px 4px 3px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.25); border-radius: 5px; font: 10px/1.2 system-ui, sans-serif; text-align: center; overflow: hidden; }
@@ -251,7 +253,7 @@
 <div id="dmg"></div>
 <div id="top">
   <div class="tickets" id="tkA"><i></i><span></span></div>
-  <div id="mid"><div id="clock" role="timer" aria-label="Time remaining">20:00</div><div id="zones"></div><div id="modeLbl"></div></div>
+  <div id="mid"><div id="clock" role="timer" aria-label="Time remaining">20:00</div><div id="zones"></div><div id="modeLbl"></div><div id="evLbl" role="status" aria-live="polite"></div></div>
   <div class="tickets" id="tkE"><i></i><span></span></div>
 </div>
 <div id="killfeed"></div>
@@ -2570,13 +2572,36 @@ function screenDir(q) {
   const r = vsub(q, cam.pos), f = cam.dir, right = vnorm(vcross(f, [0, 1, 0])), up = vcross(right, f);
   return [vdot(r, right), vdot(r, up), vdot(r, f)];
 }
+// field objective place (supply crate, radio relay): a diamond with its name and range, or an edge arrow
+function drawObjectiveCue(W, H) {
+  if (!ev || !ev.at || !player.alive) return;
+  const D = OBJ[ev.kind], top = vadd(ev.p, [0, ev.kind === "relay" ? 12 : 4 + ev.drop * 12, 0]), s = project(top), m = 40, d = vlen(vsub(ev.p, player.pos));
+  hx.save(); hx.lineWidth = 3; hx.strokeStyle = "rgba(0,0,0,.85)"; hx.font = "bold 12px system-ui, sans-serif"; hx.textAlign = "center";
+  if (s && s[0] > m && s[0] < W - m && s[1] > m && s[1] < H - m) {
+    const pulse = 1 + 0.12 * Math.sin(now * 5);
+    hx.translate(s[0], s[1]); hx.rotate(Math.PI / 4); hx.fillStyle = D.col; hx.globalAlpha = 0.9;
+    hx.strokeRect(-7 * pulse, -7 * pulse, 14 * pulse, 14 * pulse); hx.fillRect(-7 * pulse, -7 * pulse, 14 * pulse, 14 * pulse);
+    if (ev.kind === "relay") { hx.fillStyle = ev.prog >= 0 ? "#3c8ee6" : "#e2483c"; const f = Math.abs(ev.prog) * 14 * pulse; hx.fillRect(-7 * pulse, 7 * pulse - f, 14 * pulse, f); }
+    hx.setTransform(1, 0, 0, 1, 0, 0); hx.globalAlpha = 1;
+    const lbl = `${ev.kind === "supply" ? "SUPPLIES" : "RELAY"} ${Math.round(d)} m`;
+    hx.strokeText(lbl, s[0], s[1] - 16); hx.fillStyle = D.col; hx.fillText(lbl, s[0], s[1] - 16);
+  } else {
+    const [x, y] = screenDir(top), a = Math.atan2(-y, x), ax = W / 2 + Math.cos(a) * W * 0.42, ay = H / 2 + Math.sin(a) * H * 0.37;
+    hx.translate(ax, ay); hx.rotate(a); hx.fillStyle = D.col;
+    hx.beginPath(); hx.moveTo(16, 0); hx.lineTo(-2, -11); hx.lineTo(2, 0); hx.lineTo(-2, 11); hx.closePath(); hx.stroke(); hx.fill();
+    hx.setTransform(1, 0, 0, 1, 0, 0);
+    const lbl = `${ev.kind === "supply" ? "SUPPLIES" : "RELAY"} ${Math.round(d)} m`, lx = ax - Math.cos(a) * 34, ly = ay - Math.sin(a) * 26 + 4;
+    hx.strokeText(lbl, lx, ly); hx.fillStyle = D.col; hx.fillText(lbl, lx, ly);
+  }
+  hx.restore();
+}
 function drawEnemyCues(W, H) {
   const cx = W / 2, cy = H / 2, list = [];
-  if (markersOn) for (const e of tanks) {
-    if (!e.alive || e.team === player.team || e.spottedUntil < now) continue;
+  for (const e of tanks) {
+    if (!e.alive || e.team === player.team || e.spottedUntil < now || !(markersOn || e.hvt || e.conv)) continue;
     list.push({ e, d: vlen(vsub(e.pos, player.pos)) });
   }
-  list.sort((a, b) => a.d - b.d);
+  list.sort((a, b) => (!!(a.e.hvt || a.e.conv) - !!(b.e.hvt || b.e.conv)) || a.d - b.d); // gold objective targets draw last, on top
   let arrows = 0;
   const labels = [];
   for (const { e, d } of list) {
@@ -2585,23 +2610,25 @@ function drawEnemyCues(W, H) {
     const fade = clamp((e.spottedUntil - now) / 0.6, 0.35, 1);
     if (s && s[0] > m && s[0] < W - m && s[1] > m && s[1] < H - m) {
       hx.globalAlpha = fade;
-      hx.fillStyle = "#ff3b2f"; hx.strokeStyle = "rgba(0,0,0,.8)"; hx.lineWidth = 2;
-      const k = clamp(1.3 - d / 1500, 0.75, 1.3);
+      const gold = e.hvt || e.conv; // field-objective targets are gold, and always labelled
+      hx.fillStyle = gold ? "#ffc23d" : "#ff3b2f"; hx.strokeStyle = "rgba(0,0,0,.8)"; hx.lineWidth = 2;
+      const k = clamp(1.3 - d / 1500, 0.75, 1.3) * (e.hvt ? 1.3 : 1);
       hx.beginPath(); hx.moveTo(s[0] - 7 * k, s[1] - 10 * k); hx.lineTo(s[0] + 7 * k, s[1] - 10 * k); hx.lineTo(s[0], s[1]); hx.closePath(); hx.stroke(); hx.fill();
       hx.font = "bold 11px ui-monospace, monospace"; hx.lineWidth = 3;
       // nearest first: a label that would overlap one already drawn is dropped (clustered enemies used to
       // print their distances on top of each other); the marker itself always stays
-      const lbl = `${Math.round(d)} m`, lw = hx.measureText(lbl).width + 6, ly = s[1] - 14 * k;
-      if (!labels.some(r => Math.abs(r[0] - s[0]) < (r[2] + lw) / 2 && Math.abs(r[1] - ly) < 13)) {
-        labels.push([s[0], ly, lw]);
-        hx.strokeText(lbl, s[0], ly); hx.fillStyle = "#ffd2cc"; hx.fillText(lbl, s[0], ly);
+      const lbl = `${e.hvt ? "★ COMMANDER " : e.conv ? "TRUCK " : ""}${Math.round(d)} m`, lw = hx.measureText(lbl).width + 6, ly = s[1] - 14 * k;
+      // gold labels draw last and only give way to each other, never to an ordinary marker
+      if (!labels.some(r => (!gold || r[3]) && Math.abs(r[0] - s[0]) < (r[2] + lw) / 2 && Math.abs(r[1] - ly) < 13)) {
+        labels.push([s[0], ly, lw, gold]);
+        hx.strokeText(lbl, s[0], ly); hx.fillStyle = gold ? "#ffe6a0" : "#ffd2cc"; hx.fillText(lbl, s[0], ly);
       }
       hx.globalAlpha = 1;
     } else if (arrows < 8) {
       arrows++;
       const [x, y] = screenDir(top), a = Math.atan2(-y, x), rx = W * 0.44, ry = H * 0.4, ax = cx + Math.cos(a) * rx, ay = cy + Math.sin(a) * ry;
       hx.save(); hx.globalAlpha = fade; hx.translate(ax, ay); hx.rotate(a);
-      hx.fillStyle = "#ff3b2f"; hx.strokeStyle = "rgba(0,0,0,.8)"; hx.lineWidth = 2;
+      hx.fillStyle = e.hvt || e.conv ? "#ffc23d" : "#ff3b2f"; hx.strokeStyle = "rgba(0,0,0,.8)"; hx.lineWidth = 2;
       hx.beginPath(); hx.moveTo(14, 0); hx.lineTo(-4, -9); hx.lineTo(0, 0); hx.lineTo(-4, 9); hx.closePath(); hx.stroke(); hx.fill();
       hx.restore();
       hx.globalAlpha = fade; hx.font = "bold 11px ui-monospace, monospace"; hx.lineWidth = 3; hx.strokeStyle = "rgba(0,0,0,.8)";
@@ -2609,6 +2636,7 @@ function drawEnemyCues(W, H) {
       hx.strokeText(lbl, lx, ly); hx.fillStyle = "#ffd2cc"; hx.fillText(lbl, lx, ly); hx.globalAlpha = 1;
     }
   }
+  drawObjectiveCue(W, H);
   // damage direction: a red arc around the crosshair pointing at whoever just hit you (always shown)
   if (hitFrom && now - hitFrom.t < 3 && player.alive) {
     const [x, y] = screenDir(hitFrom.p), a = Math.atan2(-y, x), al = clamp(1 - (now - hitFrom.t) / 3, 0, 1);
@@ -2823,23 +2851,23 @@ const ZL = "ABC";
 const MODES = {
   conquest: { key: "conquest", name: "Conquest", allow: "any", time: MATCH_TIME, tickets: [START_TICKETS, START_TICKETS],
     tag: "Combined arms · zones A, B, C",
-    desc: "The classic Steel Front battle: tanks, SPAA and aircraft on both sides. Hold more of the three zones than the enemy to drain their tickets; every destroyed vehicle also costs its side 8 tickets.",
+    desc: "The classic Steel Front battle: tanks, SPAA and aircraft on both sides. Hold more of the three zones than the enemy to drain their tickets; every destroyed vehicle also costs its side 8 tickets. Optional field objectives (supply drops, a radio relay, an enemy commander, a supply column) appear during the battle.",
     win: "Win when the enemy runs out of tickets, or by holding more tickets when the 20 minutes run out." },
   breakthrough: { key: "breakthrough", name: "Breakthrough", allow: "any", time: MATCH_TIME, tickets: [500, 3],
     tag: "Attack · capture A → B → C in order",
-    desc: "Your side attacks a dug-in enemy. Only one zone is open at a time: take A, then B, then C. A captured zone is locked and your spawn moves up behind it. Each allied loss costs 8 of your 500 reinforcement tickets.",
+    desc: "Your side attacks a dug-in enemy. Only one zone is open at a time: take A, then B, then C. A captured zone is locked and your spawn moves up behind it. Each allied loss costs 8 of your 500 reinforcement tickets. Optional field objectives (supply drops, a radio relay, an enemy commander, a supply column) appear during the battle.",
     win: "Win by capturing all three zones. You lose if your reinforcements run out or the 20 minutes expire." },
   annihilation: { key: "annihilation", name: "Annihilation", allow: "ground", time: MATCH_TIME, tickets: [240, 240],
     tag: "Ground only · no zones, no aircraft",
-    desc: "A pure armoured clash: eight tanks a side, no capture points, no aircraft. Every destroyed tank costs its side 8 of 240 tickets, and the AI hunts the nearest enemy.",
+    desc: "A pure armoured clash: eight tanks a side, no capture points, no aircraft. Every destroyed tank costs its side 8 of 240 tickets, and the AI hunts the nearest enemy. Optional field objectives (supply drops, a radio relay, an enemy commander, a supply column) appear during the battle.",
     win: "Win by draining the enemy's tickets first, or by holding more tickets when time runs out." },
   air: { key: "air", name: "Air Superiority", allow: "air", time: MATCH_TIME, tickets: [200, 200],
     tag: "Air only · 6 aircraft + 2 ground targets a side",
-    desc: "Six fighters and attackers per side fight for the sky, and each side also fields a tank and an SPAA as strike targets. Every aircraft or vehicle lost costs its side 10 of 200 tickets.",
+    desc: "Six fighters and attackers per side fight for the sky, and each side also fields a tank and an SPAA as strike targets. Every aircraft or vehicle lost costs its side 10 of 200 tickets. Optional field objectives (supply drops, a radio relay, an enemy commander, a supply column) appear during the battle.",
     win: "Win by draining the enemy's tickets, or by holding more tickets when time runs out." },
   laststand: { key: "laststand", name: "Last Stand", allow: "any", time: MATCH_TIME, tickets: [40, 0], waves: 8, waveBonus: 2,
     tag: "Co-op defence · hold zone B against 8 waves · +2 reinforcements per wave destroyed",
-    desc: "Six allies hold the church at zone B against eight growing enemy waves. Later waves add heavy tanks and ground-attack aircraft. Your side has 40 reinforcements, and each allied loss uses one. Every destroyed wave brings 2 more.",
+    desc: "Six allies hold the church at zone B against eight growing enemy waves. Later waves add heavy tanks and ground-attack aircraft. Your side has 40 reinforcements, and each allied loss uses one. Every destroyed wave brings 2 more, and a supply crate lands near B.",
     win: "Win by destroying all 8 waves, or by still holding B when the 20 minutes are up. You lose if the enemy captures B or your reinforcements run out." },
 };
 const MODE_LIST = Object.values(MODES);
@@ -2851,8 +2879,7 @@ let smokes = [], strikes = [];  // consumables in play: smoke screens, artillery
 function killCost(t) {
   if (M.key === "breakthrough") return t.team === 0 ? KILL_TICKETS : 0;
   if (M.key === "laststand") return t.team === 0 ? 1 : 0;
-  if (M.key === "air") return 10;
-  return KILL_TICKETS;
+  return (M.key === "air" ? 10 : KILL_TICKETS) * (ms.push ? FINAL_PUSH.kill : 1); // both sides lose more in the final push
 }
 function setupZones() {
   const mk = (i, owner) => ({ pos: ZONE_POS[i], label: ZL[i], owner, prog: owner === 0 ? 1 : owner === 1 ? -1 : 0, contested: false, playerIn: false, locked: false, active: true });
@@ -2893,8 +2920,9 @@ function updateZones(dt) {
   while (ticketAcc >= 1) {
     ticketAcc -= 1;
     const diff = zones.filter(z => z.owner === 0).length - zones.filter(z => z.owner === 1).length;
-    if (diff > 0) tickets[1] = Math.max(0, tickets[1] - diff * TICKET_BLEED);
-    if (diff < 0) tickets[0] = Math.max(0, tickets[0] + diff * TICKET_BLEED);
+    const bleed = TICKET_BLEED * (ms.push ? FINAL_PUSH.bleed : 1);
+    if (diff > 0) tickets[1] = Math.max(0, tickets[1] - diff * bleed);
+    if (diff < 0) tickets[0] = Math.max(0, tickets[0] + diff * bleed);
   }
 }
 // where a unit (re)spawns: the breakthrough front moves forward, Last Stand defenders start at B
@@ -2906,6 +2934,8 @@ function spawnBase(t) {
 // AI ground goal for the current mode: {key, p, r} (a new key makes the unit pick a fresh spot)
 function pickGoal(t) {
   const ai = t.ai;
+  if (t.conv) return { key: "conv", p: t.conv.to, r: 3 };
+  if (ev && ev.p && ev.div.has(t)) return { key: `ev${ev.id}`, p: ev.p, r: ev.kind === "relay" ? 9 : ev.kind === "convoy" ? 40 : 2 }; // drawn into a field objective
   if (M.key === "conquest") {
     let bz = 0, bs = 1e9;
     zones.forEach((z, zi) => {
@@ -2934,6 +2964,7 @@ function goalSpot(p, r) {
 }
 // AI units that died come back after 12 s unless the mode says otherwise
 function respawnAI(t) {
+  if (t.conv) { t.gone = true; return; } // supply-column trucks do not come back
   if (M.key === "laststand") {
     if (t.team === 1) { t.gone = true; return; } // wave units do not come back; the next wave does
     if (tickets[0] <= 0) return;
@@ -2955,9 +2986,18 @@ function spawnWave() {
   }
   const side = ["from the east", "down the north road", "from the west"][ms.wave % 3];
   feed(`<span class="enemy">Wave ${ms.wave}: ${n} enemies ${side}</span>`);
-  centerMsg(`WAVE ${ms.wave} / ${M.waves}\n${n} enemies attacking ${side}${airN ? ` · ${airN} aircraft` : ""}`, "#ff9a6e");
+  centerMsg(`${ms.wave === M.waves ? "FINAL WAVE" : `WAVE ${ms.wave} / ${M.waves}`}\n${n} enemies attacking ${side}${airN ? ` · ${airN} aircraft` : ""}`, "#ff9a6e");
 }
 function modeStep(dt) {
+  if (ticketMode() && !ms.push) {
+    const left = M.time - battleTime, low = Math.min(tickets[0] / M.tickets[0], tickets[1] / M.tickets[1]);
+    if (left <= FINAL_PUSH.left || low <= FINAL_PUSH.frac) {
+      ms.push = true; // the closing phase: every loss and every zone counts for more, on both sides, so the end is decisive
+      centerMsg(`FINAL PUSH\nTickets drain faster for both sides: vehicle losses ×${FINAL_PUSH.kill}${M.key === "conquest" ? `, zone bleed ×${FINAL_PUSH.bleed}` : ""}`, "#ff9a6e");
+      feed(`<span class="enemy">Final push: every loss counts for more</span>`);
+      if (AC && AC.state === "running") { tone("sawtooth", 220, 0.05, 0.5, 330); }
+    }
+  }
   if (M.key !== "laststand") return;
   ms.left = 0;
   for (const t of tanks) if (t.team === 1 && t.alive && !t.type.air) ms.left++; // a wave is beaten when its ground units are
@@ -2969,6 +3009,7 @@ function modeStep(dt) {
     if (ms.wave > (ms.paid || 0)) { ms.paid = ms.wave; award(`WAVE ${ms.wave} DESTROYED`, SCORE.wave, "#9be38b"); }
     if (ms.wave >= M.waves) { ms.cleared = true; return; }
     ms.nextT = 15; tickets[0] += M.waveBonus; // relief arrives between waves: clearing waves fast is what keeps the line alive
+    if (!ev) { const e = startEvent("supply", objectiveSpot(zones[0].pos, 80, 150)); if (e) e.life = 32; } // a crate near B: worth the dash?
     feed(`<span class="ally">+${M.waveBonus} reinforcements arrive</span>`);
     centerMsg(`WAVE ${ms.wave} DESTROYED · +${M.waveBonus} reinforcements\nNext wave in 15 s: repair and reposition`, "#9be38b");
   } else if (ms.waveT > 240 && ms.wave < M.waves) spawnWave(); // the enemy does not wait forever
@@ -2993,10 +3034,13 @@ function checkEnd(left) {
 // objective line under the clock
 function modeHud() {
   switch (M.key) {
-    case "conquest": return "Conquest · hold more zones to drain the enemy's tickets";
+    case "conquest": {
+      const a = zones.filter(z => z.owner === 0).length, e = zones.filter(z => z.owner === 1).length, b = TICKET_BLEED * (ms.push ? FINAL_PUSH.bleed : 1) * Math.abs(a - e);
+      return `${ms.push ? "FINAL PUSH · " : "Conquest · "}zones ${a}–${e}${a > e ? ` · enemy losing ${b.toFixed(1)}/s` : a < e ? ` · you are losing ${b.toFixed(1)}/s: take a zone` : " · even: take a zone to start the drain"}`;
+    }
     case "breakthrough": { const z = zones.find(q => q.active); return z ? `Breakthrough · attack zone ${z.label} (${zones.filter(q => q.locked).length}/3 taken) · reinforcements ${Math.ceil(tickets[0])}` : "Breakthrough · all zones taken"; }
-    case "annihilation": return "Annihilation · destroy enemy tanks, no zones";
-    case "air": return "Air Superiority · shoot down aircraft, strike the ground targets";
+    case "annihilation": return `${ms.push ? "FINAL PUSH" : "Annihilation"} · destroy enemy tanks, no zones`;
+    case "air": return `${ms.push ? "FINAL PUSH" : "Air Superiority"} · shoot down aircraft, strike the ground targets`;
     case "laststand": return ms.nextT > 0 ? `Last Stand · wave ${ms.wave + 1}/${M.waves} in ${Math.ceil(ms.nextT)} s · reinforcements ${tickets[0]}`
       : `Last Stand · wave ${ms.wave}/${M.waves} · ${ms.left} enem${ms.left === 1 ? "y" : "ies"} left · reinforcements ${tickets[0]}`;
   }
@@ -3028,6 +3072,173 @@ function outcomeScore(o) {
   if (M.key === "breakthrough") return `zones taken ${zones.filter(z => z.locked).length}/3 · reinforcements ${o.a}`;
   if (M.key === "laststand") return `waves destroyed ${ms.done || 0}/${M.waves} · reinforcements ${o.a}`;
   return `${o.a} : ${o.e}`;
+}
+// ---- field objectives: optional side events during a battle (pass 7). One runs at a time, the first about a minute
+// in, then a new one 40-65 s after the last ends. Each is a choice: leave the main fight for a bonus, or not. The AI
+// joins in (a couple of enemies contest the relay and the supply crate, allies help hold the relay and hunt the
+// supply column), so an event is also a new skirmish somewhere on the map. Nothing makes the enemy stronger: an
+// event the enemy wins, or one nobody takes, only loses the bonus.
+const OBJ = {
+  supply: { name: "SUPPLY DROP", life: 70, col: "#8be06a", smoke: [0.45, 0.95, 0.4], how: "drive into the crate: full repair, fresh crew, reload" },
+  relay: { name: "RADIO RELAY", life: 90, col: "#ffcf5a", smoke: [1, 0.85, 0.35], hold: 12, R: 16, how: "hold the relay 12 s: reveals every enemy for 30 s" },
+  hvt: { name: "ENEMY COMMANDER", life: 100, col: "#ffc23d", how: "destroy the marked vehicle" },
+  convoy: { name: "SUPPLY COLUMN", life: 150, col: "#ffc23d", how: "destroy the 3 marked trucks before they cross the map" },
+};
+const OBJ_PAY = { relay: 15, hvt: 20, convoy: 15 }; // enemy tickets lost (Breakthrough: your reinforcements gained)
+const FINAL_PUSH = { left: 240, frac: 0.25, bleed: 2, kill: 1.5 }; // ticket modes: the closing phase
+let ev = null; // the running field objective
+const ticketMode = () => M.key === "conquest" || M.key === "annihilation" || M.key === "air";
+function objectiveBonus(n) {
+  if (M.key === "breakthrough") { tickets[0] += n; return `+${n} reinforcements`; }
+  if (ticketMode()) { tickets[1] = Math.max(0, tickets[1] - n); return `enemy −${n} tickets`; }
+  return "";
+}
+// an open, fairly flat spot clear of buildings and zones, preferably a short drive from the player
+function objectiveSpot(near, dMin = 160, dMax = 420) {
+  let best = null, bs = 1e9;
+  for (let k = 0; k < 60; k++) {
+    const x = rand(-480, 480), z = rand(-260, 300);
+    if (normalAt(x, z)[1] < 0.95) continue;
+    if (buildings.some(b => x > b.mn[0] - 12 && x < b.mx[0] + 12 && z > b.mn[2] - 12 && z < b.mx[2] + 12)) continue;
+    if (ZONE_POS.some(zp => Math.hypot(x - zp[0], z - zp[2]) < ZONE_R + 45)) continue;
+    const d = near ? Math.hypot(x - near[0], z - near[2]) : 300;
+    let sc = d < dMin ? dMin - d + 200 : d > dMax ? d - dMax : rand(0, 40);
+    // a fair race: the nearest enemy tank should be clearly further away than you (one 50 m away always won)
+    let de = 1e9; for (const t of tanks) if (t.alive && t.team === 1 && !t.type.air) de = Math.min(de, Math.hypot(x - t.pos[0], z - t.pos[2]));
+    if (de < d * 1.3 + 40) sc += (d * 1.3 + 40 - de) * 2;
+    if (sc < bs) { bs = sc; best = [x, heightAt(x, z), z]; }
+  }
+  return best || [0, heightAt(0, 150), 150];
+}
+// the n nearest AI ground units of a team (not trucks, not the commander) that will drive to p
+function nearestAI(team, p, n) {
+  return tanks.filter(t => t.ai && t.alive && t.team === team && !t.type.air && !t.conv && !t.hvt)
+    .sort((a, b) => dist2d(a.pos, p) - dist2d(b.pos, p)).slice(0, n);
+}
+function eventKinds() {
+  const air = !!(player.alive ? player.type.air : selectedType.air);
+  if (M.key === "laststand") return [];
+  if (M.key === "air") return ["hvt", "convoy"];
+  return air ? ["hvt", "convoy"] : ["supply", "relay", "hvt", "convoy"];
+}
+function startEvent(kind, at = null) {
+  const D = OBJ[kind], id = (ms.evN = (ms.evN || 0) + 1);
+  const e = { kind, id, t: 0, life: D.life, p: null, div: new Set(), prog: 0, helped: false, units: [], puffT: 0, drop: 0 };
+  if (kind === "supply" || kind === "relay") {
+    e.p = at || objectiveSpot(player.alive ? player.pos : spawnBase(player)); e.at = true; // a place on the map (the column's p is only where allies go)
+    e.drop = kind === "supply" ? 6 : 0; // the crate comes down under a parachute
+    if (M.key !== "laststand") for (const u of nearestAI(1, e.p, kind === "relay" ? 2 : 1)) e.div.add(u);
+    if (kind === "relay") for (const u of nearestAI(0, e.p, 1)) e.div.add(u);
+  } else if (kind === "hvt") {
+    const air = !!player.type.air, pool = tanks.filter(t => t.ai && t.alive && t.team === 1 && !t.conv && !!t.type.air === air);
+    const pool2 = pool.length ? pool : tanks.filter(t => t.ai && t.alive && t.team === 1 && !t.conv);
+    if (!pool2.length) return null;
+    const u = pool2[(Math.random() * pool2.length) | 0];
+    u.hvt = true; e.units = [u]; e.name = u.name;
+  } else if (kind === "convoy") {
+    const s = Math.random() < 0.5 ? -1 : 1, z = rand(200, 330), from = [s * 600, 0, z], to = [-s * 600, 0, z + rand(-60, 60)];
+    for (let i = 0; i < 3; i++) {
+      const u = makeTank(1, TYPES.light, `Truck ${i + 1}`, false, 0);
+      u.conv = { to }; spawnTank(u);
+      const x = from[0] + s * i * 16, zz = from[2] + rand(-3, 3);
+      u.pos = [x, heightAt(x, zz), zz]; u.yaw = s > 0 ? -Math.PI / 2 : Math.PI / 2; updateTankMatrices(u);
+      u.ai.goal = to; u.ai.goalZone = "conv"; tanks.push(u); e.units.push(u);
+    }
+    e.p = [0, 0, z];
+    for (const u of nearestAI(0, e.p, 2)) e.div.add(u);
+  }
+  ev = e;
+  const where = e.at ? ` · ${Math.round(dist2d(e.p, player.pos))} m ${compass(e.p)}` : "";
+  centerMsg(`FIELD OBJECTIVE: ${D.name}${where}\n${D.how}`, D.col);
+  feed(`<span style="color:${D.col}">&#9733; ${D.name}${kind === "hvt" ? `: ${e.name} (${e.units[0].type.name}) is marked` : ""}</span>`);
+  if (AC && AC.state === "running") { tone("square", 880, 0.05, 0.12, 880); setTimeout(() => tone("square", 1175, 0.05, 0.18, 1175), 140); }
+  return e;
+}
+function compass(p) {
+  const a = Math.atan2(p[0] - player.pos[0], p[2] - player.pos[2]); // +z (enemy side) is north on the minimap
+  return ["N", "NW", "W", "SW", "S", "SE", "E", "NE"][((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
+}
+// close the running objective. won: true (your side), false (enemy side or expired)
+function endEvent(won, text, credit) {
+  const e = ev, D = OBJ[e.kind];
+  ev = null; ms.evNext = battleTime + rand(40, 65);
+  for (const u of e.units) u.hvt = false;
+  for (const u of e.units) if (u.conv && u.alive) u.gone = true; // a truck that got through leaves the map
+  if (won) {
+    const bonus = OBJ_PAY[e.kind] ? objectiveBonus(OBJ_PAY[e.kind]) : "";
+    ms.objWon = (ms.objWon || 0) + 1;
+    if (credit) { player.objs++; award(`${D.name} COMPLETE`, SCORE.obj, D.col); banner = { title: "OBJECTIVE COMPLETE", sub: `${text}${bonus ? ` · ${bonus}` : ""}`, t: now, col: D.col }; }
+    else centerMsg(`${D.name}: ${text}${bonus ? `\n${bonus}` : ""}`, D.col);
+    feed(`<span class="ally">&#9733; ${text}${bonus ? ` (${bonus})` : ""}</span>`);
+  } else { feed(`<span class="enemy">&#9733; ${text}</span>`); centerMsg(`${D.name}: ${text}`, "#c8d0d8"); }
+}
+function eventStep(dt) {
+  if (ms.reveal > 0) { ms.reveal -= dt; for (const t of tanks) if (t.team === 1 && t.alive) t.spottedUntil = Math.max(t.spottedUntil, now + 0.6); }
+  if (!ev) {
+    if (M.key !== "laststand" && battleTime >= (ms.evNext ?? 60)) {
+      const ks = eventKinds().filter(k => k !== ms.evLast), k = ks[(Math.random() * ks.length) | 0];
+      if (k) { ms.evLast = k; if (!startEvent(k)) ms.evNext = battleTime + 20; }
+    }
+    return;
+  }
+  const e = ev, D = OBJ[e.kind];
+  e.t += dt; e.drop = Math.max(0, e.drop - dt);
+  if (e.p && (e.kind === "supply" || e.kind === "relay")) { // a coloured smoke column marks it from far away
+    e.puffT -= dt;
+    if (e.puffT <= 0) { e.puffT = 0.12; puff([e.p[0] + rand(-1, 1), e.p[1] + 1.5, e.p[2] + rand(-1, 1)], [rand(-0.5, 0.5), rand(3, 5), rand(-0.5, 0.5)], D.smoke, rand(6, 8), rand(1.4, 2.2), -5, 0.25, 0.6, 0.65); } // buoyant: rises ~20 m against the puff drag
+  }
+  if (e.kind === "supply") {
+    if (e.drop > 0) return;
+    const c = tanks.find(t => t.alive && !t.type.air && !t.conv && dist2d(t.pos, e.p) < 8);
+    if (c && c.team === 0) {
+      resupply(c);
+      endEvent(true, c.isPlayer ? "supplies secured: repaired, re-crewed and reloaded" : `${c.name} took the supplies`, c.isPlayer);
+    } else if (c) endEvent(false, "the enemy reached the supplies first");
+    else if (e.t > e.life) endEvent(false, "the supply crate was lost");
+  } else if (e.kind === "relay") {
+    let a = 0, en = 0;
+    for (const t of tanks) if (t.alive && !t.type.air && !t.conv && dist2d(t.pos, e.p) < D.R) { if (t.team === 0) { a++; if (t.isPlayer) e.helped = true; } else en++; }
+    e.contested = a > 0 && en > 0;
+    if (a && !en) e.prog = Math.min(1, e.prog + dt / D.hold * Math.min(a, 2));
+    else if (en && !a) e.prog = Math.max(-1, e.prog - dt / D.hold * Math.min(en, 2));
+    if (e.prog >= 1) { ms.reveal = 30; endEvent(true, "relay secured: all enemies revealed for 30 s", e.helped); }
+    else if (e.prog <= -1) endEvent(false, "the enemy took the relay");
+    else if (e.t > e.life) endEvent(false, "the relay went off the air");
+  } else if (e.kind === "hvt") {
+    const u = e.units[0];
+    if (u.alive) u.spottedUntil = Math.max(u.spottedUntil, now + 0.6);
+    if (!u.alive || !tanks.includes(u)) {
+      const mine = u.killedBy === player || (u.pDmgT !== undefined && now - u.pDmgT < ASSIST_WINDOW);
+      endEvent(true, `enemy commander ${u.name} destroyed`, mine);
+    } else if (e.t > e.life) endEvent(false, `the commander ${u.name} slipped away`);
+  } else if (e.kind === "convoy") {
+    for (const u of e.units) {
+      if (u.alive) u.spottedUntil = Math.max(u.spottedUntil, now + 0.6);
+      if (!u.alive && u.killedBy && u.killedBy.isPlayer) e.helped = true;
+    }
+    const live = e.units.filter(u => u.alive), gone = live.filter(u => dist2d(u.pos, u.conv.to) < 25);
+    for (const u of gone) { u.gone = true; u.alive = false; feed(`<span class="enemy">${u.name} got through</span>`); }
+    const left = live.length - gone.length, killed = e.units.filter(u => !u.alive && !u.gone).length;
+    if (!left) { if (killed === e.units.length) endEvent(true, "supply column destroyed", e.helped); else endEvent(false, `${e.units.length - killed} of ${e.units.length} trucks got through`); }
+    else if (e.t > e.life) endEvent(false, "the supply column escaped");
+  }
+}
+function resupply(t) {
+  t.hp = t.type.hp; t.trackT = t.engineT = t.breechT = t.fireT = 0; t.reloadT = 0; t.repairT = 0; t.repairCd = 0;
+  setupCrew(t); t.swapSeat = null;
+  if (t.type.rockets) t.rockets = t.type.rockets.n;
+  if (t.type.auto) t.mag = t.type.auto.mag;
+  if (t.isPlayer) { for (const k in t.consCd) t.consCd[k] = 0; sparks(vadd(t.pos, [0, 2, 0]), 14); }
+}
+// HUD line under the mode objective
+function eventHud() {
+  if (!ev) return M.key === "laststand" ? "" : ms.reveal > 0 ? `Relay: all enemies revealed · ${Math.ceil(ms.reveal)} s` : "";
+  const e = ev, D = OBJ[e.kind], left = Math.max(0, Math.ceil(e.life - e.t)), d = e.at ? ` · ${Math.round(dist2d(e.p, player.pos))} m ${compass(e.p)}` : "";
+  if (e.kind === "supply") return `★ ${D.name}${e.drop > 0 ? " landing" : ""}${d} · ${left} s · drive into it: repair + reload`;
+  if (e.kind === "relay") return `★ ${D.name}${d} · ${e.contested ? "CONTESTED" : e.prog < 0 ? `enemy ${Math.round(-e.prog * 100)}%` : `held ${Math.round(e.prog * 100)}%`} · ${left} s`;
+  if (e.kind === "hvt") { const u = e.units[0]; return `★ COMMANDER ${u.name} · ${u.type.name}${u.alive ? ` · ${Math.round(vlen(vsub(u.pos, player.pos)))} m` : ""} · ${left} s · −${OBJ_PAY.hvt} tickets`; }
+  const live = e.units.filter(u => u.alive).length;
+  return `★ ${D.name} · ${e.units.length - live}/${e.units.length} trucks destroyed · ${left} s · −${OBJ_PAY.convoy} tickets`;
 }
 // ---- consumables in battle (stock is bought in the hangar shop and saved in the profile)
 function segSphere(a, b, c, r) {
@@ -3109,7 +3320,7 @@ function updateAI(t, dt, now) {
       }
       bd = best ? 0 : 450 * (foe ? ENEMY_AI.see : 1);
     }
-    if (!best) for (const e of tanks) {
+    if (!best && !t.conv) for (const e of tanks) {
       if (e.team === t.team || !e.alive || e.type.air) continue;
       const d = vlen(vsub(e.pos, t.pos));
       if (d < bd && los(eye, center(e))) { best = e; bd = d; }
@@ -3690,13 +3901,13 @@ function playerHit(result, shooter, msgs = []) {
 // points; kills get a banner, a chime and a crosshair flash, and quick or unbroken kill runs get a callout.
 // The score only feeds personal bests and vehicle mastery (see the profile section): it changes nothing in
 // the fight, and no AI or difficulty value depends on it.
-const SCORE = { hit: 10, crit: 20, kill: 100, air: 120, assist: 40, cap: 150, wave: 120, long: 50, blood: 50, multi: 50 };
+const SCORE = { hit: 10, crit: 20, kill: 100, air: 120, assist: 40, cap: 150, wave: 120, long: 50, blood: 50, multi: 50, obj: 150 };
 const MULTI_WINDOW = 12, ASSIST_WINDOW = 20, LONG_SHOT = 500;
 const MULTI_NAME = ["", "", "DOUBLE KILL", "TRIPLE KILL", "MULTI KILL"];
 const STREAK_NAME = { 3: "KILL STREAK", 5: "UNSTOPPABLE", 8: "STEEL LEGEND" };
 let pops = [], banner = null, killFlashT = -99;
 function resetBattleScore(p) {
-  Object.assign(p, { score: 0, streak: 0, bestStreak: 0, multi: 0, bestMulti: 0, lastKillT: -99, longest: 0, assists: 0, guidedKills: 0, firstBlood: false });
+  Object.assign(p, { score: 0, streak: 0, bestStreak: 0, multi: 0, bestMulti: 0, lastKillT: -99, longest: 0, assists: 0, guidedKills: 0, firstBlood: false, objs: 0 });
   pops = []; banner = null; killFlashT = -99;
 }
 // one popup line; `key` merges repeats (machine-gun hits on one target) into a single counting line
@@ -3832,7 +4043,9 @@ function slotType(team, s) {
 function newBattle() {
   M = MODES[profile.mode] || MODES.conquest;
   battleTime = 0; tickets = M.tickets.slice(); ticketAcc = 0; outcome = null; respawnT = 0;
-  ms = { front: null, wave: 0, nextT: 20, waveT: 0, done: 0, left: 0, cleared: false, nameI: (Math.random() * NAMES.length) | 0, waveBase: null };
+  ms = { front: null, wave: 0, nextT: 20, waveT: 0, done: 0, left: 0, cleared: false, nameI: (Math.random() * NAMES.length) | 0, waveBase: null,
+    evNext: 60, evN: 0, evLast: null, objWon: 0, reveal: 0, push: false };
+  ev = null;
   setupZones();
   shells = []; parts = []; smokes = []; strikes = [];
   for (const t of trees) { t.falling = false; t.fall = 0; t.M = chain(trans(t.x, t.y, t.z), scl(t.s, t.s, t.s)); }
@@ -3888,7 +4101,7 @@ function showMenu(mode) {
   if (over) {
     const o = outcome || { result: "draw", reason: "time", a: Math.round(tickets[0]), e: Math.round(tickets[1]) };
     $("title").textContent = o.result === "win" ? "VICTORY" : o.result === "loss" ? "DEFEAT" : "DRAW";
-    $("sub").textContent = `${M.name}: ${outcomeText(o)} (${outcomeScore(o)})\nKills ${player.kills} · Deaths ${player.deaths} · Captures ${player.caps} · Battle time ${fmtClock(Math.min(battleTime, M.time))}`;
+    $("sub").textContent = `${M.name}: ${outcomeText(o)} (${outcomeScore(o)})\nKills ${player.kills} · Deaths ${player.deaths} · Captures ${player.caps}${player.objs ? ` · Objectives ${player.objs}` : ""} · Battle time ${fmtClock(Math.min(battleTime, M.time))}`;
     $("rewards").innerHTML = rewardsHtml(o.rewards);
     $("play").textContent = "Play again";
   }
@@ -4148,6 +4361,7 @@ function step(dt) {
   updateParticles(dt);
   updateZones(dt);
   modeStep(dt);
+  eventStep(dt);
   updateConsumables(dt);
   updateCamera(dt);
   for (const tr of trees) if (tr.falling && tr.fall < 1.45) {
@@ -4336,6 +4550,20 @@ function render() {
   for (const z of zones) {
     const zp = z.pos, c = z.owner === 0 ? [0.25, 0.55, 1] : z.owner === 1 ? [1, 0.3, 0.25] : [0.95, 0.95, 0.95];
     draw(flagMesh, chain(trans(zp[0], zp[1], zp[2]), rotY(now * 0.3)), c, 0.3);
+  }
+  if (ev && ev.at) { // field objective in the world: a supply crate (on a parachute while landing) or a radio mast
+    const p = ev.p;
+    if (ev.kind === "supply") {
+      const y = p[1] + 0.8 + ev.drop * 12, sway = Math.sin(now * 1.7) * 0.12 * (ev.drop > 0 ? 1 : 0);
+      draw(cubeMesh, chain(trans(p[0], y, p[2]), rotY(0.6), rotZ(sway), scl(2.4, 1.6, 1.6)), [0.42, 0.34, 0.18], 0);
+      draw(cubeMesh, chain(trans(p[0], y + 0.82, p[2]), rotY(0.6), scl(2.5, 0.12, 0.4)), [0.85, 0.85, 0.8], 0.2);
+      if (ev.drop > 0) draw(cubeMesh, chain(trans(p[0], y + 5, p[2]), rotZ(sway), scl(5, 0.3, 5)), [0.9, 0.92, 0.86], 0.3);
+    } else if (ev.kind === "relay") {
+      const c = ev.prog > 0.02 ? [0.25, 0.55, 1] : ev.prog < -0.02 ? [1, 0.3, 0.25] : [1, 0.8, 0.3];
+      draw(cubeMesh, chain(trans(p[0], p[1] + 6, p[2]), scl(0.25, 12, 0.25)), [0.3, 0.3, 0.3], 0);
+      draw(cubeMesh, chain(trans(p[0], p[1] + 0.6, p[2]), scl(2.2, 1.2, 1.4)), [0.32, 0.36, 0.26], 0);
+      draw(flagMesh, chain(trans(p[0], p[1] + 2.5, p[2]), rotY(now * 0.5)), c, 0.4);
+    }
   }
   use(P.ground);
   gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1, -4); // road surface sits a hair above the terrain
@@ -4563,9 +4791,15 @@ function drawMinimap() {
     if (t.isPlayer || !t.alive) continue;
     if (t.team !== 0 && t.spottedUntil < now) continue;
     const [x, y] = toMap(clamp(t.pos[0], -HALF, HALF), clamp(t.pos[2], -HALF, HALF));
-    mm.fillStyle = t.team === 0 ? "#5aaaff" : "#ff4a3c";
+    mm.fillStyle = t.team === 0 ? "#5aaaff" : t.hvt || t.conv ? "#ffc23d" : "#ff4a3c";
     if (t.type.air) { mm.beginPath(); mm.moveTo(x, y - 4); mm.lineTo(x + 4, y + 3); mm.lineTo(x - 4, y + 3); mm.closePath(); mm.fill(); }
     else mm.fillRect(x - 2.5, y - 2.5, 5, 5);
+  }
+  if (ev && ev.at) { // field objective: a pulsing ring (the relay ring fills with its hold progress)
+    const [x, y] = toMap(ev.p[0], ev.p[2]), D = OBJ[ev.kind];
+    mm.strokeStyle = D.col; mm.lineWidth = 2; mm.beginPath(); mm.arc(x, y, 6 + 2 * Math.sin(now * 5), 0, Math.PI * 2); mm.stroke();
+    if (ev.kind === "relay" && ev.prog) { mm.strokeStyle = ev.prog > 0 ? "#5aaaff" : "#ff4a3c"; mm.lineWidth = 3; mm.beginPath(); mm.arc(x, y, 10, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.abs(ev.prog)); mm.stroke(); }
+    mm.fillStyle = D.col; mm.fillRect(x - 2, y - 2, 4, 4); mm.lineWidth = 1;
   }
   if (player.alive) {
     const [x, y] = toMap(clamp(player.pos[0], -HALF, HALF), clamp(player.pos[2], -HALF, HALF));
@@ -4628,6 +4862,7 @@ function updateDom(dt) {
   updateRepairButton(t);
   const left = M.time - battleTime, clock = $("clock");
   txt($("modeLbl"), modeHud());
+  txt($("evLbl"), eventHud());
   updateConsBar(t);
   txt(clock, fmtClock(left));
   if (clock.className !== (left <= 60 ? "final" : left <= 300 ? "late" : "")) clock.className = left <= 60 ? "final" : left <= 300 ? "late" : "";
@@ -4834,6 +5069,7 @@ function grantRewards(o) {
   if (p.caps) rows.push([pl(p.caps, "zone capture"), p.caps * 350, p.caps * 150]);
   if (M.key === "breakthrough") { const n = zones.filter(z => z.locked).length; if (n) rows.push([`${n}/3 zones broken through`, n * 400, n * 150]); }
   if (M.key === "laststand" && ms.done) rows.push([`${pl(ms.done, "wave")} destroyed`, ms.done * 300, ms.done * 160]);
+  if (p.objs) rows.push([pl(p.objs, "field objective"), p.objs * 250, p.objs * 120]);
   const mins = Math.floor(Math.min(battleTime, M.time) / 60);
   if (mins) rows.push([`${mins} min in battle`, mins * 40, mins * 25]);
   const medals = MEDALS.filter(m => m.f(p, o));
@@ -5377,6 +5613,12 @@ function renderModal() {
     h = `<h3 style="color:#9fd4ff">Ground vehicles</h3>${$("ctlGround").outerHTML.replace(/ id="[^"]*"/, "").replace(/ style="[^"]*"/, "")}
       <h3 style="color:#9fd4ff">Aircraft</h3>${$("ctlAir").outerHTML.replace(/ id="[^"]*"/, "").replace(/ style="[^"]*"/, "")}<p class="note" style="opacity:.9">${$("hintAir").innerHTML}</p>
       <h3 style="color:#9fd4ff">Consumables</h3><table class="ctl">${CONS.map(c => `<tr><td>${c.key}</td><td>${c.name}: ${c.d}</td></tr>`).join("")}</table>
+      <h3 style="color:#9fd4ff">Field objectives and the final push</h3><p class="note" style="opacity:.9">About a minute into a battle, and again every minute or so after one ends, an optional <b>field objective</b> appears. It is announced on screen, shown in the gold line under the clock with its range, direction and time left, marked with coloured smoke in the world, a gold marker and a ring on the minimap. A couple of enemies (and sometimes allies) head for it too. Ignoring one costs nothing; completing it scores +${SCORE.obj} and pays ${fmtN(250)} Cr / 120 XP at the end.</p><table class="ctl">
+        <tr><td>Supply drop</td><td>A crate parachutes down (green smoke). Be the first to drive into it: full repair, a fresh crew, instant reload, rockets refilled and consumable cooldowns reset. In Last Stand one lands near B after every destroyed wave.</td></tr>
+        <tr><td>Radio relay</td><td>A mast (yellow smoke). Hold it alone for ${OBJ.relay.hold} s (enemies inside pause it): every enemy is revealed for 30 s and the enemy loses ${OBJ_PAY.relay} tickets.</td></tr>
+        <tr><td>Enemy commander</td><td>One enemy vehicle (an aircraft if you are flying) gets a gold ★ marker. Destroy it within ${OBJ.hvt.life} s: −${OBJ_PAY.hvt} enemy tickets.</td></tr>
+        <tr><td>Supply column</td><td>Three unarmed trucks cross behind the enemy line, marked gold. Destroy all of them: −${OBJ_PAY.convoy} enemy tickets on top of the usual losses. Good prey for aircraft.</td></tr></table>
+      <p class="note" style="opacity:.9">In Breakthrough the bonus is extra reinforcements instead. In Conquest, Annihilation and Air Superiority the last ${FINAL_PUSH.left / 60} minutes, or the moment either side drops to ${FINAL_PUSH.frac * 100}% tickets, are the <b>final push</b>: both sides lose ×${FINAL_PUSH.kill} tickets per vehicle and Conquest zones bleed ×${FINAL_PUSH.bleed}, so a close battle ends with a real decision instead of running out the clock. The line under the clock shows the zone count and who is draining whom.</p>
       <h3 style="color:#9fd4ff">Credits, XP and unlocks</h3><p class="note" style="opacity:.9">Every finished battle pays credits (Cr) and XP: a base amount for the result, plus kills, zone captures, broken-through zones, destroyed Last Stand waves and time in battle. Boosters add 50%. XP raises your commander level; each level pays a credit bonus and unlocks some camouflage and crew training. Contracts in the hangar pay extra credits when completed. Leaving a battle early pays nothing. All ${GROUND_LIST.length + AIR_LIST.length} vehicles are free and always available. Credits buy modifications (per vehicle), camouflage, consumables, crew training and boosters. There is no real-money shop. Progress is saved in this browser (localStorage).</p>
       <h3 style="color:#9fd4ff">Battle score, medals and mastery</h3><p class="note" style="opacity:.9">Your hits (+${SCORE.hit}, critical +${SCORE.crit}), kills (+${SCORE.kill}, aircraft +${SCORE.air}), assists (+${SCORE.assist}: an enemy you damaged in the last ${ASSIST_WINDOW} s is finished by someone else), captures (+${SCORE.cap}) and cleared waves (+${SCORE.wave}) pop up under the crosshair. Bonuses: first blood, long shots from ${LONG_SHOT} m, and double / triple kills within ${MULTI_WINDOW} s. Kill streaks (kills without being destroyed) get a callout at 3, 5 and 8. At the end of a battle you can earn medals (${MEDALS.length} to collect, +${MEDAL_PAY[0]} Cr / +${MEDAL_PAY[1]} XP each). Your score also counts toward that vehicle's mastery: ${MASTERY.length} stars, each paying a one-off credit bonus, plus personal bests per vehicle and overall. The score changes nothing in the fight, the enemy does not get harder, and nothing is lost if you take a break.</p>`;
   } else if (modalKind === "reset") {
@@ -6133,13 +6375,15 @@ function runSelfTest() {
     // tank vs tank, with the target driving sideways so only a steering rocket hits it
     // a lane with a clear view over 320 m: the map, its buildings and trees are random, so each candidate is tested
     // with the seeker itself (was: a terrain-only check at 10 lanes, which failed on some maps)
-    const laneOk = x => {
-      const pr = unit(H, 0, x, 0), from = seekerFrom(pr), sees = e => lockValid(pr, e, aimAt(pr, e), LOCK.cone, from);
-      if (![0, 6, 12, 20, 30].every(dx => sees(unit(HIST.sherman, 1, x + dx, 320, Math.PI / 2)))) return false;
-      return [-250, -150, -50, 50].every(dx => los(from, [x + dx, heightAt(x, 500) + 180, 500]));
+    const laneOk = ([x, z]) => {
+      const pr = unit(H, 0, x, z), from = seekerFrom(pr), pods = H.rockets.pts.map(q => tp(rocketBase(pr), q)); // rockets leave the pods, lower than the seeker
+      const sees = e => lockValid(pr, e, aimAt(pr, e), LOCK.cone, from) && pods.every(q => los(q, center(e)));
+      if (![0, 6, 12, 20, 30].every(dx => sees(unit(HIST.sherman, 1, x + dx, z + 320, Math.PI / 2)))) return false;
+      return true; // the aircraft's altitude is chosen for the lane below
     };
-    const lx = Array.from({ length: 37 }, (_, i) => i % 2 ? -(i + 1) * 25 : i * 25).find(laneOk) ?? 0;
-    const hn = unit(H, 0, lx, 0), foe = unit(HIST.sherman, 1, lx, 320, Math.PI / 2), mate = unit(HIST.sherman, 0, lx + 40, 200), far = unit(HIST.sherman, 1, lx, 1300);
+    const lanes = [0, -200, 150, -350].flatMap(z => Array.from({ length: 37 }, (_, i) => [i % 2 ? -(i + 1) * 25 : i * 25, z]));
+    const [lx, lz] = lanes.find(laneOk) ?? [0, 0];
+    const hn = unit(H, 0, lx, lz), foe = unit(HIST.sherman, 1, lx, lz + 320, Math.PI / 2), mate = unit(HIST.sherman, 0, lx + 40, lz + 200), far = unit(HIST.sherman, 1, lx, lz + 1300);
     hn.isPlayer = true; shells = [];
     ok("a new Hornet has 4 rockets", hn.rockets === 4, hn.rockets);
     tanks = [hn, mate]; hold(hn, aimAt(hn, mate), 1);
@@ -6164,11 +6408,14 @@ function runSelfTest() {
     ok("the rocket steers onto a tank driving sideways and damages it", foe.hp < hp0 || !foe.alive, `hp ${hp0.toFixed(0)} → ${foe.hp.toFixed(0)} after ${hitT.toFixed(1)} s, moved ${(foe.pos[0] - lx).toFixed(0)} m`);
     // tank vs aircraft
     const air = unit(AIR.bf109, 1, 0, 0); spawnPlane(air); air.ai = null;
-    air.pos = [lx - 250, heightAt(lx, 500) + 180, 500]; air.Z = [1, 0, 0]; air.Y = [0, 1, 0]; air.X = vcross(air.Y, air.Z); air.speed = 120; air.vel = vscale(air.Z, 120); updateTankMatrices(air);
+    // fly high enough that the random terrain cannot hide the crossing path from the seeker
+    const altOk = h => [-250, -200, -150, -100, -50, 0, 50, 100, 150, 250].every(dx => los(seekerFrom(hn), [lx + dx, heightAt(lx, lz + 500) + h, lz + 500]));
+    const alt = [180, 240, 300, 380, 460].find(altOk) || 460;
+    air.pos = [lx - 250, heightAt(lx, lz + 500) + alt, lz + 500]; air.Z = [1, 0, 0]; air.Y = [0, 1, 0]; air.X = vcross(air.Y, air.Z); air.speed = 120; air.vel = vscale(air.Z, 120); updateTankMatrices(air);
     hn.lock = null; hn.lockT = 0; hn.rocketT = 0; tanks = [hn, air]; shells = [];
     const flyOn = () => { flySubsteps(air, [1, 0, 0], 1 / 30); updateTankMatrices(air); };
-    for (let i = 0; i < 30; i++) { flyOn(); updateLock(hn, 1 / 30, aimAt(hn, air)); }
-    ok("tank auto-locks an aircraft", isLocked(hn) && hn.lock === air);
+    for (let i = 0; i < 45; i++) { flyOn(); updateLock(hn, 1 / 30, aimAt(hn, air)); }
+    ok("tank auto-locks an aircraft", isLocked(hn) && hn.lock === air, `alt ${alt} d ${Math.round(vlen(vsub(air.pos, hn.pos)))} los ${los(seekerFrom(hn), air.pos)} valid ${lockValid(hn, air, aimAt(hn, air), LOCK.cone)} lock ${hn.lock && hn.lock.name} t ${hn.lockT.toFixed(2)}`);
     fireRockets(hn);
     for (let i = 0; i < 240 && air.alive && shells.length; i++) { flyOn(); updateShells(1 / 30); }
     ok("the tank's rocket chases and downs a crossing aircraft", !air.alive, `alive=${air.alive}`);
@@ -6253,6 +6500,100 @@ function runSelfTest() {
     ok("the score system does not touch the enemy AI handicap", JSON.stringify(ENEMY_AI) === AI0);
     showMenu("start"); const lob = $("lbCareer").innerHTML + $("lbCards").innerHTML + $("lbInfo").innerHTML;
     ok("the hangar shows medals, best score and mastery stars", /Medals \d+\/\d+/.test(lob) && /Best battle score/.test(lob) && /Mastery/.test(lob) && /class="ms/.test(lob));
+    state = "playing";
+  });
+  guard("field objectives and the final push", () => {
+    battle("conquest");
+    const p = player, AI0 = JSON.stringify(ENEMY_AI), run = (sec, f) => { for (let i = 0; i < sec * 10; i++) { if (f) f(); eventStep(0.1); } };
+    battleTime = 59; eventStep(0.1);
+    ok("no field objective in the first minute", !ev);
+    battleTime = 60; eventStep(0.1);
+    ok("a field objective starts about a minute in", !!ev && OBJ[ev.kind], ev && ev.kind);
+    endEvent(false, "test");
+    ok("the next objective is scheduled 40-65 s after one ends", !ev && ms.evNext >= battleTime + 40 && ms.evNext <= battleTime + 65);
+    // supply drop: you cannot grab it mid-air; driving into it repairs, re-crews and reloads you
+    const s0 = p.score, spot = objectiveSpot(p.pos);
+    const e = startEvent("supply", spot);
+    ok("an objective spot is clear of zones and buildings", ZONE_POS.every(z => dist2d(z, spot) > ZONE_R + 40) && !buildings.some(b => spot[0] > b.mn[0] && spot[0] < b.mx[0] && spot[2] > b.mn[2] && spot[2] < b.mx[2]));
+    p.pos = spot.slice(); p.hp = 20; p.trackT = 9; p.crew[1].ko = true; p.reloadT = 3;
+    eventStep(0.1);
+    ok("the crate cannot be taken while it is still parachuting down", ev === e && p.hp === 20);
+    e.drop = 0; eventStep(0.1);
+    ok("driving into the supply crate fully repairs, re-crews and reloads you", !ev && p.hp === p.type.hp && p.trackT === 0 && crewLeft(p) === p.crew.length && p.reloadT === 0, `${p.hp} ${crewLeft(p)}/${p.crew.length}`);
+    ok("completing an objective scores and counts for the end screen", p.objs === 1 && p.score === s0 + SCORE.obj, `${p.objs} ${p.score - s0}`);
+    p.pos = [0, 0, -500];
+    const foe = tanks.find(t => t.team === 1 && !t.type.air && t.alive), e2 = startEvent("supply", objectiveSpot(null)); e2.drop = 0;
+    ok("an enemy is sent to contest the supply crate", e2.div.size >= 1 && [...e2.div].every(u => u.team === 1) && pickGoal([...e2.div][0]).p === e2.p);
+    const tk = tickets.slice(); foe.pos = e2.p.slice(); eventStep(0.1);
+    ok("an enemy reaching the crate first only loses you the bonus", !ev && p.objs === 1 && tickets[0] === tk[0] && tickets[1] === tk[1]);
+    // radio relay: hold it alone; an enemy inside pauses it
+    const e3 = startEvent("relay"); p.pos = e3.p.slice(); foe.pos = vadd(e3.p, [4, 0, 0]);
+    run(3);
+    ok("an enemy inside the relay stops it being taken", ev === e3 && e3.prog === 0 && e3.contested);
+    foe.pos = [0, 0, 600]; const t1 = tickets[1];
+    run(13);
+    ok("holding the relay 12 s reveals every enemy and costs the enemy tickets", !ev && ms.reveal > 0 && Math.abs(t1 - tickets[1] - OBJ_PAY.relay) < 1e-6 && p.objs === 2, `${t1 - tickets[1]} ${ms.reveal}`);
+    run(1);
+    ok("revealed enemies are spotted wherever they are", tanks.filter(t => t.team === 1 && t.alive).every(t => t.spottedUntil > now));
+    ms.reveal = 0;
+    // enemy commander
+    const e4 = startEvent("hvt"), u = e4.units[0];
+    ok("the enemy commander is one marked, spotted enemy of your kind (ground)", u.team === 1 && u.hvt && !u.type.air && tanks.filter(t => t.hvt).length === 1);
+    eventStep(0.1); ok("the commander is always spotted", u.spottedUntil > now);
+    const t2 = tickets[1]; destroyTank(u, p); eventStep(0.1);
+    ok("destroying the commander costs the enemy the bonus tickets as well", !ev && !u.hvt && Math.abs(t2 - tickets[1] - OBJ_PAY.hvt - killCost(u)) < 1e-6 && p.objs === 3, t2 - tickets[1]);
+    // supply column
+    const n0 = tanks.length, e5 = startEvent("convoy"), trucks = e5.units;
+    ok("a supply column is 3 enemy trucks (marked on the trucks, not on a place)", !e5.at && trucks.length === 3 && tanks.length === n0 + 3 && trucks.every(t => t.team === 1 && t.conv));
+    const tr = trucks[0], ally = tanks.find(t => t.team === 0 && !t.type.air && t !== p);
+    ally.pos = vadd(tr.pos, [0, 0, -60]); tr.ai.think = 0; updateAI(tr, 0.05, now);
+    ok("trucks do not shoot (no target even with an enemy in sight)", !tr.ai.target && pickGoal(tr).p === tr.conv.to);
+    ok("allies are sent to intercept the column", [...e5.div].every(t => t.team === 0));
+    const t3 = tickets[1]; for (const t of trucks) destroyTank(t, p); eventStep(0.1);
+    ok("destroying the whole column pays the bonus", !ev && Math.abs(t3 - tickets[1] - OBJ_PAY.convoy - 3 * KILL_TICKETS) < 1e-6 && p.objs === 4, t3 - tickets[1]);
+    respawnAI(tr); ok("destroyed trucks do not respawn", tr.gone);
+    const e6 = startEvent("convoy"); for (const t of e6.units) t.pos = t.conv.to.slice(); const t4 = tickets[1]; eventStep(0.1);
+    ok("a column that gets through leaves the map and costs you nothing", !ev && e6.units.every(t => t.gone) && tickets[1] === t4 && p.objs === 4);
+    // HUD
+    startEvent("relay"); let hudOk = true;
+    try { eventHud(); drawObjectiveCue(hud.width, hud.height); drawEnemyCues(hud.width, hud.height); drawMinimap(); } catch (x) { hudOk = String(x); }
+    ok("the objective line, marker and minimap ring draw", hudOk === true && /RADIO RELAY/.test(eventHud()), hudOk);
+    ev = null;
+    ok("in an aircraft only air-relevant objectives come up", (() => { const T = p.type; p.type = AIR.p51; const k = eventKinds(); p.type = T; return k.join() === "hvt,convoy"; })());
+    const r = grantRewards({ result: "win", reason: "tickets", a: 1, e: 0 });
+    ok("completed objectives pay at the end of the battle", r.rows.some(x => /4 field objectives/.test(x[0]) && x[1] === 1000));
+    // final push
+    ok("no final push early in a close battle", !ms.push && killCost(foe) === KILL_TICKETS);
+    tickets[1] = M.tickets[1] * 0.24; modeStep(0.1);
+    ok("the final push starts at 25% tickets and raises losses for both sides", ms.push && killCost(foe) === KILL_TICKETS * FINAL_PUSH.kill && killCost(p) === KILL_TICKETS * FINAL_PUSH.kill);
+    battle("conquest"); battleTime = M.time - FINAL_PUSH.left; modeStep(0.1);
+    ok("the final push starts with 4 minutes left", ms.push && /FINAL PUSH/.test(modeHud()));
+    zones[0].owner = 0; zones[1].owner = 0; zones[2].owner = 1;
+    ok("the objective line shows who is draining whom", /zones 2–1 · enemy losing 0\.6\/s/.test(modeHud()), modeHud());
+    battle("breakthrough"); const b0 = tickets.slice(); objectiveBonus(15); battleTime = M.time - 10; modeStep(0.1);
+    ok("Breakthrough: objectives add reinforcements; no final push", tickets[0] === b0[0] + 15 && tickets[1] === b0[1] && !ms.push);
+    // Last Stand: no scheduled objectives, a crate near B after each destroyed wave
+    battle("laststand", HIST.tiger); battleTime = 300; eventStep(0.1);
+    ok("Last Stand has no timed objectives", !ev);
+    ms.wave = 1; ms.nextT = 0; ms.waveT = 5;
+    for (const t of tanks) if (t.team === 1) t.alive = false;
+    modeStep(0.1);
+    ok("Last Stand: a supply crate lands near B after a destroyed wave", ev && ev.kind === "supply" && dist2d(ev.p, zones[0].pos) < 200 && ev.life < 40, ev && Math.round(dist2d(ev.p, zones[0].pos)));
+    ev = null;
+    ok("field objectives do not touch the enemy AI handicap", JSON.stringify(ENEMY_AI) === AI0);
+  });
+  guard("match flow with field objectives", () => {
+    battle("air", AIR.p51); startEvent("convoy"); let bad = "";
+    for (let i = 0; i < 30 * 90 && state === "playing" && !bad; i++) { const was = player.alive; step(1 / 30); if (was && !player.alive) respawnT = 6; if (tanks.some(t => t.pos.some(v => !isFinite(v)))) bad = "NaN"; }
+    ok("Air Superiority: 90 s with a supply column runs clean", !bad && state === "playing", bad || `${(ms.evN || 0)} objectives so far`);
+    for (const mode of ["conquest", "annihilation", "air", "breakthrough", "laststand"]) {
+      battle(mode, mode === "air" ? AIR.p51 : HIST.sherman); battleTime = M.time - 2; if (mode !== "laststand") startEvent(mode === "air" ? "hvt" : "relay");
+      for (let i = 0; i < 30 * 4 && state === "playing"; i++) step(1 / 30);
+      ok(`${mode}: the battle ends on time with a result and rewards`, state === "over" && outcome && ["win", "loss", "draw"].includes(outcome.result) && outcome.rewards && outcome.rewards.cr > 0, outcome && `${outcome.result}/${outcome.reason}`);
+      state = "playing";
+    }
+    battle("conquest"); tickets[1] = 4; ms.push = true; const foe = tanks.find(t => t.team === 1 && !t.type.air); destroyTank(foe, player); step(1 / 30);
+    ok("a final-push kill can end the battle (enemy out of tickets = victory)", state === "over" && outcome.result === "win" && outcome.reason === "tickets");
     state = "playing";
   });
   guard("battle soak", () => {

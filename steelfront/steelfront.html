@@ -75,6 +75,7 @@
   #cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-bottom: 8px; }
   .card { padding: 6px 8px; border: 2px solid rgba(255,255,255,.15); border-radius: 8px; cursor: pointer; text-align: left; font-size: 11px; background: rgba(255,255,255,.04); }
   .card.sel { border-color: #ffcf5a; background: rgba(255,207,90,.12); }
+  .card.locked { opacity: .6; border-style: dashed; }
   .card h3 { margin: 0 0 1px; font-size: 13px; color: #ffcf5a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .card .cls { opacity: .7; }
   #detail { text-align: left; font-size: 12px; line-height: 1.45; padding: 8px 10px; margin-bottom: 10px; background: rgba(0,0,0,.25); border-radius: 8px; min-height: 120px; }
@@ -187,6 +188,13 @@
   .vc.no { opacity: .45; }
   .vc svg { display: block; width: 64px; height: 26px; margin-bottom: 2px; opacity: .9; }
   .vc b { display: block; font-size: 12px; color: #ffcf5a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vc.locked { border-color: rgba(255,190,80,.35); background: linear-gradient(160deg, rgba(255,190,80,.12), rgba(255,255,255,.03)); }
+  .vc.locked svg { opacity: .45; }
+  .vc .pr { position: absolute; right: 6px; top: 5px; font: bold 10px ui-monospace, Menlo, Consolas, monospace; color: #ffcf5a; }
+  .vc .pm { color: #ffcf5a; font-weight: 700; }
+  .buyv { margin: 6px 0 4px; padding: 7px 9px; border: 1px solid rgba(255,207,90,.5); border-radius: 5px; background: rgba(255,190,60,.1); font-size: 12px; }
+  .buyv button { margin-top: 6px; width: 100%; pointer-events: auto; }
+  .buyv .short { color: #ff9a8a; }
   .vc .st { position: absolute; right: 6px; top: 5px; font: 10px ui-monospace, Menlo, Consolas, monospace; opacity: .75; }
   .vc .ms { position: absolute; right: 6px; top: 18px; font-size: 10px; letter-spacing: -1px; color: #ffcf5a; }
   .vc .ms.z { color: rgba(255,255,255,.28); }
@@ -1013,6 +1021,22 @@ function addCone(b, M, col, segs = 8) {
   addPoly(b, ring, col, ctr);
 }
 const finish = b => uploadMesh(b.pos, b.nor, b.col);
+// Weathering / material pass for vehicle models (build time only, no per-frame cost). Per face: ambient occlusion
+// that darkens toward the bottom (y0..y1), dust and mud on the lower hull and running gear (below mudTop), sun-faded
+// upper faces and shadowed undersides, and a small deterministic tone variation so large plates read as separate
+// panels. Vertex colours multiply the camouflage tint, so every camo keeps working.
+const MUD = [0.5, 0.43, 0.33];
+function weather(b, o = {}) {
+  const { y0 = -1, y1 = 1, ao = 0.24, mud = 0, mudTop = 0, jit = 0.07 } = o, P = b.pos, N = b.nor, Cc = b.col;
+  for (let i = 0; i < P.length; i += 9) {
+    const cx = (P[i] + P[i + 3] + P[i + 6]) / 3, cy = (P[i + 1] + P[i + 4] + P[i + 7]) / 3, cz = (P[i + 2] + P[i + 5] + P[i + 8]) / 3, ny = N[i + 1];
+    const hsh = Math.abs(Math.sin(Math.round(cx * 4) * 12.9898 + Math.round(cy * 4) * 78.233 + Math.round(cz * 4) * 37.719) * 43758.5453) % 1;
+    let k = (1 - ao + ao * smoothstep(y0, y1, cy)) * (1 + (hsh - 0.5) * jit) * (ny > 0.7 ? 1.04 : ny < -0.5 ? 0.82 : 1);
+    const m = mud ? mud * (1 - smoothstep(mudTop * 0.35, mudTop, cy)) : 0;
+    for (let v = 0; v < 3; v++) for (let c = 0; c < 3; c++) { const j = i + v * 3 + c; Cc[j] = Math.min(1, lerp(Cc[j], MUD[c], m) * k); }
+  }
+  return b;
+}
 
 // ---------------------------------------------------------------- detailed modelling toolkit
 // Lofts connect consecutive rings (equal point counts) with quads; works for hulls, turrets,
@@ -1199,46 +1223,39 @@ const TYPES = {
     armor: { hf: 45, hs: 30, hr: 20, ht: 12, tf: 50, ts: 30, tr: 20 }, pen: 110, dmg: 30, reload: 3.8, v0: 780, hp: 100,
     rockets: { n: 4, kind: "SF-G", regen: 8, pts: [[1.17, 0.5, 0.25], [-1.17, 0.5, 0.25], [1.17, 0.26, 0.25], [-1.17, 0.26, 0.25]] } },
 };
-const TYPE_LIST = [TYPES.light, TYPES.medium, TYPES.heavy, TYPES.hornet];
+// premium Steel Front vehicles: bought once with earned credits (no real money anywhere), player-only
+TYPES.valkyrie = { key: "valkyrie", name: "Valkyrie V-8", cls: "Strike tank", W: 3.3, L: 6.5, Hh: 0.95, tw: 0.62,
+  tur: { w: 2.05, h: 0.72, l: 2.6, z: -0.15 }, bar: { len: 5.6, r: 0.085 },
+  speed: 21, rev: 8, accel: 9, turn: 1.15, traverse: 0.95, elevRate: 0.55,
+  armor: { hf: 120, hs: 55, hr: 35, ht: 20, tf: 140, ts: 65, tr: 45 }, pen: 270, dmg: 52, reload: 3.4, v0: 1050, hp: 120,
+  price: 45000, sf: { wheels: 6, skirts: true, cast: false, brake: true, ext: true } };
+TYPES.swarm = { key: "swarm", name: "Hornet R-9 Swarm", cls: "Heavy rocket tank", W: 3.3, L: 6.2, Hh: 1.0, tw: 0.62,
+  tur: { w: 2.1, h: 0.82, l: 2.4, z: 0 }, bar: { len: 3.8, r: 0.07 },
+  speed: 16, rev: 6, accel: 6.5, turn: 0.95, traverse: 0.85, elevRate: 0.5,
+  armor: { hf: 100, hs: 50, hr: 30, ht: 18, tf: 110, ts: 55, tr: 35 }, pen: 165, dmg: 42, reload: 3.6, v0: 820, hp: 130,
+  rockets: { n: 8, kind: "SF-G", regen: 4.5, pts: [[1.27, 0.78, 0.25], [-1.27, 0.78, 0.25], [1.27, 0.58, 0.25], [-1.27, 0.58, 0.25], [1.27, 0.38, 0.25], [-1.27, 0.38, 0.25], [1.27, 0.18, 0.25], [-1.27, 0.18, 0.25]] },
+  price: 55000, sf: { wheels: 6, skirts: true, cast: false, ext: false, pods: 3 } };
+TYPES.titan = { key: "titan", name: "Titan HX-9", cls: "Super-heavy tank", W: 3.9, L: 7.6, Hh: 1.35, tw: 0.8,
+  tur: { w: 2.8, h: 1.1, l: 3.0, z: -0.25 }, bar: { len: 6.2, r: 0.12 },
+  speed: 11, rev: 4, accel: 3.6, turn: 0.55, traverse: 0.42, elevRate: 0.32,
+  armor: { hf: 250, hs: 130, hr: 80, ht: 45, tf: 290, ts: 150, tr: 95 }, pen: 330, dmg: 78, reload: 6.2, v0: 1000, hp: 175,
+  price: 75000, sf: { wheels: 8, skirts: true, cast: true, brake: true, ext: true } };
+const TYPE_LIST = [TYPES.light, TYPES.medium, TYPES.heavy, TYPES.hornet, TYPES.valkyrie, TYPES.swarm, TYPES.titan];
+const isPremium = T => !!(T && (T.base || T).price);
 Object.assign(TYPES.light, { role: "light", nation: "Steel Front", gun: "57 mm L/60", crew: 3, desc: "Original Steel Front design: a nimble scout with a quick-firing gun. Use speed and flanking shots." });
 Object.assign(TYPES.medium, { role: "medium", nation: "Steel Front", gun: "76 mm L/55", crew: 4, desc: "Original Steel Front design: the balanced all-rounder." });
 Object.assign(TYPES.heavy, { role: "heavy", nation: "Steel Front", gun: "100 mm L/56", crew: 5, desc: "Original Steel Front design: thick frontal armour and a hard-hitting gun, but slow." });
 Object.assign(TYPES.hornet, { role: "light", nation: "Steel Front", gun: "50 mm L/50", crew: 3, desc: "Original Steel Front arcade design: a light tank with two turret pods of lock-on SF-G rockets. Keep an enemy tank or aircraft near the crosshair until the box turns red (LOCKED), then press R: the rocket steers itself to the target. Four rockets; the pods reload one every 8 s." });
+Object.assign(TYPES.valkyrie, { role: "medium", nation: "Steel Front", gun: "90 mm L/70 high-velocity", crew: 4, weight: "38 t", engine: "SF-1200 gas turbine",
+  desc: "Premium Steel Front design: a low, fast strike tank with a long 90 mm high-velocity gun (270 mm pen) and a 3.4 s reload. Outruns everything on tracks and punishes flanks." });
+Object.assign(TYPES.swarm, { role: "medium", nation: "Steel Front", gun: "76 mm L/55", crew: 4, weight: "34 t", engine: "SF-900 diesel",
+  desc: "Premium Steel Front arcade design: the Hornet's big brother. Two quad pods carry 8 lock-on SF-G rockets that reload one every 4.5 s, on a tougher hull with a real 76 mm gun." });
+Object.assign(TYPES.titan, { role: "heavy", nation: "Steel Front", gun: "128 mm L/60", crew: 5, weight: "92 t", engine: "Twin SF-1500 diesels",
+  desc: "Premium Steel Front design: a super-heavy breakthrough tank. 250 mm frontal armour, 175 hp and a 128 mm gun with 330 mm penetration. Slow to turn: guard your flanks." });
 for (const T of TYPE_LIST) {
   T.hullY0 = 0.35; T.hullTop = 0.35 + T.Hh; T.rad = (T.W + T.L) / 4;
   T.gunPivot = [0, T.tur.h * 0.5, T.tur.l / 2 + 0.15];
-  const body = [0.9, 0.9, 0.88], dark = [0.32, 0.32, 0.3], black = [0.16, 0.16, 0.15];
-  const h = builder(), W = T.W, L = T.L, Hh = T.Hh, tw = T.tw;
-  for (const s of [-1, 1]) {
-    const x = s * (W / 2 - tw / 2);
-    addBox(h, chain(trans(x, 0.45, 0), scl(tw, 0.8, L - 0.3)), dark);
-    for (const z of [L / 2 - 0.35, -L / 2 + 0.35]) addCyl(h, chain(trans(x, 0.45, z), rotZ(Math.PI / 2), scl(0.8, tw, 0.8)), dark);
-    for (let i = 0; i < 5; i++) addCyl(h, chain(trans(x + s * 0.03, 0.4, -L / 2 + 0.9 + i * (L - 1.8) / 4), rotZ(Math.PI / 2), scl(0.62, tw + 0.04, 0.62)), black);
-    addBox(h, chain(trans(x, 0.9, 0), scl(tw + 0.08, 0.07, L + 0.05)), body);
-  }
-  addBox(h, chain(trans(0, T.hullY0 + Hh * 0.45, -0.1), scl(W - 2 * tw + 0.02, Hh * 0.9, L * 0.9)), body);
-  addBox(h, chain(trans(0, T.hullTop - Hh * 0.22, -0.2), scl(W - 0.05, Hh * 0.44, L * 0.78)), body);
-  addBox(h, chain(trans(0, T.hullY0 + Hh * 0.6, L * 0.4), rotX(0.95), scl(W - 0.1, 0.14, Hh * 1.25)), body);
-  addBox(h, chain(trans(0, T.hullTop + 0.02, -L * 0.36), scl(W * 0.55, 0.06, L * 0.18)), black);
-  for (const s of [-1, 1]) addBox(h, chain(trans(s * W * 0.33, T.hullTop - 0.05, L * 0.47), scl(0.16, 0.16, 0.16)), [1, 0.95, 0.7]);
-  T.hullMesh = finish(h);
-  const t = builder(), U = T.tur;
-  addBox(t, chain(trans(0, U.h / 2, 0), scl(U.w, U.h, U.l)), body);
-  addBox(t, chain(trans(0, U.h * 0.85, -0.1), scl(U.w * 0.88, U.h * 0.3, U.l * 0.9)), body);
-  addBox(t, chain(trans(0, U.h * 0.5, U.l / 2 + 0.12), scl(U.w * 0.5, U.h * 0.7, 0.3)), body);
-  addBox(t, chain(trans(0, U.h * 0.55, -U.l / 2 - 0.25), scl(U.w * 0.8, U.h * 0.6, 0.5)), body);
-  addCyl(t, chain(trans(-U.w * 0.25, U.h + 0.12, -U.l * 0.15), scl(0.55, 0.25, 0.55)), body);
-  addBox(t, chain(trans(U.w * 0.36, U.h + 1.0, -U.l * 0.38), scl(0.03, 2.0, 0.03)), black);
-  if (T.rockets) for (const s of [-1, 1]) { // rocket pods on the turret sides, open at the front
-    addBox(t, chain(trans(s * (U.w / 2 + 0.22), 0.38, -0.05), scl(0.4, 0.58, 1.6)), dark);
-    for (const y of [0.26, 0.5]) addCyl(t, chain(trans(s * (U.w / 2 + 0.22), y, 0.76), rotX(Math.PI / 2), scl(0.17, 0.02, 0.17)), black, 8);
-  }
-  T.turMesh = finish(t);
-  const g = builder(), B = T.bar;
-  addCyl(g, chain(trans(0, 0, B.len / 2), rotX(Math.PI / 2), scl(B.r * 2, B.len, B.r * 2)), body, 8);
-  addCyl(g, chain(trans(0, 0, 0.4), rotX(Math.PI / 2), scl(B.r * 3.6, 0.8, B.r * 3.6)), body, 8);
-  addBox(g, chain(trans(0, 0, B.len - 0.15), scl(B.r * 4, B.r * 2.6, 0.32)), dark);
-  T.barMesh = finish(g);
+  T.sf = { wheels: { light: 5, medium: 6, heavy: 7 }[T.role] || 5, skirts: T.role === "heavy", cast: T.role === "heavy", brake: T.role !== "light", ext: T.role !== "light", ...(T.sf || {}) };
 }
 
 
@@ -1697,13 +1714,89 @@ function buildWirbelwind(T) {
   addCyl(g, chain(trans(0, 0.44, -0.15), rotX(Math.PI / 2), scl(0.22, 0.02, 0.22)), C.steel, 10);
   return { h, hd, t, td, g };
 }
+// ---- Steel Front designs (Lynx, Warden, Bastion, Hornet and the premium line): one parametric model built from the
+// same parts as the historical roster (lofted hull with sloped plates, sprung road wheels on a linked track, cast or
+// welded turret with cupola and bustle, mantlet, fume extractor and muzzle brake), so the originals no longer look
+// like plain boxes next to the historical tanks. Dimensions, turret position and rocket-pod points are unchanged.
+function buildSF(T) {
+  const h = builder(), hd = builder(), t = builder(), td = builder(), g = builder(), B = C.body, F = T.sf;
+  const W = T.W, L = T.L, tw = T.tw, top = T.hullTop, U = T.tur, hw = W / 2, xc = hw - tw / 2;
+  const n = F.wheels, span = L - 1.9, r = Math.min(span / (n - 1) * 0.47, 0.42), wy = r + 0.09, tTop = wy + r + 0.12;
+  const yS = Math.min(top - 0.12, tTop + 0.06), z0 = -L / 2, z1 = L / 2;
+  const TP = [[z0, top - T.Hh * 0.28], [z0 + 0.3, top], [z1 * 0.32, top], [z1 - 0.12, yS - 0.05], [z1, yS - 0.18]];
+  const BP = [[z0, top - T.Hh * 0.28], [z0 + 0.35, 0.5], [z1 - 0.7, 0.5], [z1, yS - 0.18]];
+  hullLoft(h, [z0, z0 + 0.3, z0 + 0.35, z1 * 0.32, z1 - 0.7, z1 - 0.12, z1].map(z => ({ z, y0: prof(BP, z), yT: prof(TP, z), yS, wB: hw - tw - 0.03, wS: hw - 0.02, wT: hw - 0.14 })), B);
+  gear(h, { xc, tw, front: { z: z1 - 0.42, y: tTop - 0.32, r: 0.32, type: "sprocket" }, rear: { z: z0 + 0.42, y: tTop - 0.36, r: 0.3, holes: 6 },
+    wheels: Array.from({ length: n }, (_, i) => [z1 - 0.95 - i * span / (n - 1) + 0.05, r, 0, tw * 0.82, 6]),
+    rollers: Array.from({ length: Math.max(2, n - 3) }, (_, i) => [z1 - 1.3 - i * (span - 0.6) / Math.max(1, n - 4), tTop - 0.1, 0.09]), yTop: tTop });
+  const glA = [z1 * 0.32, top], glB = [z1 - 0.12, yS - 0.05]; // the upper glacis plate
+  for (const s of [-1, 1]) {
+    addBox(h, chain(trans(s * xc, yS + 0.02, 0), scl(tw + 0.1, 0.05, L - 0.2)), B); // fender over the track
+    addBox(h, chain(trans(s * xc, yS - 0.04, z1 - 0.18), rotX(0.35), scl(tw + 0.1, 0.04, 0.42)), B);
+    if (F.skirts) for (let k = 0; k < 4; k++) addBox(h, chain(trans(s * (hw + 0.04), yS - 0.25, z0 + 0.75 + (k + 0.5) * (L - 1.5) / 4), scl(0.04, 0.42, (L - 1.5) / 4 - 0.05)), C.bodyDark);
+    headlight(h, hd, s * (hw - 0.42), yS + 0.12, z1 - 0.3, true);
+    towHook(h, s * 0.6, 0.62, z1 + 0.02); towHook(h, s * 0.6, 0.62, z0 - 0.02);
+    tool(h, s * (hw - 0.2), yS + 0.08, -0.4, L * 0.32);
+    addCyl(h, chain(trans(s * 0.55, top - 0.15, z0 - 0.08), rotX(Math.PI / 2), scl(0.16, 0.25, 0.16)), C.dark, 8); // exhaust
+    addDisc(hd, [s * (hw + 0.075), (yS + top) / 2 - 0.05, z0 + L * 0.3], [s, 0, 0], [0, 1, 0], 0.24, C.yellow, 14); // Steel Front roundel
+    addDisc(hd, [s * (hw + 0.085), (yS + top) / 2 - 0.05, z0 + L * 0.3], [s, 0, 0], [0, 1, 0], 0.14, C.black, 3);
+  }
+  for (let i = -2; i <= 2; i++) addBox(h, chain(onPlate(glA, glB, i * 0.42, 0.25, 0.02), scl(0.34, 0.035, 0.08)), C.dark); // spare track links
+  addBox(h, chain(onPlate(glA, glB, hw * 0.45, -0.25, 0.03), scl(0.5, 0.06, 0.32)), B); // driver's hatch
+  periscope(h, hw * 0.45, top + 0.05, z1 * 0.3);
+  mgBarrel(h, -hw * 0.45, (glA[1] + glB[1]) / 2 + 0.05, (glA[0] + glB[0]) / 2, 0.4, 0.025);
+  grille(h, 0, top + 0.01, z0 + L * 0.2, W * 0.45, L * 0.22, 9);
+  addBox(h, chain(trans(0, top - 0.2, z0 - 0.03), scl(W * 0.55, 0.32, 0.06)), C.dark);
+  // turret: cast (rounded) or welded (angular), with a rear bustle
+  const p = F.cast ? 2.6 : 7, ry = U.h / 2, rr = (z, k, kh = 1) => ringXY(0, ry * kh, z, U.w / 2 * k, ry * kh, 16, p);
+  addLoft(t, [rr(-U.l / 2 - 0.4, 0.62, 0.8), rr(-U.l / 2, 0.92), rr(0, 1), rr(U.l / 2 - 0.25, 0.9), rr(U.l / 2, F.cast ? 0.6 : 0.72, 0.9)], B);
+  addCyl(t, chain(trans(0, 0.04, 0), scl(U.w * 0.9, 0.1, U.w * 0.9)), C.dark, 16);
+  cupola(t, -U.w * 0.24, U.h - 0.04, -U.l * 0.12, 0.3, 0.24);
+  hatch(t, U.w * 0.22, U.h + 0.01, -U.l * 0.05, 0.25);
+  periscope(t, U.w * 0.24, U.h + 0.05, U.l * 0.22); periscope(t, -U.w * 0.05, U.h + 0.05, U.l * 0.25);
+  addBox(t, chain(trans(U.w * 0.36, U.h + 1.0, -U.l * 0.38), scl(0.03, 2.0, 0.03)), C.black); // antenna
+  addCyl(t, chain(trans(U.w * 0.36, U.h + 0.03, -U.l * 0.38), scl(0.12, 0.08, 0.12)), C.dark, 8);
+  addBox(t, chain(trans(0, U.h * 0.55, -U.l / 2 - 0.6), scl(U.w * 0.7, U.h * 0.5, 0.35)), C.dark); // stowage bin
+  for (const s of [-1, 1]) {
+    if (!T.rockets) for (let k = 0; k < 3; k++) addCyl(t, chain(trans(s * (U.w / 2 - 0.05), U.h * 0.78, U.l * 0.12 - k * 0.18), rotZ(s * 0.9), scl(0.11, 0.3, 0.11)), C.dark, 8); // smoke dischargers
+    handrail(t, s * (U.w / 2 + 0.02), U.h * 0.62, -U.l * 0.15, U.l * 0.45);
+    addDisc(td, [s * (U.w / 2 + 0.01), U.h * 0.45, -U.l * 0.18], [s, 0, 0], [0, 1, 0], 0.2, C.yellow, 14);
+    addDisc(td, [s * (U.w / 2 + 0.02), U.h * 0.45, -U.l * 0.18], [s, 0, 0], [0, 1, 0], 0.12, C.black, 3);
+  }
+  if (T.rockets) { // rocket pods on the turret sides, open at the front (launch points = T.rockets.pts)
+    const ys = [...new Set(T.rockets.pts.map(q => q[1]))], px = Math.abs(T.rockets.pts[0][0]), ph = Math.max(...ys) - Math.min(...ys) + 0.34;
+    for (const s of [-1, 1]) {
+      addBox(t, chain(trans(s * px, (Math.max(...ys) + Math.min(...ys)) / 2, -0.05), scl(0.42, ph, 1.6)), C.dark);
+      addBox(t, chain(trans(s * px, Math.max(...ys) + ph / 2 - 0.12, -0.05), scl(0.46, 0.05, 1.66)), B);
+      for (const y of ys) { addCyl(t, chain(trans(s * px, y, 0.76), rotX(Math.PI / 2), scl(0.18, 0.03, 0.18)), C.black, 10); addDisc(td, [s * px, y, 0.78], [0, 0, 1], [0, 1, 0], 0.06, C.red, 8); }
+      addBox(t, chain(trans(s * (U.w / 2 + 0.03), 0.4, -0.05), scl(0.1, 0.16, 0.5)), C.steel); // pod mount
+    }
+  }
+  // gun: mantlet, barrel with sleeve, fume extractor and muzzle brake
+  const R = T.bar.r, len = T.bar.len;
+  addBox(g, chain(trans(0, 0, -0.08), scl(U.w * 0.42, U.h * 0.66, 0.36)), B);
+  addCyl(g, chain(trans(0, 0, 0.12), rotZ(Math.PI / 2), scl(U.h * 0.6, U.w * 0.36, U.h * 0.6)), B, 12);
+  tube(g, 0.15, 0.95, R * 1.7, B, 12);
+  tube(g, 0.95, len - (F.brake ? 0.32 : 0), R, B, 12);
+  if (F.ext) tube(g, len * 0.5, len * 0.5 + 0.5, R * 1.75, B, 12);
+  if (F.brake) { tube(g, len - 0.34, len, R * 1.85, C.dark, 12); for (const s of [-1, 1]) addBox(g, chain(trans(s * R * 1.5, 0, len - 0.17), scl(0.03, R * 2.4, 0.12)), C.black); }
+  else tube(g, len - 0.12, len, R * 1.25, C.dark, 10);
+  addBox(g, chain(trans(U.w * 0.12, U.h * 0.18, 0.15), scl(0.08, 0.08, 0.3)), C.dark); mgBarrel(g, U.w * 0.12, U.h * 0.18, 0.3, 0.45, 0.022); // coaxial MG
+  return { h, hd, t, td, g };
+}
 const BUILDERS = { sherman: buildSherman, t34: buildT34, panther: buildPanther, tiger: buildTiger, is2: buildIS2, hellcat: buildHellcat, wirbelwind: buildWirbelwind };
-for (const k in HIST) {
-  const T = HIST[k], parts = BUILDERS[k](T);
-  T.hullMesh = finish(parts.h); T.turMesh = finish(parts.t); T.barMesh = finish(parts.g);
+// every ground model: full detail, a low-detail copy for distance, decals, all run through the weathering pass
+function buildGroundMeshes(T, fn) {
+  const parts = fn(T), top = T.hullTop, wh = (b, y1) => weather(b, { y0: 0, y1, mud: 0.38, mudTop: 0.95 }), wt = b => weather(b, { y0: -0.05, y1: T.tur.h * 0.6, ao: 0.16 });
+  T.hullMesh = finish(wh(parts.h, top)); T.turMesh = finish(wt(parts.t)); T.barMesh = finish(weather(parts.g, { ao: 0 }));
   T.hullDecal = parts.hd.pos.length ? finish(parts.hd) : null; T.turDecal = parts.td.pos.length ? finish(parts.td) : null;
-  LOD = true; const lo = BUILDERS[k](T); LOD = false;
-  T.hullLo = finish(lo.h); T.turLo = finish(lo.t); T.barLo = finish(lo.g);
+  LOD = true; const lo = fn(T); LOD = false;
+  T.hullLo = finish(wh(lo.h, top)); T.turLo = finish(wt(lo.t)); T.barLo = finish(weather(lo.g, { ao: 0 }));
+}
+for (const T of TYPE_LIST) buildGroundMeshes(T, buildSF);
+for (const k in HIST) {
+  const T = HIST[k];
+  buildGroundMeshes(T, BUILDERS[k]);
   T.rad = (T.W + T.L) / 4; T.hullY0 = 0.4;
   TYPES[k] = T;
 }
@@ -1756,6 +1849,67 @@ AIR.kestrel = { ...AIR.p51, key: "kestrel", name: "P-51D Kestrel", nation: "Stee
   rockets: { ...AIR.p51.rockets, kind: "SF-G" }, topSpeed: AIR.p51.topSpeed,
   desc: "Steel Front arcade variant of the Mustang airframe: six .50 cal guns and six lock-on SF-G rockets instead of bombs. Keep an enemy aircraft or tank near the crosshair until the box turns red (LOCKED), then press R: the rocket steers itself to the target. Game-only fantasy weapon." };
 
+// premium Steel Front aircraft (credits only, player-only like the ground premiums)
+AIR.bulwark = { key: "bulwark", air: true, name: "Bulwark AX-2", nation: "Steel Front", cls: "Heavy attacker", role: "attacker", price: 55000,
+  L: 11.2, span: 13.0, vmax: 150, acc: 9, stall: 47, corner: 110, stiff: 170, pitchRate: 0.85, rollRate: 1.8, yawRate: 0.32, hp: 120, armorK: 0.45,
+  guns: [{ name: "2 × 37 mm SF-37 cannon", pts: [[2.2, -0.42, 1.9], [-2.2, -0.42, 1.9]], rate: 4, v0: 900, dmg: 18, pen: 70 }, { name: "4 × 12.7 mm", pts: [[2.7, -0.38, 1.3], [-2.7, -0.38, 1.3], [2.95, -0.36, 1.28], [-2.95, -0.36, 1.28]], rate: 26, v0: 870, dmg: 1.6, pen: 22 }],
+  bombs: { n: 2, kg: 500, pts: [[1.35, -0.95, 0.4], [-1.35, -0.95, 0.4]] }, rockets: { n: 8, kind: "HVAR", pts: [[3.4, -0.6, 0.8], [-3.4, -0.6, 0.8], [3.8, -0.57, 0.75], [-3.8, -0.57, 0.75], [4.2, -0.54, 0.7], [-4.2, -0.54, 0.7], [4.6, -0.51, 0.65], [-4.6, -0.51, 0.65]] },
+  hit: { fw: 1.3, fh: 1.6, nose: 4.6, tail: -6.6, wz: 1.3, chord: 2.8, wy: -0.45, ts: 4.4, tz: -5.6 }, propPos: [0, 0.05, 4.15], propR: 1.95,
+  engine: "SF-28 twin-row radial, 2,800 hp", topSpeed: "610 km/h at 5,000 m", weight: "8.1 t loaded", crew: 1,
+  desc: "Premium Steel Front design: a flying fortress for ground attack. Two 37 mm cannon (70 mm pen) and four .50s, two 500 kg bombs, eight HVAR rockets, an armoured tub and 120 hp. Heavy on the controls but very hard to bring down." };
+AIR.talon = { key: "talon", air: true, jet: true, name: "Talon J-1", nation: "Steel Front", cls: "Jet fighter", role: "fighter", price: 80000,
+  L: 10.6, span: 10.0, vmax: 235, acc: 15, stall: 58, corner: 150, stiff: 230, pitchRate: 1.1, rollRate: 2.9, yawRate: 0.35, hp: 60,
+  guns: [{ name: "4 × 30 mm SF-30 cannon", pts: [[0.36, -0.22, 3.6], [-0.36, -0.22, 3.6], [0.32, 0.02, 3.7], [-0.32, 0.02, 3.7]], rate: 18, v0: 900, dmg: 8, pen: 45 }],
+  bombs: null, rockets: { n: 8, kind: "SF-G", pts: [[2.4, -0.52, 0.2], [-2.4, -0.52, 0.2], [2.9, -0.48, 0.0], [-2.9, -0.48, 0.0], [3.4, -0.44, -0.2], [-3.4, -0.44, -0.2], [3.9, -0.4, -0.4], [-3.9, -0.4, -0.4]] },
+  hit: { fw: 1.1, fh: 1.3, nose: 5.1, tail: -5.5, wz: 0.4, chord: 3.2, wy: -0.3, ts: 3.4, tz: -4.4 }, propPos: [0, 0, -5.35], propR: 0,
+  engine: "2 × SF-J9 turbojet, 9 kN each", topSpeed: "880 km/h", weight: "6.3 t loaded", crew: 1,
+  desc: "Premium Steel Front design: a twin-jet interceptor, by far the fastest thing in the sky. Four 30 mm cannon and eight lock-on SF-G rockets. Keep the speed up: it stalls at a higher speed than the piston fighters." };
+function buildSFPlane(T) {
+  const h = builder(), hd = builder(), B = C.body, jet = !!T.jet;
+  if (jet) {
+    fuselage(h, [[5.2, 0.0, 0.05, 0.05], [4.6, 0.0, 0.3, 0.32, 2.2], [3.4, 0.05, 0.5, 0.55, 2.3], [1.6, 0.05, 0.62, 0.66, 2.6], [-0.8, 0.05, 0.68, 0.62, 2.8], [-3.2, 0.1, 0.56, 0.52, 2.6], [-4.9, 0.15, 0.42, 0.42, 2.4], [-5.35, 0.15, 0.4, 0.4, 2.4]], B, 18);
+    for (const s of [-1, 1]) { // side intakes and the twin nozzles
+      addLoft(h, [[2.3, -0.02, 0.22, 0.3], [1.6, -0.05, 0.3, 0.36], [-1.2, -0.05, 0.3, 0.34]].map(([z, cy, rx, ry]) => ringXY(s * 0.72, cy, z, rx, ry, 12, 2.8)), B, true, true, C.black);
+      addCyl(hd, chain(trans(s * 0.22, 0.15, -5.42), rotX(Math.PI / 2), scl(0.42, 0.2, 0.42)), C.dark, 12);
+      addCyl(hd, chain(trans(s * 0.22, 0.15, -5.5), rotX(Math.PI / 2), scl(0.3, 0.04, 0.3)), [1, 0.55, 0.2], 12);
+    }
+    canopy(hd, [[3.1, 0.52, 0.12, 0.08], [2.6, 0.6, 0.3, 0.3], [1.8, 0.62, 0.34, 0.36], [0.9, 0.6, 0.26, 0.24], [0.3, 0.56, 0.08, 0.06]]);
+    canopyFrames(h, [2.2], 0.62, 0.32, 0.32);
+    T._wy = -0.3; T._dih = -0.03;
+    addWing(h, { semi: 5.0, y: -0.3, dihedral: -0.03, stations: [[0, 3.6, 1.9, 0.3], [0.35, 2.7, 0.9, 0.22], [1.0, 1.3, -1.1, 0.1]] }, B); // swept
+    addWing(h, { semi: 1.9, y: 0.35, stations: [[0, 1.6, -3.7, 0.12], [1, 0.75, -4.8, 0.06]] }, B);
+    addFin(h, [[0.4, 2.2, -2.9, 0.16], [1.0, 1.6, -3.7, 0.12], [1.9, 0.8, -4.7, 0.07]], B);
+    for (const s of [-1, 1]) for (const p of T.rockets.pts.filter(q => Math.sign(q[0]) === s)) addBox(hd, chain(trans(p[0], p[1] + 0.1, p[2] - 0.2), scl(0.06, 0.08, 0.9)), C.dark);
+    for (const g of T.guns[0].pts) mgBarrel(hd, g[0], g[1], g[2] - 0.6, 0.6, 0.04);
+    addBox(hd, chain(trans(0, -0.68, 0.5), scl(0.06, 0.03, 3.2)), C.dark); // belly strake
+    T.propMesh = null;
+  } else {
+    fuselage(h, [[4.1, 0.05, 0.62, 0.62, 2.1], [3.5, 0.05, 0.74, 0.76, 2.2], [2.2, 0.05, 0.72, 0.8, 2.3], [0.6, 0.05, 0.66, 0.82, 2.4], [-1.2, 0.08, 0.58, 0.74, 2.4], [-3.4, 0.18, 0.38, 0.54, 2.2], [-5.6, 0.3, 0.2, 0.34, 2.1], [-6.6, 0.35, 0.08, 0.16, 2]], B, 18);
+    addCyl(h, chain(trans(0, 0.05, 4.05), rotX(Math.PI / 2), scl(1.36, 0.2, 1.36)), C.dark, 18); // cowl ring
+    for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; addBox(hd, chain(trans(Math.cos(a) * 0.52, 0.05 + Math.sin(a) * 0.52, 3.98), rotZ(a), scl(0.2, 0.12, 0.16)), C.steel); } // cylinder heads
+    addLoft(h, [[0.2, -0.78, 0.34, 0.14], [-0.4, -0.9, 0.38, 0.22], [-1.6, -0.86, 0.34, 0.2], [-2.4, -0.72, 0.2, 0.1]].map(([z, cy, rx, ry]) => ringXY(0, cy, z, rx, ry, 12, 2.6)), C.bodyDark, true, true, C.black); // armoured tub
+    canopy(hd, [[0.9, 0.82, 0.16, 0.1], [0.5, 0.88, 0.32, 0.32], [-0.3, 0.88, 0.34, 0.38], [-1.1, 0.84, 0.26, 0.26], [-1.6, 0.82, 0.1, 0.08]]);
+    canopyFrames(h, [0.6, -0.4], 0.88, 0.33, 0.34);
+    T._wy = -0.45; T._dih = 0.07;
+    addWing(h, { semi: 6.5, y: -0.45, dihedral: 0.07, stations: [[0, 3.0, 1.45, 0.46], [0.3, 2.6, 1.35, 0.36], [0.75, 1.9, 1.1, 0.24], [1.0, 1.3, 0.9, 0.15]] }, B);
+    addWing(h, { semi: 2.4, y: 0.4, stations: [[0, 1.5, -5.3, 0.15], [1, 0.85, -5.7, 0.08]] }, B);
+    addFin(h, [[0.4, 1.9, -4.9, 0.18], [1.1, 1.4, -5.45, 0.13], [1.8, 0.75, -5.9, 0.08]], B);
+    exhausts(hd, 4, 3.0, 0.22, -0.05, 0.7);
+    for (const s of [-1, 1]) {
+      tube(hd, 1.0, 2.7, 0.09, C.dark, 10, s * 2.2, -0.42); tube(hd, 2.7, 3.0, 0.12, C.black, 10, s * 2.2, -0.42); // 37 mm cannon pods
+      for (const p of T.rockets.pts.filter(q => Math.sign(q[0]) === s)) addBox(hd, chain(trans(p[0], p[1] + 0.12, p[2]), scl(0.05, 0.06, 0.7)), C.black);
+      addBox(h, chain(trans(s * 1.35, -0.72, 0.4), scl(0.1, 0.18, 0.9)), C.bodyDark); // bomb pylons
+    }
+    T.propMesh = buildProp(T, 4, 0.42, 0.6, C.yellow, 0.3);
+  }
+  for (const s of [-1, 1]) { // Steel Front roundels on wings and fuselage
+    const wx = s * (jet ? 3.3 : 4.4), wy = (jet ? -0.3 : -0.45) + Math.abs(wx) * Math.tan(T._dih) + (jet ? 0.12 : 0.2);
+    addDisc(hd, [wx, wy, jet ? -0.4 : 0.6], [0, 1, 0], [0, 0, 1], 0.5, C.yellow, 16); addDisc(hd, [wx, wy + 0.01, jet ? -0.4 : 0.6], [0, 1, 0], [0, 0, 1], 0.3, C.black, 3);
+    const fx = s * (jet ? 0.6 : 0.5);
+    addDisc(hd, [fx, 0.2, jet ? -2.6 : -3.0], [s, 0, 0], [0, 1, 0], 0.32, C.yellow, 16); addDisc(hd, [fx * 1.03, 0.2, jet ? -2.6 : -3.0], [s, 0, 0], [0, 1, 0], 0.19, C.black, 3);
+  }
+  T.planeMesh = finish(weather(h, { y0: -1, y1: 0.9, ao: 0.2, jit: 0.03 })); T.planeDetail = finish(hd);
+}
 function fuselage(b, st, col, n = 16) { addLoft(b, st.map(([z, cy, rx, ry, p = 2]) => ringXY(0, cy, z, rx, ry, n, p)), col); }
 function canopy(hd, st) { addLoft(hd, st.map(([z, cy, rx, ry]) => ringXY(0, cy, z, rx, ry, 14, 2)), C.glass); }
 function canopyFrames(h, zs, cy, rx, ry) { for (const z of zs) for (let i = 1; i < 8; i++) { const a = i / 8 * Math.PI; addBox(h, chain(trans(Math.cos(a) * rx * 1.02, cy + Math.sin(a) * ry * 1.02, z), rotZ(a + Math.PI / 2), scl(0.04, ry * 0.42, 0.04)), C.bodyDark); } }
@@ -1796,7 +1950,7 @@ function buildP51(T) {
     addUSStar(hd, [s * 0.345, 0.15, -3.1], [s, 0, 0], [0, 1, 0], 0.3);
   }
   mgBarrel(hd, -4.9, -0.0, 0.85, 0.6, 0.015, C.steel);
-  T.planeMesh = finish(h); T.planeDetail = finish(hd); T.propMesh = buildProp(T, 4, 0.3, 0.7, C.red, 0.26);
+  T.planeMesh = finish(weather(h, { y0: -1, y1: 0.9, ao: 0.2, jit: 0.03 })); T.planeDetail = finish(hd); T.propMesh = buildProp(T, 4, 0.3, 0.7, C.red, 0.26);
 }
 function buildSpitfire(T) {
   const h = builder(), hd = builder(), B = C.body;
@@ -1822,7 +1976,7 @@ function buildSpitfire(T) {
     for (const [k, col] of [[-0.12, C.red], [0, C.white], [0.12, C.blue]]) addRect(hd, [s * 0.075, 0.68, -4.65 + k], [s, 0, 0], [0, 1, 0], 0.12, 0.42, col);
   }
   addBox(h, chain(trans(0, 0.9, -1.9), rotX(-0.25), scl(0.04, 0.3, 0.1)), C.bodyDark);
-  T.planeMesh = finish(h); T.planeDetail = finish(hd); T.propMesh = buildProp(T, 4, 0.27, 0.75, C.bodyDark, 0.24);
+  T.planeMesh = finish(weather(h, { y0: -1, y1: 0.9, ao: 0.2, jit: 0.03 })); T.planeDetail = finish(hd); T.propMesh = buildProp(T, 4, 0.27, 0.75, C.bodyDark, 0.24);
 }
 function buildBf109(T) {
   const h = builder(), hd = builder(), B = C.body;
@@ -1849,7 +2003,7 @@ function buildBf109(T) {
   addRect(hd, [0, -0.55, 2.76], [0, 0, 1], [0, 1, 0], 0.34, 0.14, C.black);
   exhausts(hd, 6, 2.55, 0.16, 0.12, 0.46);
   addBox(h, chain(trans(0, 0.88, -1.6), rotX(-0.3), scl(0.03, 0.28, 0.08)), C.bodyDark);
-  T.planeMesh = finish(h); T.planeDetail = finish(hd); T.propMesh = buildProp(T, 3, 0.3, 0.62, C.black, 0.28);
+  T.planeMesh = finish(weather(h, { y0: -1, y1: 0.9, ao: 0.2, jit: 0.03 })); T.planeDetail = finish(hd); T.propMesh = buildProp(T, 3, 0.3, 0.62, C.black, 0.28);
 }
 function buildFw190(T) {
   const h = builder(), hd = builder(), B = C.body;
@@ -1871,7 +2025,7 @@ function buildFw190(T) {
   }
   addBox(h, chain(trans(0, -0.75, 0.25), scl(0.18, 0.2, 1.1)), C.bodyDark);
   addBox(h, chain(trans(0, 0.88, -1.75), rotX(-0.3), scl(0.03, 0.28, 0.08)), C.bodyDark);
-  T.planeMesh = finish(h); T.planeDetail = finish(hd); T.propMesh = buildProp(T, 3, 0.33, 0.55, C.black, 0.34, true);
+  T.planeMesh = finish(weather(h, { y0: -1, y1: 0.9, ao: 0.2, jit: 0.03 })); T.planeDetail = finish(hd); T.propMesh = buildProp(T, 3, 0.33, 0.55, C.black, 0.34, true);
 }
 function buildIl2(T) {
   const h = builder(), hd = builder(), B = C.body;
@@ -1900,9 +2054,9 @@ function buildIl2(T) {
     addRedStar(hd, [s * 4.6, -0.6, 0.0], [0, -1, 0], [0, 0, 1], 0.5);
   }
   addBox(h, chain(trans(0, 0.98, 0.95), rotX(-0.2), scl(0.03, 0.3, 0.08)), C.bodyDark);
-  T.planeMesh = finish(h); T.planeDetail = finish(hd); T.propMesh = buildProp(T, 3, 0.3, 0.6, C.dark, 0.3);
+  T.planeMesh = finish(weather(h, { y0: -1, y1: 0.9, ao: 0.2, jit: 0.03 })); T.planeDetail = finish(hd); T.propMesh = buildProp(T, 3, 0.3, 0.6, C.dark, 0.3);
 }
-const AIR_BUILDERS = { p51: buildP51, spitfire: buildSpitfire, bf109: buildBf109, fw190: buildFw190, il2: buildIl2, kestrel: buildP51 };
+const AIR_BUILDERS = { p51: buildP51, spitfire: buildSpitfire, bf109: buildBf109, fw190: buildFw190, il2: buildIl2, kestrel: buildP51, bulwark: buildSFPlane, talon: buildSFPlane };
 for (const k in AIR) {
   const T = AIR[k];
   AIR_BUILDERS[k](T);
@@ -1912,9 +2066,11 @@ for (const k in AIR) {
   TYPES[k] = T;
 }
 const AIR_LIST = Object.values(AIR);
-const GROUND_LIST = [TYPES.light, TYPES.medium, TYPES.heavy, TYPES.hornet, ...Object.values(HIST)];
+const GROUND_LIST = [TYPES.light, TYPES.medium, TYPES.heavy, TYPES.hornet, ...Object.values(HIST), TYPES.valkyrie, TYPES.swarm, TYPES.titan];
 // the arcade lock-on vehicles are for the player only: AI line-ups (and so enemy difficulty) are unchanged
-const AI_AIR = AIR_LIST.filter(T => !lockOnType(T)), AI_GROUND = GROUND_LIST.filter(T => !lockOnType(T));
+// premium (credit-unlocked) vehicles are player-only too
+const PREMIUM_LIST = [...GROUND_LIST, ...AIR_LIST].filter(isPremium);
+const AI_AIR = AIR_LIST.filter(T => !lockOnType(T) && !isPremium(T)), AI_GROUND = GROUND_LIST.filter(T => !lockOnType(T) && !isPremium(T));
 // stores and shared air meshes
 const bombMesh = (() => {
   const b = builder(), col = [0.36, 0.4, 0.32];
@@ -2977,7 +3133,7 @@ function spawnWave() {
   ms.wave++; ms.waveT = 0;
   const n = waveSize(ms.wave), airN = ms.wave >= 6 ? 2 : ms.wave >= 3 ? 1 : 0;
   const pool = AI_GROUND.filter(T => T.role !== "spaa" && (ms.wave >= 4 || T.role !== "heavy"));
-  const heavy = GROUND_LIST.filter(T => T.role === "heavy"), pick = a => a[(Math.random() * a.length) | 0];
+  const heavy = AI_GROUND.filter(T => T.role === "heavy"), pick = a => a[(Math.random() * a.length) | 0];
   ms.waveBase = [[-230, 0, 560], [0, 0, 590], [230, 0, 560]][ms.wave % 3];
   for (let i = 0; i < n; i++) {
     const T = i < airN ? (i === 0 && ms.wave >= 5 ? AIR.il2 : pick(AI_AIR)) : ms.wave >= 7 && i === airN ? pick(heavy) : pick(pool);
@@ -4001,10 +4157,11 @@ function buildCards() {
   $("tabGround").style.display = M.allow === "air" ? "none" : ""; $("tabAir").style.display = M.allow === "ground" ? "none" : "";
   for (const T of air ? AIR_LIST : GROUND_LIST) {
     const c = document.createElement("div");
-    c.className = "card" + (T === selectedType ? " sel" : "");
+    const lk = !isOwned(T);
+    c.className = "card" + (T === selectedType ? " sel" : "") + (lk ? " locked" : "");
     const n = (profile.mods[T.key] || []).length;
-    c.innerHTML = `<h3>${T.name}</h3><div class="cls">${T.cls} · ${T.nation}${n ? ` · ${n} mod${n > 1 ? "s" : ""}` : ""}</div>`;
-    c.addEventListener("click", () => { selectedType = T; profile.sel = T.key; saveProfile(); buildCards(); });
+    c.innerHTML = `<h3>${lk ? "&#128274; " : ""}${T.name}</h3><div class="cls">${T.cls} · ${T.nation}${lk ? ` · ${fmtN(T.price)} Cr: unlock in the hangar` : n ? ` · ${n} mod${n > 1 ? "s" : ""}` : ""}</div>`;
+    c.addEventListener("click", () => { if (lk) { $("detail").innerHTML = `<h2>&#128274; ${T.name}</h2><p>Premium vehicle: unlock it in the hangar for ${fmtN(T.price)} Cr (you have ${fmtN(profile.credits)} Cr). It can't be picked until then.</p>`; return; } selectedType = T; profile.sel = T.key; saveProfile(); buildCards(); });
     cards.appendChild(c);
   }
   const T = selectedType, d = $("detail");
@@ -4052,7 +4209,7 @@ function newBattle() {
   const names = NAMES.slice().sort(() => Math.random() - 0.5);
   tanks = [];
   // a vehicle the mode does not allow (e.g. a tank in Air Superiority) is swapped for a stock one
-  const PT = modeAllows(M, selectedType) ? selectedType : M.allow === "air" ? AIR.p51 : TYPES.sherman;
+  const PT = deployable(selectedType);
   player = makeTank(0, playerType(PT), "You", true, 3);
   player.tint = camoTint(PT); player.consCd = {}; player.consUsed = {}; player.boostT = 0; player.gKills = 0; player.aKills = 0;
   resetBattleScore(player);
@@ -4067,7 +4224,7 @@ function newBattle() {
   $("zones").innerHTML = ""; // zone diamonds are not shown in the top HUD
   const start = { conquest: "Capture zones A · B · C · 20 minutes", breakthrough: "Attack! Capture A, then B, then C", annihilation: "Destroy the enemy armour",
     air: "Win the sky · strike the enemy ground units", laststand: "Hold zone B · first wave in 20 s" }[M.key];
-  centerMsg(`${M.name.toUpperCase()}\n${start}${PT !== selectedType ? `\n${selectedType.name} is not allowed here: flying the ${PT.name}` : ""}`, "#ffcf5a");
+  centerMsg(`${M.name.toUpperCase()}\n${start}${PT !== selectedType ? `\n${selectedType.name} is ${isOwned(selectedType) ? "not allowed here" : "locked (buy it in the hangar)"}: using the ${PT.name}` : ""}`, "#ffcf5a");
 }
 // result: "win" | "loss" | "draw"; reason: "tickets" | "time" | "objectives" | "zone" | "neutral" | "waves"
 function endBattle(result, reason) {
@@ -4303,7 +4460,7 @@ function step(dt) {
   } else {
     respawnT -= dt;
     if (respawnT <= 0) {
-      if (modeAllows(M, selectedType)) p.type = playerType(selectedType);
+      p.type = playerType(deployable(selectedType)); // a locked or disallowed choice falls back to a stock vehicle
       p.tint = camoTint(p.type.base); spawnTank(p); cam.sniper = false; freeDir = null; centerMsg("RESPAWNED", "#7cc0ff");
       if (p.type.air) { cam.yaw = p.team === 0 ? 0 : Math.PI; cam.pitch = 0; cam.adistS = 0; } else cam.pitch = clamp(cam.pitch, -0.7, 0.55);
     }
@@ -4611,9 +4768,12 @@ function drawUnit(t, discs) {
     draw(T.planeMesh, t.M, tint, 0, 1, sp);
     if (d < 260 || (shadowPass && t.isPlayer)) draw(T.planeDetail, t.M, plain, 0, 1, sp);
     if (d > 600) return;
+    if (T.jet) { if (!dead && !shadowPass && t.throttle > 0.05) for (const s of [-1, 1]) draw(cubeMesh, chain(t.M, trans(s * 0.22, 0.15, -5.56 - t.throttle * 0.4), scl(0.26, 0.26, 0.3 + t.throttle * 0.9)), [1, 0.62, 0.25], 1, 0.85); } // afterburner glow
+    else {
     const PM = chain(t.M, trans(...T.propPos), rotZ(t.propA));
     draw(T.propMesh, PM, plain, 0, 1, sp);
     if (!dead && !shadowPass) discs.push([chain(t.M, trans(T.propPos[0], T.propPos[1], T.propPos[2] + 0.12), scl(T.propR, T.propR, 1)), 0.18]);
+    }
     if (d > 300) return;
     if (T.bombs && !T.bombs.internal) for (let i = 0; i < t.bombs; i++) { const k = Math.cbrt(T.bombs.kg / 250); draw(bombMesh, chain(t.M, trans(...T.bombs.pts[i]), scl(k, k, k)), plain); }
     if (T.rockets) for (let i = 0; i < t.rockets; i++) draw(rocketMesh, chain(t.M, trans(...T.rockets.pts[i])), plain);
@@ -4899,8 +5059,8 @@ function updateDom(dt) {
 // credits buy modifications, camouflage, consumables, crew training and reward boosters.
 const SAVE_KEY = "steelfront.profile.v1";
 const fmtN = n => Math.round(n).toLocaleString("en-US");
-const TIER = { light: 1, medium: 1, heavy: 1, sherman: 2, t34: 2, hellcat: 2, wirbelwind: 2, panther: 3, tiger: 3, is2: 3, hornet: 2, kestrel: 2, spitfire: 2, bf109: 2, p51: 2, il2: 2, fw190: 3 };
-const TIER_K = [1, 1, 1.35, 1.75];
+const TIER = { light: 1, medium: 1, heavy: 1, sherman: 2, t34: 2, hellcat: 2, wirbelwind: 2, panther: 3, tiger: 3, is2: 3, hornet: 2, kestrel: 2, spitfire: 2, bf109: 2, p51: 2, il2: 2, fw190: 3, valkyrie: 4, swarm: 4, titan: 4, bulwark: 4, talon: 4 };
+const TIER_K = [1, 1, 1.35, 1.75, 2.2];
 const MODS = {
   ground: [
     { id: "ap", name: "APCBC ammunition", price: 2400, fx: "+8% penetration", d: "Capped, ballistic-capped rounds that hold together better against sloped plates." },
@@ -4976,7 +5136,7 @@ const MAX_LVL = 30, xpFor = L => 1500 + 750 * (L - 1); // XP to go from level L 
 const lvlBonus = L => 1000 + 250 * L;
 function freshProfile() {
   return { v: 1, credits: 6000, xp: 0, level: 1, mods: {}, camoOwned: ["std"], camo: {}, cons: { smoke: 2, toolkit: 1, arty: 1, boost: 1 }, crew: { ground: 0, air: 0 },
-    boost: { credit: 0, xp: 0 }, stats: { battles: 0, wins: 0, kills: 0, gKills: 0, aKills: 0, caps: 0, waves: 0, earned: 0 }, contracts: [], lastContract: "", medals: {}, vstats: {}, best: 0,
+    boost: { credit: 0, xp: 0 }, stats: { battles: 0, wins: 0, kills: 0, gKills: 0, aKills: 0, caps: 0, waves: 0, earned: 0 }, contracts: [], lastContract: "", medals: {}, vstats: {}, best: 0, owned: [],
     mode: "conquest", sel: "sherman", nation: "all" };
 }
 let profile = freshProfile(), saveState = "new"; // new | loaded | saved | corrupt | unavailable
@@ -5003,7 +5163,8 @@ function loadProfile(raw = null) { // raw: a save text to read instead of localS
     if (p.vstats && typeof p.vstats === "object") for (const k in p.vstats) { const v = p.vstats[k]; if (TYPES[k] && v && typeof v === "object") f.vstats[k] = { b: Math.floor(num(v.b)), k: Math.floor(num(v.k)), pts: Math.floor(num(v.pts)), best: Math.floor(num(v.best)) }; }
     f.best = Math.floor(num(p.best));
     if (MODES[p.mode]) f.mode = p.mode;
-    if (TYPES[p.sel]) f.sel = p.sel;
+    if (Array.isArray(p.owned)) f.owned = [...new Set(p.owned.filter(k => typeof k === "string" && TYPES[k] && isPremium(TYPES[k])))];
+    if (TYPES[p.sel] && isOwned(TYPES[p.sel], f)) f.sel = p.sel; // a premium vehicle that is not owned is never kept selected
     if (p.nation === "all" || GROUND_LIST.concat(AIR_LIST).some(T => T.nation === p.nation)) f.nation = p.nation;
     profile = f; saveState = "loaded";
   } catch (e) {
@@ -5011,6 +5172,27 @@ function loadProfile(raw = null) { // raw: a save text to read instead of localS
     // the next save overwrites the unreadable one: keep its text so a hand-edit typo doesn't lose the progress for good
     if (!given) try { if (localStorage.getItem(SAVE_KEY + ".bak") === null) localStorage.setItem(SAVE_KEY + ".bak", raw); } catch (e2) { /* storage full */ }
   }
+}
+// premium vehicles: bought once with earned credits, then owned for good (profile.owned). Free vehicles are always owned.
+const isOwned = (T, prof = profile) => !isPremium(T) || prof.owned.includes((T.base || T).key);
+let buyArm = null; // two-step purchase: the first click arms the button, the second within 4 s buys
+function buyVehicle(T, confirm = true) {
+  T = T.base || T;
+  if (!isPremium(T) || isOwned(T)) return false;
+  if (profile.credits < T.price) { toast(`Not enough credits for the ${T.name}: ${fmtN(T.price - profile.credits)} Cr short`, "bad"); uiSnd(false); return false; }
+  if (confirm && buyArm !== T.key) { buyArm = T.key; setTimeout(() => { if (buyArm === T.key) { buyArm = null; renderLobby(); } }, 4000); renderLobby(); return false; }
+  buyArm = null;
+  profile.credits -= T.price; profile.owned.push(T.key);
+  const saved = saveProfile();
+  toast(`Unlocked the ${T.name} for ${fmtN(T.price)} Cr${saved ? "" : " (not saved: storage blocked)"}`, "good"); uiSnd(true);
+  renderLobby();
+  return true;
+}
+// the vehicle actually deployed: one the mode allows and the player owns, else a stock fallback
+function deployable(T) {
+  if (modeAllows(M, T) && isOwned(T)) return T;
+  if (M.allow === "air" || (T.air && M.allow !== "ground")) return AIR.p51;
+  return TYPES.sherman;
 }
 function saveProfile() {
   if (SELFTEST) return true; // the self-test plays with a throwaway profile and never touches the real save
@@ -5128,7 +5310,7 @@ const HSPOT = { ground: [0, 0, 0], air: [200, 0, 0] };
 const APRON_Y = 0.08;
 let hangarMesh = null, hangarGround = null, hangarTrees = [];
 // landing gear for parked aircraft (the flight models have it retracted): [half track, z offset]
-const GEAR = { p51: [1.8, 0], kestrel: [1.8, 0], spitfire: [0.95, 0.15], bf109: [1.0, 0.2], fw190: [1.75, 0.1], il2: [2.05, 0.3] };
+const GEAR = { p51: [1.8, 0], kestrel: [1.8, 0], spitfire: [0.95, 0.15], bf109: [1.0, 0.2], fw190: [1.75, 0.1], il2: [2.05, 0.3], bulwark: [2.3, 0.2], talon: [1.5, 0.3] };
 function gearGeom(T) {
   const H = T.hit, k = clamp(T.span / 11, 0.9, 1.3), gg = GEAR[T.key] || [1.6, 0];
   return { gx: gg[0], zM: H.wz - 0.35 + gg[1], yW: H.wy - 1.45 * k, r: 0.36 * k, zT: H.tail + 0.75, yT: -0.75, rT: 0.17 };
@@ -5411,7 +5593,7 @@ function vehicleIcon(T) {
   return `<svg viewBox="0 0 64 26" aria-hidden="true">${hull}<path fill="${f}" d="M18 8h${L}l3 7H16z"/><rect fill="${f}" x="${18 + L}" y="9.5" width="${T.role === "heavy" ? 20 : 18}" height="2"/>${wheels}</svg>`;
 }
 // 0..100 ratings for the hangar bars (stock and with the player's upgrades)
-const AIR_FP = Math.max(...AIR_LIST.map(T => T.guns.reduce((s, g) => s + g.rate * g.dmg, 0)));
+const AIR_FP = Math.max(...AI_AIR.map(T => T.guns.reduce((s, g) => s + g.rate * g.dmg, 0)));
 function ratings(T) {
   const P = playerType(T), r = (a, b) => [clamp(a, 0, 100), clamp(b, 0, 100)];
   if (T.air) return [["Speed", ...r(T.vmax / 1.75, P.vmax / 1.75), `${Math.round(P.vmax * 3.6)} km/h`],
@@ -5431,16 +5613,18 @@ function renderLobby() {
   txt($("lbLevel"), `Level ${profile.level}${profile.level >= MAX_LVL ? " (max)" : ` · ${fmtN(profile.xp)} / ${fmtN(xpFor(profile.level))} XP`}`);
   $("lbXp").style.width = `${profile.level >= MAX_LVL ? 100 : profile.xp / xpFor(profile.level) * 100}%`;
   txt($("lbModeName"), m.name);
-  const go = $("lbGo"), sub = $("lbGoSub");
-  go.setAttribute("aria-disabled", ok ? "false" : "true");
+  const go = $("lbGo"), sub = $("lbGoSub"), own = isOwned(T);
+  go.setAttribute("aria-disabled", ok && own ? "false" : "true");
   go.title = ok ? `Start a ${m.name} battle in the ${T.name}` : "";
-  sub.className = ok ? "" : "warn";
+  sub.className = ok && own ? "" : "warn";
   sub.textContent = ok ? `${m.name} · ${m.tag}` : `${m.name} is ${m.allow === "air" ? "aircraft" : "ground vehicles"} only: pick ${m.allow === "air" ? "an aircraft" : "a tank"} or change the mode`;
+  if (ok && !own) sub.textContent = `${T.name} is locked: unlock it for ${fmtN(T.price)} Cr, or pick another vehicle`;
   // left: vehicle card
   const mods = MODS[T.air ? "air" : "ground"], have = mods.filter(x => hasMod(T, x.id));
   const rate = ratings(T).map(([n, a, b, v]) => `<span>${n}</span><div class="b"><i class="${b > a + 0.5 ? "up" : ""}" style="width:${b}%"></i></div><span style="font:10px ui-monospace,monospace;text-align:right;white-space:nowrap">${v}</span>`).join("");
   const allowed = MODE_LIST.filter(x => modeAllows(x, T)).map(x => x.name).join(", ");
-  $("lbInfo").innerHTML = `<h2>${esc(T.name)}</h2><div class="meta"><span class="nat" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${NAT_COL[T.nation]}"></span> ${T.nation} · ${T.cls} · free to use</div>
+  $("lbInfo").innerHTML = `<h2>${esc(T.name)}</h2><div class="meta"><span class="nat" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${NAT_COL[T.nation]}"></span> ${T.nation} · ${T.cls} · ${!isPremium(T) ? "free to use" : own ? '<span class="pm">&#9733; premium · owned</span>' : `<span class="pm">&#128274; premium · ${fmtN(T.price)} Cr</span>`}</div>
+    ${isPremium(T) && !own ? `<div class="buyv">&#128274; <b>Locked.</b> Unlock it once for <b>${fmtN(T.price)} Cr</b> of earned battle credits; you have ${fmtN(profile.credits)} Cr.${profile.credits < T.price ? ` <span class="short">${fmtN(T.price - profile.credits)} Cr short: win battles and finish contracts.</span>` : ""}<button id="lbBuyV"${profile.credits < T.price ? ' class="secondary" aria-disabled="true"' : ""}>${buyArm === T.key ? `Confirm: spend ${fmtN(T.price)} Cr` : `Unlock for ${fmtN(T.price)} Cr`}</button></div>` : ""}
     <div class="rate">${rate}</div>
     <table>${vehicleRows(T).slice(0, 4).map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}</table>
     ${(() => { const v = vstat(T), L = masteryLvl(v.pts), nx = MASTERY[L], pv = MASTERY[L - 1] || 0;
@@ -5453,6 +5637,7 @@ function renderLobby() {
     <div style="font-size:11px;opacity:.6;margin-top:6px">Modes: ${allowed}</div>
     <p class="desc" title="${esc(T.desc || "")}">${esc(T.desc || "")}</p>`;
   $("lbMods").onclick = () => openShop("mods");
+  if ($("lbBuyV")) $("lbBuyV").onclick = () => buyVehicle(T);
   for (const el of $("lbCamo").querySelectorAll("button")) el.onclick = () => {
     const c = CAMOS.find(x => x.id === el.dataset.camo);
     if (!profile.camoOwned.includes(c.id)) { openShop("camo"); return; }
@@ -5470,7 +5655,7 @@ function renderLobby() {
   const S = profile.stats, saveTxt = { unavailable: "Saving is blocked in this browser: progress lasts until you close the page.", corrupt: "The old save could not be read: started a new profile (its text is kept in localStorage as steelfront.profile.v1.bak).", new: "New profile: progress is saved in this browser.", loaded: "Progress is saved in this browser.", saved: "Progress is saved in this browser." }[saveState];
   $("lbCareer").innerHTML = `<h3>Career</h3><div class="kv"><span>Battles · wins</span><span>${S.battles} · ${S.wins}${S.battles ? ` (${Math.round(S.wins / S.battles * 100)}%)` : ""}</span><span>Ground · air kills</span><span>${S.gKills} · ${S.aKills}</span>
     <span>Zones · waves</span><span>${S.caps} · ${S.waves}</span><span>Credits earned</span><span>${fmtN(S.earned)}</span><span>Best battle score</span><span>${fmtN(profile.best)}</span></div>
-    <div style="font-size:12px;margin-top:6px">Medals ${MEDALS.filter(m => profile.medals[m.id]).length}/${MEDALS.length}</div><div class="medgrid">${MEDALS.map(m => `<span class="${profile.medals[m.id] ? "" : "no"}" title="${m.name}: ${m.d}${profile.medals[m.id] ? ` · earned ${profile.medals[m.id]}×` : " · not earned yet"}">${m.icon}${profile.medals[m.id] > 1 ? `<small>${profile.medals[m.id]}</small>` : ""}</span>`).join("")}</div><div style="font-size:11px;opacity:.65;margin-top:6px">${saveTxt} All vehicles are free. Credits come only from playing: battle rewards, contracts and level-ups.</div>`;
+    <div style="font-size:12px;margin-top:6px">Medals ${MEDALS.filter(m => profile.medals[m.id]).length}/${MEDALS.length}</div><div class="medgrid">${MEDALS.map(m => `<span class="${profile.medals[m.id] ? "" : "no"}" title="${m.name}: ${m.d}${profile.medals[m.id] ? ` · earned ${profile.medals[m.id]}×` : " · not earned yet"}">${m.icon}${profile.medals[m.id] > 1 ? `<small>${profile.medals[m.id]}</small>` : ""}</span>`).join("")}</div><div style="font-size:11px;opacity:.65;margin-top:6px">${saveTxt} ${PREMIUM_LIST.length} premium vehicles unlock with credits; all others are free. Credits come only from playing: battle rewards, contracts and level-ups.</div>`;
   lobbyCards();
 }
 function lobbyCards() {
@@ -5487,8 +5672,9 @@ function lobbyCards() {
   const m = MODES[profile.mode];
   $("lbCards").innerHTML = (lobbyCat === "air" ? AIR_LIST : GROUND_LIST).filter(T => profile.nation === "all" || T.nation === profile.nation).map(T => {
     const n = (profile.mods[T.key] || []).length, tot = MODS[T.air ? "air" : "ground"].length, c = camoOf(T);
-    return `<button class="vc${T === selectedType ? " sel" : ""}${modeAllows(m, T) ? "" : " no"}" role="option" aria-selected="${T === selectedType}" data-k="${T.key}" title="${T.name} · ${T.cls} · ${T.nation}${modeAllows(m, T) ? "" : ` · not allowed in ${m.name}`}">
-      <span class="st">${n}/${tot} mods</span><span class="ms${masteryLvl(vstat(T).pts) ? "" : " z"}" aria-label="Mastery ${masteryLvl(vstat(T).pts)} of ${MASTERY.length}">${stars(masteryLvl(vstat(T).pts))}</span>${vehicleIcon(T)}<b>${esc(T.name)}</b><span class="nat" style="background:${NAT_COL[T.nation]}"></span>${T.cls}${c.col ? ` · <span style="color:rgb(${c.col.map(v => Math.round(v * 255)).join(",")})">&#9632;</span>` : ""}</button>`;
+    const lk = !isOwned(T);
+    return `<button class="vc${T === selectedType ? " sel" : ""}${modeAllows(m, T) ? "" : " no"}${lk ? " locked" : ""}" role="option" aria-selected="${T === selectedType}" data-k="${T.key}" title="${T.name} · ${T.cls} · ${T.nation}${lk ? ` · premium, locked: ${fmtN(T.price)} Cr` : isPremium(T) ? " · premium, owned" : ""}${modeAllows(m, T) ? "" : ` · not allowed in ${m.name}`}">
+      ${lk ? `<span class="pr">&#128274; ${fmtN(T.price)} Cr</span>` : `<span class="st">${isPremium(T) ? "&#9733; " : ""}${n}/${tot} mods</span>`}<span class="ms${masteryLvl(vstat(T).pts) ? "" : " z"}" aria-label="Mastery ${masteryLvl(vstat(T).pts)} of ${MASTERY.length}">${stars(masteryLvl(vstat(T).pts))}</span>${vehicleIcon(T)}<b>${esc(T.name)}</b><span class="nat" style="background:${NAT_COL[T.nation]}"></span>${T.cls}${c.col ? ` · <span style="color:rgb(${c.col.map(v => Math.round(v * 255)).join(",")})">&#9632;</span>` : ""}</button>`;
   }).join("");
   for (const el of $("lbCards").querySelectorAll(".vc")) el.onclick = () => { selectVehicle(TYPES[el.dataset.k]); renderLobby(); };
 }
@@ -5517,6 +5703,7 @@ function goBattle() {
     toast(`${m.name} needs ${m.allow === "air" ? "an aircraft" : "a ground vehicle"}: pick one in the line-up`, "bad"); uiSnd(false);
     lobbyCat = m.allow; renderLobby(); return;
   }
+  if (!isOwned(selectedType)) { toast(`The ${selectedType.name} is locked: unlock it for ${fmtN(selectedType.price)} Cr or pick another vehicle`, "bad"); uiSnd(false); return; }
   if (cine.skipKey) return; // a held intro-skip key must not also start a battle
   startPlaying();
 }
@@ -5619,7 +5806,7 @@ function renderModal() {
         <tr><td>Enemy commander</td><td>One enemy vehicle (an aircraft if you are flying) gets a gold ★ marker. Destroy it within ${OBJ.hvt.life} s: −${OBJ_PAY.hvt} enemy tickets.</td></tr>
         <tr><td>Supply column</td><td>Three unarmed trucks cross behind the enemy line, marked gold. Destroy all of them: −${OBJ_PAY.convoy} enemy tickets on top of the usual losses. Good prey for aircraft.</td></tr></table>
       <p class="note" style="opacity:.9">In Breakthrough the bonus is extra reinforcements instead. In Conquest, Annihilation and Air Superiority the last ${FINAL_PUSH.left / 60} minutes, or the moment either side drops to ${FINAL_PUSH.frac * 100}% tickets, are the <b>final push</b>: both sides lose ×${FINAL_PUSH.kill} tickets per vehicle and Conquest zones bleed ×${FINAL_PUSH.bleed}, so a close battle ends with a real decision instead of running out the clock. The line under the clock shows the zone count and who is draining whom.</p>
-      <h3 style="color:#9fd4ff">Credits, XP and unlocks</h3><p class="note" style="opacity:.9">Every finished battle pays credits (Cr) and XP: a base amount for the result, plus kills, zone captures, broken-through zones, destroyed Last Stand waves and time in battle. Boosters add 50%. XP raises your commander level; each level pays a credit bonus and unlocks some camouflage and crew training. Contracts in the hangar pay extra credits when completed. Leaving a battle early pays nothing. All ${GROUND_LIST.length + AIR_LIST.length} vehicles are free and always available. Credits buy modifications (per vehicle), camouflage, consumables, crew training and boosters. There is no real-money shop. Progress is saved in this browser (localStorage).</p>
+      <h3 style="color:#9fd4ff">Credits, XP and unlocks</h3><p class="note" style="opacity:.9">Every finished battle pays credits (Cr) and XP: a base amount for the result, plus kills, zone captures, broken-through zones, destroyed Last Stand waves and time in battle. Boosters add 50%. XP raises your commander level; each level pays a credit bonus and unlocks some camouflage and crew training. Contracts in the hangar pay extra credits when completed. Leaving a battle early pays nothing. ${GROUND_LIST.length + AIR_LIST.length - PREMIUM_LIST.length} vehicles are free and always available. The ${PREMIUM_LIST.length} premium Steel Front vehicles (${PREMIUM_LIST.map(T => `${T.name} ${fmtN(T.price)} Cr`).join(", ")}) are unlocked once with earned credits from the hangar info panel and are then yours for good; the enemy never fields them. Credits also buy modifications (per vehicle), camouflage, consumables, crew training and boosters. There is no real-money shop. Progress is saved in this browser (localStorage).</p>
       <h3 style="color:#9fd4ff">Battle score, medals and mastery</h3><p class="note" style="opacity:.9">Your hits (+${SCORE.hit}, critical +${SCORE.crit}), kills (+${SCORE.kill}, aircraft +${SCORE.air}), assists (+${SCORE.assist}: an enemy you damaged in the last ${ASSIST_WINDOW} s is finished by someone else), captures (+${SCORE.cap}) and cleared waves (+${SCORE.wave}) pop up under the crosshair. Bonuses: first blood, long shots from ${LONG_SHOT} m, and double / triple kills within ${MULTI_WINDOW} s. Kill streaks (kills without being destroyed) get a callout at 3, 5 and 8. At the end of a battle you can earn medals (${MEDALS.length} to collect, +${MEDAL_PAY[0]} Cr / +${MEDAL_PAY[1]} XP each). Your score also counts toward that vehicle's mastery: ${MASTERY.length} stars, each paying a one-off credit bonus, plus personal bests per vehicle and overall. The score changes nothing in the fight, the enemy does not get harder, and nothing is lost if you take a break.</p>`;
   } else if (modalKind === "reset") {
     h = `<p class="note" style="opacity:.9">This deletes your credits, level, purchases, contracts and career stats in this browser and starts again with 6,000 Cr. Graphics settings are kept.</p>`;
@@ -6369,7 +6556,7 @@ function runSelfTest() {
   guard("lock-on rockets", () => {
     const H = TYPES.hornet, K = AIR.kestrel;
     ok("Hornet R-5 (tank) and P-51D Kestrel (plane) are playable with lock-on rockets", lockOnType(H) && lockOnType(K) && GROUND_LIST.includes(H) && AIR_LIST.includes(K) && !lockOnType(HIST.sherman) && !lockOnType(AIR.il2));
-    ok("…and never appear in AI line-ups (enemy difficulty unchanged)", !AI_GROUND.some(lockOnType) && !AI_AIR.some(lockOnType) && AI_AIR.length === AIR_LIST.length - 1);
+    ok("…and never appear in AI line-ups (enemy difficulty unchanged)", !AI_GROUND.some(lockOnType) && !AI_AIR.some(lockOnType) && AI_AIR.length === AIR_LIST.filter(T => !lockOnType(T) && !isPremium(T)).length);
     const aimAt = (t, e) => vnorm(vsub(center(e), seekerFrom(t)));
     const hold = (t, aim, secs) => { for (let i = 0; i < secs * 30; i++) updateLock(t, 1 / 30, typeof aim === "function" ? aim() : aim); };
     // tank vs tank, with the target driving sideways so only a steering rocket hits it
@@ -6595,6 +6782,62 @@ function runSelfTest() {
     battle("conquest"); tickets[1] = 4; ms.push = true; const foe = tanks.find(t => t.team === 1 && !t.type.air); destroyTank(foe, player); step(1 / 30);
     ok("a final-push kill can end the battle (enemy out of tickets = victory)", state === "over" && outcome.result === "win" && outcome.reason === "tickets");
     state = "playing";
+  });
+  guard("vehicle models and premium vehicles", () => {
+    const all = [...GROUND_LIST, ...AIR_LIST];
+    ok("every vehicle has its meshes (ground: hull, turret, gun, low-detail copies; air: airframe, detail, prop unless a jet)",
+      all.every(T => T.air ? T.planeMesh && T.planeMesh.count > 300 && T.planeDetail && (T.jet ? !T.propMesh : T.propMesh) : T.hullMesh.count > 2000 && T.turMesh.count > 200 && T.barMesh.count > 50 && T.hullLo && T.turLo && T.barLo && T.hullLo.count < T.hullMesh.count),
+      all.filter(T => !(T.air ? T.planeMesh : T.hullMesh && T.hullLo)).map(T => T.key).join());
+    ok("the original Steel Front tanks use the detailed builder (were a few dozen boxes)", [TYPES.light, TYPES.medium, TYPES.heavy, TYPES.hornet].every(T => T.hullMesh.count > 8000 && T.hullDecal), TYPES.light.hullMesh.count);
+    { const b = builder(); addBox(b, chain(trans(0, 0.2, 0), scl(1, 0.4, 1)), [1, 1, 1]); addBox(b, chain(trans(0, 1.8, 0), scl(1, 0.4, 1)), [1, 1, 1]); weather(b, { y0: 0, y1: 2, mud: 0.4, mudTop: 1 });
+      const lo = b.col.slice(0, 108), hi = b.col.slice(108), avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+      ok("the weathering pass darkens and muddies the lower hull and keeps colours in range", avg(lo) < avg(hi) - 0.1 && b.col.every(v => v >= 0 && v <= 1), `${avg(lo).toFixed(2)} < ${avg(hi).toFixed(2)}`); }
+    const P = PREMIUM_LIST;
+    ok("5 premium vehicles: 3 ground, 2 air, each with a credit price", P.length === 5 && P.filter(T => !T.air).length === 3 && P.every(T => T.price >= 40000), P.map(T => `${T.key}:${T.price}`).join());
+    ok("premium vehicles out-class the stock line-up", TYPES.titan.pen > Math.max(...AI_GROUND.map(T => T.pen)) && TYPES.titan.armor.hf > Math.max(...AI_GROUND.map(T => T.armor.hf)) && TYPES.valkyrie.speed > Math.max(...AI_GROUND.map(T => T.speed)) * 0.95 && AIR.talon.vmax > Math.max(...AI_AIR.map(T => T.vmax)) * 1.3 && AIR.bulwark.hp > Math.max(...AI_AIR.map(T => T.hp)));
+    ok("premium vehicles never appear in AI pools", !AI_GROUND.some(isPremium) && !AI_AIR.some(isPremium));
+    battle("conquest"); const seen = new Set();
+    for (let i = 0; i < 300; i++) for (let s = 0; s < 8; s++) seen.add(slotType(i % 2, s).key);
+    battle("laststand", HIST.tiger); ms.wave = 7; ms.nextT = 0; for (let i = 0; i < 6; i++) { spawnWave(); for (const t of tanks) seen.add(t.type.key); }
+    ok("…in any line-up slot or Last Stand wave", !P.some(T => seen.has(T.key)), [...seen].join());
+    // buying
+    profile = freshProfile(); profile.credits = 1000;
+    ok("a fresh profile owns no premium vehicle and every free one", P.every(T => !isOwned(T)) && [...AI_GROUND, ...AI_AIR, TYPES.hornet, AIR.kestrel].every(T => isOwned(T)));
+    ok("buying without enough credits fails and costs nothing", !buyVehicle(TYPES.titan, false) && profile.credits === 1000 && !isOwned(TYPES.titan));
+    profile.credits = 100000;
+    ok("the first click only arms the purchase (two-step confirm)", !buyVehicle(TYPES.titan) && profile.credits === 100000 && buyArm === "titan");
+    ok("confirming deducts the exact price and unlocks it", buyVehicle(TYPES.titan) && profile.credits === 100000 - TYPES.titan.price && isOwned(TYPES.titan) && isOwned(playerType(TYPES.titan)));
+    ok("an owned vehicle can't be bought twice", !buyVehicle(TYPES.titan, false) && profile.credits === 100000 - TYPES.titan.price);
+    { const keep = profile, st = saveState, text = JSON.stringify({ ...profile, owned: ["titan", "bogus", "sherman", "titan"], sel: "talon" });
+      loadProfile(text); saveState = st;
+      ok("ownership survives a save and load; junk entries and a locked selection are dropped", profile.owned.join() === "titan" && profile.sel === "sherman" && profile.credits === keep.credits, JSON.stringify([profile.owned, profile.sel]));
+      loadProfile(JSON.stringify({ credits: 5000, sel: "panther" })); saveState = st;
+      ok("an old save without the field loads with free vehicles intact", Array.isArray(profile.owned) && !profile.owned.length && profile.sel === "panther" && profile.credits === 5000);
+      profile = keep; }
+    // spawning
+    profile.owned = []; profile.mode = "conquest"; selectedType = AIR.talon; state = "menu"; newBattle(); state = "playing";
+    ok("a locked premium vehicle never spawns: a stock one is used", player.type.base === AIR.p51, player.type.key);
+    selectedType = TYPES.titan; newBattle();
+    ok("…for ground too", player.type.base === TYPES.sherman);
+    profile.owned = ["titan", "talon"]; selectedType = TYPES.titan; newBattle();
+    ok("an owned premium vehicle spawns with its stats", player.type.base === TYPES.titan && player.hp === TYPES.titan.hp);
+    profile.owned = []; destroyTank(player, tanks.find(t => t.team === 1)); respawnT = 0; step(1 / 30);
+    ok("respawning also refuses a vehicle that is no longer owned", player.alive && player.type.base === TYPES.sherman);
+    profile.owned = ["talon"]; profile.mode = "air"; selectedType = AIR.talon; state = "menu"; newBattle(); state = "playing";
+    let bad = ""; for (let i = 0; i < 30 * 20 && !bad; i++) { step(1 / 30); if (player.pos.some(v => !isFinite(v))) bad = "NaN"; }
+    ok("the Talon flies a 20 s battle clean with its prop-less model", !bad && player.type.base === AIR.talon, bad);
+    let hudOk = true; try { for (const T of [AIR.talon, AIR.bulwark, TYPES.titan, TYPES.swarm, TYPES.valkyrie]) { player.type = playerType(T); player.rockets = T.rockets ? T.rockets.n : 0; player.bombs = T.bombs ? T.bombs.n : 0; render(); drawHud(); } } catch (x) { hudOk = String(x); }
+    ok("every premium vehicle renders with the HUD", hudOk === true, hudOk);
+    ok("the Swarm fires lock-on rockets from 8 pod tubes", lockOnType(TYPES.swarm) && TYPES.swarm.rockets.n === 8 && TYPES.swarm.rockets.pts.length === 8);
+    // hangar
+    profile.owned = []; profile.credits = 1000; profile.mode = "conquest"; selectedType = TYPES.valkyrie; showMenu("start");
+    const lb = $("lbInfo").innerHTML + $("lbCards").innerHTML;
+    ok("the hangar shows the price, locked state and shortfall", /premium · 45,000 Cr/.test(lb) && /44,000 Cr short/.test(lb) && /class="pr"/.test(lb) && $("lbGo").getAttribute("aria-disabled") === "true");
+    let started = false; const sp = startPlaying; goBattle(); started = state === "playing";
+    ok("TO BATTLE is refused with a locked vehicle selected", !started && state === "menu");
+    profile.owned = ["valkyrie"]; renderLobby();
+    ok("an owned premium vehicle shows as owned and can deploy", /premium · owned/.test($("lbInfo").innerHTML) && $("lbGo").getAttribute("aria-disabled") === "false");
+    void sp; profile = freshProfile(); ensureContracts(); state = "playing";
   });
   guard("battle soak", () => {
     for (const mode of ["conquest", "laststand"]) {

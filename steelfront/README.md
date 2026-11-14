@@ -136,13 +136,58 @@ Playtest request: make the matches themselves more engaging. Battles were 20-min
 - **Momentum readout.** The Conquest line under the clock now gives the zone count and who is draining whom, for example `zones 2–1 · enemy losing 0.3/s`.
 - **End screen:** it adds an objectives count and a "field objectives" reward row.
 
+## Pass 8: model polish and premium vehicles
+
+Playtest request: polish every vehicle's 3D model, and add stronger vehicles that cost money to unlock. "Money" here is the game's own earned credits; there is no payment integration and no real-money shop.
+
+**Models**
+
+- **Steel Front tanks rebuilt.** The Lynx L-4, Warden M-7, Bastion H-2 and Hornet R-5 were a few dozen plain boxes. They now share one parametric builder (`buildSF`) made from the same parts as the historical tanks:
+  - a lofted hull with a sloped glacis, sprung road wheels (5–8 by size), a drive sprocket, an idler, return rollers and a linked track
+  - fenders, side skirts on the heavies, headlights with guards, tow hooks, tools, exhausts, an engine grille, spare track links, the driver's hatch and periscope, and a bow MG
+  - a cast (rounded) or welded (angular) turret with a bustle, cupola, hatch, periscopes, antenna, stowage bin, smoke dischargers and handrails
+  - a mantlet, a sleeved barrel, a fume extractor, a muzzle brake and a coaxial MG
+  - Steel Front roundels as decals
+  - low-detail copies for distance, like the historical tanks
+
+  Dimensions, hit boxes, turret position and rocket-pod launch points are unchanged.
+- **Weathering pass on every model.** All 22 ground and air models go through `weather()` at build time, so there is no per-frame cost:
+  - ambient-occlusion darkening toward the bottom
+  - dust and mud on the lower hull and running gear
+  - sun-faded upper faces and shadowed undersides
+  - a small per-panel tone variation
+
+  Vertex colours multiply the camouflage tint, so every camo still works.
+
+**Premium vehicles** (Steel Front nation, bought once in the hangar, then owned for good)
+
+| Vehicle | Type | Price | Why it is strong |
+| --- | --- | --- | --- |
+| Valkyrie V-8 | Strike tank | 45,000 Cr | 76 km/h, 90 mm gun with 270 mm pen, 3.4 s reload |
+| Hornet R-9 Swarm | Heavy rocket tank | 55,000 Cr | 8 lock-on SF-G rockets in two quad pods (one back every 4.5 s), 130 hp, a real 76 mm gun |
+| Titan HX-9 | Super-heavy tank | 75,000 Cr | 250/290 mm frontal armour, 175 hp, 128 mm gun with 330 mm pen |
+| Bulwark AX-2 | Heavy attacker | 55,000 Cr | 2 × 37 mm cannon (70 mm pen), 4 × .50, 2 × 500 kg bombs, 8 HVARs, 120 hp armoured tub |
+| Talon J-1 | Jet fighter | 80,000 Cr | 846 km/h at low level (the fastest piston fighter does 594), 4 × 30 mm, 8 lock-on rockets, no propeller, afterburner glow |
+
+- **Hangar:**
+  - Locked cards show a 🔒 price. The info panel shows the price, your credits and any shortfall, plus an **Unlock** button.
+  - Buying takes two clicks: the first arms the button and the second, within 4 s, buys.
+  - TO BATTLE is disabled while a locked vehicle is selected.
+  - You can still preview a locked vehicle's model and stats.
+- **Rules:**
+  - Buying checks your credits, deducts the exact price and saves `profile.owned`.
+  - Loading a save keeps only known premium keys, and a locked vehicle is never kept selected.
+  - Old saves without the field load unchanged.
+  - A locked vehicle never spawns, not even on respawn or from the pause-menu picker; a stock Sherman or P-51 is used instead.
+- **Enemy unchanged:** premium vehicles are excluded from `AI_GROUND` / `AI_AIR` and from Last Stand heavy waves, so the enemy never fields them. `ENEMY_AI` is unchanged. Flight stays unassisted, and the Talon flies the same flight model with different numbers.
+
 ## Testing
 
 ```sh
 node steelfront/tests/run-selftest.mjs    # exits 0 on PASS; set CHROME=/path/to/chrome if it isn't on PATH
 ```
 
-You can also open `steelfront.html?selftest` in any browser. The page runs 140 seeded checks and shows the results on screen. The checks cover:
+You can also open `steelfront.html?selftest` in any browser. The page runs 164 seeded checks and shows the results on screen. The checks cover:
 
 - the armour lookup and damage model
 - each fix above, as a regression check
@@ -154,6 +199,7 @@ You can also open `steelfront.html?selftest` in any browser. The page runs 140 s
 - battle score: merged hit popups, kill / first blood / long-shot scoring, double kills, assists, streak reset on death, HUD drawing, medals, mastery stars and their one-off bonus, personal bests, the rewards screen and hangar, safe loading of medal and mastery data from a save, and that the enemy AI handicap is unchanged
 - field objectives: scheduling, spot choice, the supply crate (not while landing, full repair, an enemy reaching it first), the relay (contested, reveal, tickets), the commander, the supply column (passive trucks, the bonus, no respawn, escaping), AI diverts, HUD drawing, rewards, the final push trigger and ticket costs, the Conquest momentum line, Breakthrough reinforcements, the Last Stand crate, and that `ENEMY_AI` is unchanged
 - match flow: every mode runs to a timed result with rewards, a final-push kill can win the battle, and a 90 s Air Superiority battle with a supply column runs clean
+- vehicle models and premium vehicles: every model builds (with low-detail copies, and a prop-less jet), the weathering pass, premium stats beat the stock line-up, premium vehicles never appear in AI slots or Last Stand waves, failed and two-step purchases, the exact deduction, no double buy, ownership through save and load (junk dropped, old saves fine), locked vehicles falling back to stock at spawn and respawn, a 20 s Talon flight, rendering every premium vehicle with the HUD, and the hangar's price, shortfall, locked TO BATTLE and owned states
 - lock-on test setup: the lane must be visible from the rocket pods as well as the seeker, and the test aircraft flies at an altitude the seeker can see (both used to fail on some random maps)
 - two 150 s simulated battles (Conquest and Last Stand) checked for exceptions, NaNs and zombie crews
 
@@ -175,4 +221,5 @@ Run this in a real browser after changes to gameplay, HUD or input.
 10. Deploy the Hornet R-5, then the P-51D Kestrel. Hold an enemy inside the dashed circle: the yellow box turns red (LOCKED), R fires, and the rocket curves onto the target. A friendly unit never locks.
 11. Tab shows the scoreboard, P the FPS counter and Esc pauses. Leaving to the hangar pays no rewards.
 12. Wait about a minute in Conquest: a field objective is announced and the gold line under the clock tracks it. Drive into a supply crate (full repair), hold a relay for 12 s (enemies revealed, enemy −15 tickets), and in an aircraft find the gold trucks or the ★ commander. With 4 minutes left, FINAL PUSH appears and the line under the clock says so.
+14. In the hangar, pick the Titan HX-9 with too few credits: the card shows 🔒 75,000 Cr, the panel shows the shortfall and TO BATTLE is disabled. With enough credits, Unlock → Confirm takes exactly the price, the card shows ★ owned, and the Titan deploys. Reload the page: it is still owned.
 13. Destroy two enemies within 12 s: the banner reads DOUBLE KILL, and the popups list the kill points and bonuses without covering the hit report. At the end of the battle the rewards screen shows the score, mastery stars and medals, and the hangar card shows the vehicle's stars.

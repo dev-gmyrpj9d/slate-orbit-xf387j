@@ -14,26 +14,34 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Trajectory = require(ReplicatedStorage.Shared.Trajectory)
 local Feel = require(ReplicatedStorage.Shared.Feel)
+local EngineSounds = require(ReplicatedStorage.Shared.EngineSounds)
+local Ambience = require(script.Parent.ShoreAmbience)
 local Store = require(script.Parent.Store)
 local Ui = require(script.Parent.Ui)
 
 local Effects = {}
 
--- Built-in engine content sounds (no uploaded assets). If a path is unavailable the sound is
--- silently skipped. Each cue gets a little random pitch (`jitter`) so repeats don't sound
--- mechanical, and cues that share a file are pitched apart so they stay recognisable.
+-- Built-in engine content sounds only (no uploaded assets, no guessed IDs). Every path here is
+-- listed in Shared/EngineSounds, which records the files the Roblox client actually ships
+-- (tests/sound.spec.luau enforces it). Each cue gets a little random pitch (`jitter`) so repeats
+-- don't sound mechanical, and cues that share a file are pitched apart so they stay distinct.
 type SoundDef = { id: string, speed: number, volume: number, jitter: number? }
 local SOUNDS: { [string]: SoundDef } = {
-	throw = { id = "rbxasset://sounds/swoosh.wav", speed = 1.25, volume = 0.3, jitter = 0.08 },
-	eat = { id = "rbxasset://sounds/action_jump_land.mp3", speed = 1.5, volume = 0.5, jitter = 0.1 },
-	refuse = { id = "rbxasset://sounds/action_jump_land.mp3", speed = 0.7, volume = 0.35, jitter = 0.05 },
-	splash = { id = "rbxasset://sounds/impact_water.mp3", speed = 1.2, volume = 0.35, jitter = 0.1 },
-	thud = { id = "rbxasset://sounds/action_jump_land.mp3", speed = 1.05, volume = 0.25, jitter = 0.1 },
-	reward = { id = "rbxasset://sounds/electronicpingshort.wav", speed = 1.2, volume = 0.3, jitter = 0.04 },
-	perfect = { id = "rbxasset://sounds/electronicpingshort.wav", speed = 1.6, volume = 0.4 },
-	click = { id = "rbxasset://sounds/clickfast.wav", speed = 1.1, volume = 0.3, jitter = 0.05 },
-	chime = { id = "rbxasset://sounds/electronicpingshort.wav", speed = 0.75, volume = 0.45 },
-	fanfare = { id = "rbxasset://sounds/victory.wav", speed = 1, volume = 0.3 },
+	throw = { id = EngineSounds.Path.jump, speed = 1.55, volume = 0.28, jitter = 0.08 },
+	eat = { id = EngineSounds.Path.land, speed = 1.5, volume = 0.5, jitter = 0.1 },
+	refuse = { id = EngineSounds.Path.land, speed = 0.7, volume = 0.35, jitter = 0.05 },
+	splash = { id = EngineSounds.Path.water, speed = 1.2, volume = 0.35, jitter = 0.1 },
+	thud = { id = EngineSounds.Path.land, speed = 1.05, volume = 0.25, jitter = 0.1 },
+	tick = { id = EngineSounds.Path.tick, speed = 1, volume = 0.35 },
+	click = { id = EngineSounds.Path.tick, speed = 1.1, volume = 0.3, jitter = 0.05 },
+}
+-- Short note sequences built from the engine's tick: { pitch ratio, delay }. Ratios are just
+-- intervals (major triad 1 : 5/4 : 3/2, octave 2), so the cues read as small tunes.
+local MELODIES: { [string]: { { number } } } = {
+	reward = { { 1.25, 0 }, { 1.5, 0.07 } },
+	perfect = { { 1.25, 0 }, { 1.5, 0.06 }, { 2, 0.12 } },
+	chime = { { 1.5, 0 }, { 1, 0.16 } },
+	fanfare = { { 1, 0 }, { 1.25, 0.1 }, { 1.5, 0.2 }, { 2, 0.34 } },
 }
 local random = Random.new()
 
@@ -55,6 +63,19 @@ local transientCount = 0
 
 function Effects.play(name: string)
 	if Store.setting("sound") == false then
+		return
+	end
+	local melody = MELODIES[name]
+	if melody then
+		-- One Sound per note (built in init), so overlapping notes never bend each other's pitch.
+		for i, note in ipairs(melody) do
+			local sound = sounds[name .. "_" .. i]
+			if sound then
+				task.delay(note[2], function()
+					SoundService:PlayLocalSound(sound)
+				end)
+			end
+		end
 		return
 	end
 	local sound = sounds[name]
@@ -378,6 +399,19 @@ local function landingRing(entry: Projectile)
 	})
 end
 
+-- The in-flight food closest to `position` (within `radius`), for animals to watch it come in.
+function Effects.nearestFood(position: Vector3, radius: number): Vector3?
+	local best, bestDistance = nil, radius
+	for _, entry in pairs(active) do
+		local p = entry.part.Position
+		local d = (p - position).Magnitude
+		if d < bestDistance then
+			best, bestDistance = p, d
+		end
+	end
+	return best
+end
+
 local QUALITY_COLORS = {
 	Perfect = Color3.fromRGB(255, 230, 90),
 	Good = Color3.fromRGB(160, 255, 160),
@@ -461,6 +495,18 @@ function Effects.init()
 		sound.Parent = SoundService
 		sounds[name] = sound
 	end
+	for name, melody in pairs(MELODIES) do
+		for i, note in ipairs(melody) do
+			local sound = Instance.new("Sound")
+			sound.Name = "WFI_" .. name .. "_" .. i
+			sound.SoundId = SOUNDS.tick.id
+			sound.PlaybackSpeed = SOUNDS.tick.speed * note[1]
+			sound.Volume = SOUNDS.tick.volume
+			sound.Parent = SoundService
+			sounds[name .. "_" .. i] = sound
+		end
+	end
+	Ambience.start(Store)
 	local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("FeedFx") :: RemoteEvent
 	remote.OnClientEvent:Connect(onFx)
 	RunService.RenderStepped:Connect(function()

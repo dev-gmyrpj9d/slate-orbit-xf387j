@@ -126,8 +126,28 @@ return function(H)
 			if part.Name == "Ear" then
 				local motor = part:FindFirstChildOfClass("Motor6D")
 				H.check(motor and motor.Part0.Name == "Head", "ear joint should hang from Head")
-			elseif part.Name == "EarInner" then
-				H.check(part:FindFirstChildOfClass("WeldConstraint").Part0.Name == "Ear", "inner ear rides on ear")
+			elseif part.Name == "EarInner" or part.Name == "EarTip" then
+				H.check(part:FindFirstChildOfClass("WeldConstraint").Part0.Name == "Ear", part.Name .. " rides on its ear")
+			end
+		end
+	end)
+
+	H.test("silhouette details: two-tone bodies and dark ear tips (reference principles)", function()
+		local function names(id)
+			local set = {}
+			for _, part in Factory.build(Config.Species[id], "t").model:GetChildren() do
+				set[part.Name] = (set[part.Name] or 0) + 1
+			end
+			return set
+		end
+		local hop = names("puffhop")
+		H.check(hop.EarTip == 2 and hop.Belly == 1, "hopper: two ear tips and a pale belly")
+		local fox = names("glimmerfox")
+		H.check(fox.EarTip == 2 and fox.Chest == 1, "fox: ear tips and a pale chest")
+		-- Detail parts are welded, never animated joints, so the joint budget is unchanged.
+		for _, part in Factory.build(Config.Species.puffhop, "t").model:GetChildren() do
+			if part.Name == "Belly" or part.Name == "EarTip" then
+				H.check(part:FindFirstChildOfClass("Motor6D") == nil, part.Name .. " is welded")
 			end
 		end
 	end)

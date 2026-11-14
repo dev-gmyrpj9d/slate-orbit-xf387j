@@ -215,7 +215,12 @@ local function step(dt: number)
 			walk = rig.walk,
 			lookYaw = 0,
 		}
-		local desired = if pose.state == "Anticipate" or pose.state == "Idle" then lookYaw(rig, headPos) else 0
+		-- Anticipating animals track the food coming at them; idle ones watch the player.
+		local watch = headPos
+		if pose.state == "Anticipate" then
+			watch = Effects.nearestFood(pos, 40) or headPos
+		end
+		local desired = if pose.state == "Anticipate" or pose.state == "Idle" then lookYaw(rig, watch) else 0
 		rig.lookYaw += (desired - rig.lookYaw) * math.min(1, dt * 5)
 		pose.lookYaw = rig.lookYaw
 		if rig.archetype ~= "giant" then

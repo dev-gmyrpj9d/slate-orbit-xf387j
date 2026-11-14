@@ -18,6 +18,7 @@ AnimalMotion.PARTS = {
 	Antenna = { role = "ear", parent = "Head" },
 	Stalk = { role = "ear", parent = "Head" },
 	EarInner = { parent = "Ear" },
+	EarTip = { parent = "Ear" }, -- dark tips ride on the ear, so they move with it
 	Eye = { parent = "Head" },
 	Shine = { parent = "Eye" },
 	EyeBall = { parent = "Stalk" },

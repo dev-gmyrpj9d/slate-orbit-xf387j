@@ -57,3 +57,20 @@ The starting point was the owner's eight screenshots ([SCREENSHOT_ANALYSIS.md](S
   - Offline checks run against the built place (`tests/wayfinding.spec.luau`), and the pass skips any stone that would land on a prop.
   - `tools/mapview.luau` renders a top-down map for review.
 - **Gate label copy.** Gate labels used ALL CAPS ("LOCKED: …"). They now read "Locked: … from the Map tab".
+
+## Fourth pass
+
+- **Silent sound cues (fixed).**
+  - **Problem:** `swoosh.wav`, `electronicpingshort.wav`, `clickfast.wav` and `victory.wav` are not in the current client's file manifest. The manifest is `rbxManifest.txt` in MaximumADHD/Roblox-Client-Tracker, client 0.747.0.7471481, and it lists exactly 11 files under `content/sounds`. So the throw, reward, perfect-catch, click, chime and fanfare cues were most likely silent.
+  - **Fix:** every cue now uses a shipped file, listed in `Shared/EngineSounds`.
+    - The throw uses `action_jump.mp3`.
+    - The reward, perfect-catch, chime and fanfare cues are short pitched note sequences, built from the `volume_slider.ogg` tick at just intervals. There is one Sound per note, so overlapping notes keep their pitch.
+  - **Test:** `tests/sound.spec.luau` fails on any `rbxasset://sounds/` path that isn't shipped, and on any uploaded asset ID.
+- **Shore ambience.** `Client/Controllers/ShoreAmbience` plays one looping engine sound (`action_swim.mp3`, slowed and quiet). Its volume follows the camera's distance to the nearest shoreline, so beaches and bridges hear the sea and the island centres stay quiet. It is off when Sound is off. No Creator Store audio was used: none can be licence-checked or ID-verified from here.
+- **Animal silhouettes.** These follow the reference principles in [ART_DIRECTION.md](ART_DIRECTION.md#image-references):
+  - Hoppers have dark ear tips (from the hare photo) and a pale belly.
+  - Foxes have dark ear tips and a pale chest.
+  - Boars have a dark back ridge and a paler underside.
+  - Ear tips hang from the ear (`AnimalMotion.PARTS.EarTip`), so they move with it. Every detail part is welded, not animated, so the joint count is unchanged.
+  - `tools/profileview.luau` renders side profiles of any species, from the current factory or an older copy, for review.
+- **Anticipation.** While anticipating, animals turn their heads toward the food flying at them (`Effects.nearestFood`) instead of the player.

@@ -88,7 +88,17 @@ local ARCHETYPES: { [string]: (Adder, Color3, Color3) -> (Vector3, number) } = {
 				accent
 			)
 			add("Foot", nil, Vector3.new(0.9, 0.5, 1.6), CFrame.new(side * 0.8, -1.25, -0.6), body)
+			-- Dark ear tips anchor the long-eared silhouette (reference: European hare photo).
+			add(
+				"EarTip",
+				nil,
+				Vector3.new(0.74, 0.6, 0.39),
+				CFrame.new(side * 0.79, 4.42, -1.1) * CFrame.Angles(0, 0, math.rad(-side * 12)),
+				body:Lerp(BLACK, 0.65)
+			)
 		end
+		-- A pale belly keeps the round body readable against pale grass (two-tone principle).
+		add("Belly", Enum.PartType.Ball, Vector3.new(2.3, 1.9, 2.2), CFrame.new(0, -0.55, -0.5), body:Lerp(WHITE, 0.55))
 		eyes(add, 0.5, 1.7, -2.35, 0.45)
 		add("Nose", Enum.PartType.Ball, Vector3.new(0.35, 0.35, 0.35), CFrame.new(0, 1.3, -2.5), accent)
 		add("Tail", Enum.PartType.Ball, Vector3.new(1.1, 1.1, 1.1), CFrame.new(0, 0, 1.5), WHITE)
@@ -134,9 +144,18 @@ local ARCHETYPES: { [string]: (Adder, Color3, Color3) -> (Vector3, number) } = {
 		eyes(add, 0.5, 1.5, -3.1, 0.35)
 		for _, side in ipairs({ -1, 1 }) do
 			add("Ear", nil, Vector3.new(0.6, 1.1, 0.4), CFrame.new(side * 0.6, 2.5, -2.1) * CFrame.Angles(0, 0, math.rad(-side * 15)), body)
+			add(
+				"EarTip",
+				nil,
+				Vector3.new(0.62, 0.4, 0.42),
+				CFrame.new(side * 0.69, 2.84, -2.1) * CFrame.Angles(0, 0, math.rad(-side * 15)),
+				body:Lerp(BLACK, 0.6)
+			)
 			add("Leg", nil, Vector3.new(0.5, 1.1, 0.5), CFrame.new(side * 0.6, -1.4, -1.2), body:Lerp(BLACK, 0.4))
 			add("Leg", nil, Vector3.new(0.5, 1.1, 0.5), CFrame.new(side * 0.6, -1.4, 1.2), body:Lerp(BLACK, 0.4))
 		end
+		-- Pale chest: the fox reads as two-tone from the front and the side.
+		add("Chest", nil, Vector3.new(1.6, 1.3, 0.9), CFrame.new(0, -0.25, -1.8), body:Lerp(WHITE, 0.7))
 		add("Tail", nil, Vector3.new(0.9, 0.9, 2.6), CFrame.new(0, 0.7, 2.8) * CFrame.Angles(math.rad(25), 0, 0), body)
 		local tip = add("TailTip", nil, Vector3.new(0.95, 0.95, 0.9), CFrame.new(0, 1.3, 4.0) * CFrame.Angles(math.rad(25), 0, 0), accent)
 		tip.Material = Enum.Material.Neon
@@ -229,6 +248,9 @@ ARCHETYPES.boar = function(add, body, accent)
 		add("Leg", nil, Vector3.new(0.6, 1, 0.6), CFrame.new(side * 0.8, -1.3, -1.1), body:Lerp(BLACK, 0.3))
 		add("Leg", nil, Vector3.new(0.6, 1, 0.6), CFrame.new(side * 0.8, -1.3, 1.1), body:Lerp(BLACK, 0.3))
 	end
+	-- A dark bristle ridge along the back gives the boar a distinct outline in profile.
+	add("Ridge", nil, Vector3.new(0.5, 0.6, 1.7), CFrame.new(0, 1.0, -0.1), body:Lerp(BLACK, 0.45))
+	add("Belly", Enum.PartType.Ball, Vector3.new(2, 2, 2), CFrame.new(0, -0.5, 0), body:Lerp(WHITE, 0.35))
 	return Vector3.new(0, 0.2, -3.7), 1.8
 end
 

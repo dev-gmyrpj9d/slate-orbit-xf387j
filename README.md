@@ -12,13 +12,23 @@ Source and build tooling for the Roblox place **Wild Feast Islands**.
 
 Tools are pinned in `mise.toml` (`mise install`). `tools/check.sh` runs StyLua, the tests, the build, the round-trip check and a strict `luau-lsp analyze` with Roblox definitions.
 
-To go back to the original, open `place/WildFeastIslands.original.rbxl`, or run `git checkout 611111d -- src` and rebuild.
+To go back to the original, open `place/WildFeastIslands.original.rbxl`. To go back to the first pass, run `git checkout a4246c5 -- src` and rebuild.
 
-## Gamepasses
+## Passes
 
-I searched every script in the place for `MarketplaceService`, `UserOwnsGamePass`, `PromptGamePassPurchase`, `PromptProductPurchase`, `ProcessReceipt` and any gamepass, VIP or premium checks. None exist. The only purchases spend in-game coins and research, so all features are already free to every player and no code needed changing. `tests/monetization.spec.luau` fails if a gamepass gate or purchase prompt is ever added. Marketplace settings on roblox.com were not touched. Any gamepasses listed on the game page don't grant anything in game.
+Earlier passes found no gamepasses in the original place. There is now a small optional lineup: the Lantern Egg (always hatches a Lanternkit companion), the Painter's Kit (throw trails) and the Field Satchel (+2 food bar pins). Ownership is checked on the server, prices come from Roblox, and buying stays disabled until real pass IDs go into `Config.Passes`. Design, configuration steps and Studio checks are in [`docs/MONETIZATION.md`](docs/MONETIZATION.md).
 
-## Improvements in this pass
+## Second pass (this branch)
+
+- **Audit:** [`docs/AUDIT.md`](docs/AUDIT.md). Five defects fixed: rejoin lock race, free lure extension, decor lane stall, pin double-toggle, catch hint radius.
+- **Art direction and references:** [`docs/ART_DIRECTION.md`](docs/ART_DIRECTION.md). New palette and font (Builder Sans). Emoji, ALL CAPS and "!" hype removed from player-facing text. Every text colour pair is at least 4.5:1 contrast.
+- **New features:**
+  - Shop tab with 3D companion previews.
+  - Client-drawn companions that follow their owner.
+  - Trusted animals come over to greet you.
+  - Two settings: *Tap to aim, tap again to throw* and *Larger interface*.
+
+## First pass (PR #1)
 
 Benchmark: the public listing for *Throw Food For Animals* (Roblox search API) describes this loop: throw food far, attract and collect animals, earn, buy better food, train throw power, open new areas. Wild Feast Islands already has an equivalent loop. What it lacked was the animals *feeling alive*, so that's where this pass goes. No assets or code were copied.
 
@@ -36,18 +46,18 @@ Benchmark: the public listing for *Throw Food For Animals* (Roblox search API) d
 
 ## Validation
 
-Done offline:
+Done offline (both passes, `tools/check.sh`):
 - StyLua check.
 - `luau-lsp analyze` in strict mode with Roblox definitions on all of `src/`.
-- 13 Lune tests:
+- 25 Lune tests (pass rules, save schema v4, companion rig, monetization boundaries, plus the first pass's tests):
   - pose curves are finite and mirrored
   - idle choices behave as intended
   - separation pushes animals apart
   - all 106 species plus the giant build a valid joint graph whose Motor6D C0/C1 reproduce the build pose
-  - no monetization hooks exist
+  - marketplace code only in PassService and Shop, no paid randomness or developer products
 - Round-trip check: the built place still contains every instance of the original.
 
-Needs Roblox Studio (not run here):
+Needs Roblox Studio (not run here; pass-specific checks are in `docs/MONETIZATION.md`):
 1. Play Solo and a 2-player local server.
    - Animals animate, blink and turn their heads on every client.
    - Idle animals sniff, rest and watch.
@@ -58,5 +68,11 @@ Needs Roblox Studio (not run here):
 3. `rbxasset://sounds/swoosh.wav`, `clickfast.wav` and `victory.wav` load on desktop and mobile. The other cues reuse files the original already used. A missing file is skipped silently.
 4. Feast: the chime plays when the feast is ready, the fanfare plays when the giant leaves, and the giant's fins sway.
 5. The lighting grade and ShadowMap look right, and there's no frame-time regression on a low-end phone.
+6. New HUD on desktop, phone and gamepad:
+   - Builder Sans loads.
+   - The Shop and Settings tabs fit the panel.
+   - Larger interface still fits a phone screen.
+   - Tap to throw works with mouse, F, touch and R2.
+7. At trust level 3, idle animals walk up and stop about 5 studs away.
 
 Ambient island audio (waves, birds) would need licensed audio from the Creator Store. It was left out rather than guessing asset IDs.

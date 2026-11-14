@@ -7,7 +7,7 @@ Source and build tooling for the Roblox place **Wild Feast Islands**.
 | `place/WildFeastIslands.original.rbxl` | The untouched uploaded place (md5 `c631449a540d771a2813b7ab8df8acef`). Never edited. |
 | `src/` | Every script in the place, Rojo layout (`X.luau` ModuleScript, `X.server.luau` Script, `X.client.luau` LocalScript), mirroring the instance tree. |
 | `build/WildFeastIslands.rbxl` | The playable place: the original plus `src/` plus `tools/scene.luau`. Open this in Studio. |
-| `tools/` | Lune scripts: `extract`, `build`, `roundtrip` (proves no original instance was lost), `sourcemap`, `check.sh`. |
+| `tools/` | Lune scripts: `extract`, `build`, `roundtrip` (proves no original instance was lost), `sourcemap`, `mapview` (top-down SVG of the built place), `check.sh`. |
 | `tests/` | Offline Lune tests (`lune run tests/run.luau`). |
 
 Tools are pinned in `mise.toml` (`mise install`). `tools/check.sh` runs StyLua, the tests, the build, the round-trip check and a strict `luau-lsp analyze` with Roblox definitions.
@@ -18,7 +18,20 @@ To go back to the original, open `place/WildFeastIslands.original.rbxl`. To go b
 
 Earlier passes found no gamepasses in the original place. There is now a small optional lineup: the Lantern Egg (always hatches a Lanternkit companion), the Painter's Kit (throw trails) and the Field Satchel (+2 food bar pins). Ownership is checked on the server, prices come from Roblox, and buying stays disabled until real pass IDs go into `Config.Passes`. Design, configuration steps and Studio checks are in [`docs/MONETIZATION.md`](docs/MONETIZATION.md).
 
-## Second pass (this branch)
+## Third pass (this branch)
+
+Built from the owner's eight screenshots. The per-image analysis, what was observed versus inferred, and what was deliberately *not* copied are in [`docs/SCREENSHOT_ANALYSIS.md`](docs/SCREENSHOT_ANALYSIS.md). The licensed image references are in [`docs/ART_DIRECTION.md`](docs/ART_DIRECTION.md#image-references).
+
+- **Throw meter.** A segmented gauge beside the aim point, not over it. It shows the predicted outcome in words ("Catch: Puffhop", "Lands 24 studs away") and names the actual input ("Release R2 to throw"). The goal card and hint step aside while you aim.
+- **Throw feel.** The arm cocks back with power, whips over and follows through, and everyone sees it. Your own throws show a landing ring that closes in as the food falls.
+- **Discovery.** A journal-plate card for each new animal or favourite: side-profile animal, silhouette first, the name written in. Arriving on an island shows a banner with your tally there.
+- **World.**
+  - Stepping-stone paths from the spawn to both bridges and the Feast Cove pier, signposts that point the way, and zig-zag bridge lanterns.
+  - Tidier world labels.
+  - Placement is checked against the built place, and `tools/mapview.luau` renders a top-down map.
+- **Network.** Resting animals no longer replicate every frame. The idle bob moved to the client (see the [audit](docs/AUDIT.md#third-pass)).
+
+## Second pass
 
 - **Audit:** [`docs/AUDIT.md`](docs/AUDIT.md). Five defects fixed: rejoin lock race, free lure extension, decor lane stall, pin double-toggle, catch hint radius.
 - **Art direction and references:** [`docs/ART_DIRECTION.md`](docs/ART_DIRECTION.md). New palette and font (Builder Sans). Emoji, ALL CAPS and "!" hype removed from player-facing text. Every text colour pair is at least 4.5:1 contrast.
@@ -49,7 +62,7 @@ Benchmark: the public listing for *Throw Food For Animals* (Roblox search API) d
 Done offline (both passes, `tools/check.sh`):
 - StyLua check.
 - `luau-lsp analyze` in strict mode with Roblox definitions on all of `src/`.
-- 25 Lune tests (pass rules, save schema v4, companion rig, monetization boundaries, plus the first pass's tests):
+- 38 Lune tests (third pass: idle-bob split and write budget, throw meter copy, throw and landing curves, discovery rules, wayfinding placement against the built place; earlier: pass rules, save schema v4, companion rig, monetization boundaries, plus the first pass's tests):
   - pose curves are finite and mirrored
   - idle choices behave as intended
   - separation pushes animals apart
@@ -74,5 +87,11 @@ Needs Roblox Studio (not run here; pass-specific checks are in `docs/MONETIZATIO
    - Larger interface still fits a phone screen.
    - Tap to throw works with mouse, F, touch and R2.
 7. At trust level 3, idle animals walk up and stop about 5 studs away.
+8. Third pass:
+   - **Idle bob.** Resting animals still breathe on every client. Compare network receive with the Developer Console / MicroProfiler before and after.
+   - **Throw pose.** The arm wind-up and follow-through show on R15 and R6 avatars, and another player sees the swing. This needs `Motor6D.Transform` set in PreSimulation to layer over the default animations.
+   - **Throw meter and ring.** The meter clears the target on a phone in landscape and portrait. The landing ring sits on the ground and vanishes on impact.
+   - **Discovery.** The card's viewport frames the animal (side profile) and closes on tap. The island banner shows once per arrival.
+   - **Wayfinding.** Signposts read well from the path. Lanterns look right on the bridges. Stones don't z-fight with the grass.
 
 Ambient island audio (waves, birds) would need licensed audio from the Creator Store. It was left out rather than guessing asset IDs.

@@ -20,9 +20,9 @@ The baseline is PR #1's `src/` and `build/WildFeastIslands.rbxl`. The untouched 
 
 ## Noted, not changed
 
-- **Idle bob replication.** The server writes every animal's root CFrame every Heartbeat, including the small breathing bob, so resting animals still replicate. Moving the bob to `AnimalAnimator` would cut that traffic. It needs Studio profiling to confirm the gain, so it was left alone.
+- **Idle bob replication.** *Fixed in the third pass, see below.*
 - **Unused fields.** `tutorialStep` (saved), `Config.Throw.BaseMaxSpeed`, `BaseCooldown`, `PreviewBaseSeconds` and `Config.Kitchen.MaxCookPerRequest` are never read. The tutorial is driven by the next-goal progression, which is already saved through normal progress. They were kept for save compatibility.
-- **Environment.** The world is baked into the place file (`WorldBuilder` only runs when it is missing). Changes to world geometry can't be checked visually without Studio, so this pass doesn't move or add world props.
+- **Environment.** The world is baked into the place file (`WorldBuilder` only runs when it is missing). This pass didn't move or add world props. *The third pass adds them with structured offline checks instead (see below).*
 
 ## Gaps closed in this pass
 
@@ -30,3 +30,30 @@ The baseline is PR #1's `src/` and `build/WildFeastIslands.rbxl`. The untouched 
 - **Trust you can see.** Trust only showed as a number. Animals at trust level 3 or above now trot over to greet that player (`AnimalMotion.pickIdle` "greet" mode, `AnimalService.nearestFriend`).
 - **UI tone.** The UI used emoji icons, ALL-CAPS banners, "!" on almost every message, and white text on light-orange buttons with low contrast. All of it was replaced (see `ART_DIRECTION.md`).
 - **Monetization.** The game had no gamepasses at all (PR #1 audit). There is now a small optional lineup (see `MONETIZATION.md`).
+
+## Third pass
+
+The starting point was the owner's eight screenshots ([SCREENSHOT_ANALYSIS.md](SCREENSHOT_ANALYSIS.md)) and the open item above.
+
+- **Idle bob replication (fixed).**
+  - **Before:** `AnimalService.move` wrote every animal's root CFrame every Heartbeat, so all of up to 26 animals replicated at 60 Hz even while resting.
+  - **After:** the body motion is split in `Shared/AnimalMotion`:
+    - `bodyMotion` covers what gameplay or other players must see: walk gaits, the anticipation hop, the happy spin, the refusal shake. It stays on the server.
+    - `idleBob` covers the breathing, sniffing and chewing bob. Each client adds it locally in `AnimalAnimator`.
+  - The server now writes only when the pose changes by more than `WriteEpsilon` (0.002 studs or radians), and `AnimalService.stats.writes` counts the writes.
+  - **Tests:**
+    - The split reproduces the old bob exactly for every state, pose and archetype.
+    - A simulated resting or idle animal makes at most a handful of writes in 10 s while settling, then none.
+    - A walking animal still writes every frame.
+  - **Still needs Studio:** the real bandwidth saving.
+- **Catch hint vs. mouth position.** The server's mouth position no longer includes the old 0.04–0.08 stud idle bob. The difference is below the catch radius margin, so clean catches are unaffected.
+- **Throw readability.**
+  - The single horizontal power bar is now a segmented meter beside the aim point. It shows the predicted outcome in words and the real input to press (`ThrowReadout`, `ThrowMeter`).
+  - Your throws show a landing ring that closes in as the food falls (`Effects`, `Feel.landingRing`).
+  - Throws have a wind-up and a follow-through on the character (`ThrowPose`, `Feel`).
+- **Discovery.** Spotting an animal or finding a favourite now gets a journal-plate card (`Discovery`, `JournalReveal`), and arriving on an island shows a short banner with your tally there. The favourite toast was folded into the card.
+- **World.**
+  - `World/Wayfinding` adds stepping-stone paths, signposts and bridge lanterns at server start, and tidies the baked world labels.
+  - Offline checks run against the built place (`tests/wayfinding.spec.luau`), and the pass skips any stone that would land on a prop.
+  - `tools/mapview.luau` renders a top-down map for review.
+- **Gate label copy.** Gate labels used ALL CAPS ("LOCKED: …"). They now read "Locked: … from the Map tab".

@@ -462,6 +462,9 @@ Config.Animal = {
 	ReachInset = 1.5, -- animals chasing food may walk to within this of the grass edge
 	EatDistance = 2.6,
 	FirstSpawnOffset = { 0, -16 }, -- a tutorial Puffhop waits this far from the spawn (x, z)
+	GreetTrustLevel = 3, -- idle animals come over to players whose trust with them is this high
+	GreetRadius = 34, -- studs; how far a trusted player can be noticed
+	GreetStopDistance = 5, -- studs from the player a greeting animal stops
 }
 
 --------------------------------------------------------------------------------
@@ -618,8 +621,10 @@ Config.Settings = {
 	sound = { Type = "boolean", Default = true, Label = "Sound effects" },
 	reducedEffects = { Type = "boolean", Default = false, Label = "Reduced effects" },
 	tutorial = { Type = "boolean", Default = true, Label = "Show tutorial hints" },
+	tapToThrow = { Type = "boolean", Default = false, Label = "Tap to aim, tap again to throw" },
+	largeUi = { Type = "boolean", Default = false, Label = "Larger interface" },
 }
-Config.SettingsOrder = { "sound", "reducedEffects", "tutorial" }
+Config.SettingsOrder = { "sound", "reducedEffects", "tutorial", "tapToThrow", "largeUi" }
 
 -- Tutorial steps the client may report as completed (server only stores the max step).
 Config.TutorialSteps = 4

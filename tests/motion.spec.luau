@@ -82,6 +82,14 @@ return function(H)
 		for _, mode in { "wander", "sniff", "watch", "rest" } do
 			H.check(seen[mode], "never picked " .. mode)
 		end
+		H.check(not seen.greet, "greeted without a friend nearby")
+		local greets = 0
+		for i = 0, 99 do
+			if AnimalMotion.pickIdle(i / 100, "fox", true, true).mode == "greet" then
+				greets += 1
+			end
+		end
+		H.check(greets >= 20 and greets <= 40, "a friend nearby is greeted about 30% of the time")
 	end)
 
 	H.test("separation pushes overlapping animals apart, capped, and ignores distant ones", function()

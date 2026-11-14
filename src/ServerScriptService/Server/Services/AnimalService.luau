@@ -262,6 +262,29 @@ local function nearestCharacter(animal: Animal, radius: number): Vector3?
 	return bestPos
 end
 
+-- The nearest player (within GreetRadius, on this island) who has earned this species' trust.
+local function nearestFriend(animal: Animal): Vector3?
+	local bestPos: Vector3? = nil
+	local bestDist = Config.Animal.GreetRadius
+	for _, player in ipairs(Players:GetPlayers()) do
+		local character = player.Character
+		local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local profile = hrp and deps.getProfile(player)
+		if hrp and profile then
+			local level = Economy.trustLevel(Config, profile.trust[animal.species.Id] or 0)
+			local d = (flat(hrp.Position) - animal.pos).Magnitude
+			if
+				level >= Config.Animal.GreetTrustLevel
+				and d < bestDist
+				and (flat(hrp.Position) - habitatCenter(animal.habitat)).Magnitude <= animal.habitat.Radius
+			then
+				bestPos, bestDist = hrp.Position, d
+			end
+		end
+	end
+	return bestPos
+end
+
 local function think(animal: Animal, now: number)
 	if animal.model.Parent == nil or animal.root.Parent == nil or not isFinite(animal.pos) then
 		resetAnimal(animal)
@@ -330,10 +353,22 @@ local function think(animal: Animal, now: number)
 	end
 	if now >= animal.nextWander or (animal.idleMode == "wander" and not animal.moveTarget) then
 		local watchTarget = nearestCharacter(animal, WATCH_RADIUS)
-		local choice = AnimalMotion.pickIdle(random:NextNumber(), animal.species.Archetype, watchTarget ~= nil)
-		setPose(animal, choice.mode)
+		local friend = nearestFriend(animal)
+		local choice = AnimalMotion.pickIdle(random:NextNumber(), animal.species.Archetype, watchTarget ~= nil, friend ~= nil)
 		animal.lookAt = if choice.mode == "watch" then watchTarget else nil
 		animal.moveTarget = nil
+		if choice.mode == "greet" and friend then
+			-- Trot over and stop a few studs short, facing them; the next idle pick (often "watch",
+			-- since they are close) follows once it arrives.
+			setPose(animal, "wander")
+			local away = animal.pos - flat(friend)
+			local stop = if away.Magnitude > 1e-3 then away.Unit * Config.Animal.GreetStopDistance else Vector3.zero
+			animal.moveTarget = clampToIsland(animal, flat(friend) + stop)
+			animal.lookAt = friend
+			animal.nextWander = now + random:NextNumber(choice.min, choice.max)
+			return
+		end
+		setPose(animal, choice.mode)
 		if choice.mode == "wander" then
 			local angle = random:NextNumber(0, math.pi * 2)
 			local dist = random:NextNumber(0.2, 1) * animal.wanderRadius

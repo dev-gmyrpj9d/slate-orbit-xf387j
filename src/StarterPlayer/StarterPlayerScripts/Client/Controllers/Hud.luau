@@ -254,7 +254,9 @@ end
 
 local function updateScale()
 	local viewport = workspace.CurrentCamera.ViewportSize
-	local s = math.clamp(math.min(viewport.X / 1100, viewport.Y / 640), 0.6, 1.3)
+	-- "Larger interface" (Settings) scales every HUD cluster up by a fifth.
+	local large = Store.setting("largeUi") == true
+	local s = math.clamp(math.min(viewport.X / 1100, viewport.Y / 640) * (if large then 1.2 else 1), 0.6, 1.5)
 	for _, scale in ipairs(scales) do
 		scale.Scale = s
 	end
@@ -961,7 +963,7 @@ BUILDERS.Settings = function(profile)
 	end
 	local r = row(10)
 	Ui.label({
-		Text = "Controls\nMouse and keyboard: hold left click or F to aim, let go to throw. 1–6 or Q change food, X cancels. P, K, L, H, U, M, J, B and O open the tabs.\nTouch: hold the throw button, aim with the camera, let go. Tap a food to hold it.\nGamepad: hold R2 to aim, let go to throw. L1 and R1 change food, Y opens the menu, B closes it.\nWhen the arc will land in a mouth, its dots grow and “Catch” appears.",
+		Text = "Controls\nMouse and keyboard: hold left click or F to aim, let go to throw (or turn on tap to throw above). 1–6 or Q change food, X cancels. P, K, L, H, U, M, J, B and O open the tabs.\nTouch: hold the throw button, aim with the camera, let go. Tap a food to hold it.\nGamepad: hold R2 to aim, let go to throw. L1 and R1 change food, Y opens the menu, B closes it.\nWhen the arc will land in a mouth, its dots grow and “Catch” appears.",
 		TextSize = 16,
 		LayoutOrder = 1,
 		Parent = r,
@@ -1180,7 +1182,11 @@ end
 
 local function hintFor(goal: any): (string, Instance?)
 	local mode = Store.inputMode
-	local hold = if mode == "touch" then "Hold THROW" elseif mode == "gamepad" then "Hold R2" else "Hold Left Click (or F)"
+	local tap = ThrowController.tapMode()
+	local hold = if mode == "touch"
+		then (if tap then "Tap the throw button" else "Hold the throw button")
+		elseif mode == "gamepad" then (if tap then "Press R2" else "Hold R2")
+		else (if tap then "Click (or press F)" else "Hold left click (or F)")
 	local animals = workspace:FindFirstChild("WildFeastAnimals")
 	local function nearest(speciesId: string): Instance?
 		local character = player.Character
@@ -1201,7 +1207,8 @@ local function hintFor(goal: any): (string, Instance?)
 	end
 	local world = workspace:FindFirstChild(Config.World.FolderName)
 	if goal.id == "first_feed" then
-		return hold .. " to aim at the Puffhop, then let go to toss it a Sunberry.", nearest("puffhop")
+		return hold .. " to aim at the Puffhop, then " .. (if tap then "again" else "let go") .. " to toss it a Sunberry.",
+			nearest("puffhop")
 	elseif goal.id == "first_upgrade" then
 		return "Feed a few more animals, then open Upgrades" .. (if mode == "keyboard" then " (U)" else "") .. " for Strong Arm.", nil
 	elseif goal.id == "learn_clover" then
@@ -1694,6 +1701,14 @@ function Hud.init()
 	end)
 	Store.on("inputMode", applyInputMode)
 	Store.on("profile", refresh)
+	local lastLarge: boolean? = nil
+	Store.on("profile", function()
+		local large = Store.setting("largeUi") == true
+		if large ~= lastLarge then
+			lastLarge = large
+			updateScale()
+		end
+	end)
 	local lastFeastState: string? = nil
 	Store.on("feast", function()
 		-- A bell chime when the feast becomes ready or the giant surfaces; a fanfare as it leaves.
@@ -1748,11 +1763,16 @@ function Hud.init()
 		end
 		local charging = ThrowController.charging
 		local cooldown = ThrowController.cooldownRemaining()
+		local tap = ThrowController.tapMode()
 		setIfChanged(powerFrame, "Visible", charging or cooldown > 0)
 		if charging then
 			local power = ThrowController.power
 			setIfChanged(powerFill, "Size", UDim2.fromScale(power, 1))
-			setIfChanged(powerText, "Text", string.format("Power %d%%  ·  let go to throw", math.floor(power * 100 + 0.5)))
+			setIfChanged(
+				powerText,
+				"Text",
+				string.format("Power %d%%  ·  %s to throw", math.floor(power * 100 + 0.5), if tap then "tap again" else "let go")
+			)
 		elseif cooldown > 0 then
 			setIfChanged(powerFill, "Size", UDim2.fromScale(0, 1))
 			setIfChanged(powerText, "Text", string.format("Ready in %.1fs", cooldown))
@@ -1761,9 +1781,9 @@ function Hud.init()
 			throwButton,
 			"Text",
 			if charging
-				then string.format("Let go\n%d%%", math.floor(ThrowController.power * 100 + 0.5))
+				then string.format("%s\n%d%%", if tap then "Tap" else "Let go", math.floor(ThrowController.power * 100 + 0.5))
 				elseif cooldown > 0 then "Wait"
-				else "Hold to\nthrow"
+				else (if tap then "Tap to\naim" else "Hold to\nthrow")
 		)
 		local isKeyboard = Store.inputMode == "keyboard"
 		local isGamepad = Store.inputMode == "gamepad"

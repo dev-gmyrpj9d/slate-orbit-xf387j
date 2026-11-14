@@ -75,7 +75,17 @@ local function hidePreview()
 	catchGui.Enabled = false
 end
 
+-- "Tap to throw" (Settings): the first press starts aiming, the next press of the same input
+-- throws, so no button ever has to be held (Game Accessibility Guidelines: avoid holds).
+function ThrowController.tapMode(): boolean
+	return Store.setting("tapToThrow") == true
+end
+
 function ThrowController.begin(source: string)
+	if charging and source == chargeSource and ThrowController.tapMode() then
+		ThrowController.release(source, true)
+		return
+	end
 	if charging or Store.panelOpen or not Store.profile or not head() then
 		return
 	end
@@ -96,9 +106,12 @@ function ThrowController.cancel()
 	Store.emit("charge", false)
 end
 
-function ThrowController.release(source: string)
+function ThrowController.release(source: string, tapped: boolean?)
 	if not charging or source ~= chargeSource then
 		return
+	end
+	if ThrowController.tapMode() and not tapped then
+		return -- letting go of the first tap; the next tap throws
 	end
 	local profile = Store.profile
 	local power = Trajectory.chargePower(os.clock() - chargeStart, Config.Throw.ChargeTime, Config.Throw.PowerFloor, Config.Throw.PingPong)

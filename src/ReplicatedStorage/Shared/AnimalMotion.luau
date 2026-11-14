@@ -155,9 +155,13 @@ end
 export type IdleChoice = { mode: string, min: number, max: number }
 
 -- `roll` is a uniform 0..1 number. Animals mostly wander, sometimes stop to sniff the grass,
--- watch a nearby player or lie down for a rest.
-function AnimalMotion.pickIdle(roll: number, archetype: string, hasWatchTarget: boolean): IdleChoice
-	if roll < 0.5 then
+-- watch a nearby player or lie down for a rest. An animal that trusts a nearby player
+-- (`hasFriend`) often trots over to greet them instead: trust shows in behaviour, not just a
+-- number in the journal. "greet" walks like "wander" (the server sends the pose as "wander").
+function AnimalMotion.pickIdle(roll: number, archetype: string, hasWatchTarget: boolean, hasFriend: boolean?): IdleChoice
+	if hasFriend and roll < 0.3 then
+		return { mode = "greet", min = 3, max = 5 }
+	elseif roll < 0.5 then
 		return { mode = "wander", min = 2.5, max = 6 }
 	elseif roll < 0.7 then
 		return { mode = "sniff", min = 1.8, max = 3.2 }

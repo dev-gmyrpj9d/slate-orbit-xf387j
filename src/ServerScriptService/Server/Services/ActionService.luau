@@ -11,6 +11,7 @@ local Guard = require(ReplicatedStorage.Shared.Guard)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Validation = require(ReplicatedStorage.Shared.Validation)
 local RateLimiter = require(ReplicatedStorage.Shared.RateLimiter)
+local Passes = require(ReplicatedStorage.Shared.Passes)
 
 local ActionRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Action") :: RemoteEvent
 
@@ -22,6 +23,8 @@ type Deps = {
 	summon: (string, Player) -> (boolean, string),
 	resync: (Player) -> (),
 	decorChanged: (Player) -> (),
+	requestPass: (Player, string) -> (boolean, string?),
+	cosmeticsChanged: (Player) -> (),
 }
 
 local ActionService = {}
@@ -46,6 +49,11 @@ local KINDS = {
 	RemoveDecor = true,
 	UseLure = true,
 	PinFood = true,
+	-- passes (ownership is checked by Passes/PassService, never trusted from the client)
+	BuyPass = true,
+	HatchEgg = true,
+	SetCompanion = true,
+	SetTrail = true,
 }
 
 -- Repeatable purchases carry the level/stock the client was looking at (`expect`). A request
@@ -213,7 +221,39 @@ function ActionService.init(deps: Deps)
 			if not id then
 				return
 			end
+			-- `expect` is 1 if the client saw the food pinned, 0 if not: a double tap can't undo itself.
+			local pinned = if table.find(profile.pinned or {}, id) then 1 else 0
+			if not expectMatches(payload, pinned) then
+				deps.markDirty(player)
+				return
+			end
 			ok, message = Economy.tryTogglePin(Config, profile, id)
+		elseif kind == "BuyPass" then
+			local id = stringField(payload, "id")
+			if not id then
+				return
+			end
+			local _, reason = deps.requestPass(player, id)
+			if reason then
+				deps.notify(player, reason, "info")
+			end
+			return
+		elseif kind == "HatchEgg" then
+			local id = stringField(payload, "id")
+			if not id then
+				return
+			end
+			ok, message = Passes.tryHatch(Config, profile, id)
+		elseif kind == "SetCompanion" or kind == "SetTrail" then
+			local id = stringField(payload, "id")
+			if not id then
+				return
+			end
+			if kind == "SetCompanion" then
+				ok, message = Passes.trySetCompanion(Config, profile, id)
+			else
+				ok, message = Passes.trySetTrail(Config, profile, id)
+			end
 		end
 
 		if message then
@@ -223,6 +263,8 @@ function ActionService.init(deps: Deps)
 			deps.markDirty(player)
 			if kind == "PlaceDecor" or kind == "RemoveDecor" then
 				deps.decorChanged(player)
+			elseif kind == "HatchEgg" or kind == "SetCompanion" or kind == "SetTrail" then
+				deps.cosmeticsChanged(player)
 			end
 		end
 	end

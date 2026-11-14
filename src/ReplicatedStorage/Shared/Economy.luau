@@ -3,6 +3,9 @@
 -- the read-only helpers to display costs and goals. Nothing here touches Roblox services, so all
 -- rules are covered by the offline test suite.
 
+-- Lune (offline tests) has no `script`; it loads the same file by relative path.
+local Passes = if script then require(script.Parent.Passes) else (require :: any)("./Passes")
+
 local Economy = {}
 
 type Cost = { Coins: number, Research: number }
@@ -185,7 +188,7 @@ function Economy.tryUnlockFood(config: any, profile: any, foodId: string): (bool
 	-- The first batch of a new recipe is on the house.
 	profile.inventory[foodId] =
 		cap((profile.inventory[foodId] or 0) + Economy.foodBatchSize(config, profile, foodId), config.Caps.FoodStack)
-	return true, "Learned the " .. food.Name .. " recipe!"
+	return true, "Learned to make " .. food.Name .. "."
 end
 
 function Economy.tryBuyFoodBatch(config: any, profile: any, foodId: string): (boolean, string)
@@ -234,7 +237,7 @@ function Economy.tryBuyUpgrade(config: any, profile: any, upgradeId: string): (b
 	end
 	Economy.pay(profile, cost)
 	profile.upgrades[upgradeId] = Economy.upgradeLevel(profile, upgradeId) + 1
-	return true, def.Name .. " upgraded to level " .. profile.upgrades[upgradeId] .. "!"
+	return true, def.Name .. " is now level " .. profile.upgrades[upgradeId] .. "."
 end
 
 function Economy.tryUnlockHabitat(config: any, profile: any, habitatId: string): (boolean, string)
@@ -250,7 +253,7 @@ function Economy.tryUnlockHabitat(config: any, profile: any, habitatId: string):
 	end
 	Economy.pay(profile, habitat.UnlockCost)
 	profile.unlockedHabitats[habitatId] = true
-	return true, habitat.Name .. " is open! Cross the bridge to explore."
+	return true, habitat.Name .. " is open. Cross the bridge to visit."
 end
 
 function Economy.tryRestore(config: any, profile: any, habitatId: string): (boolean, string)
@@ -271,7 +274,7 @@ function Economy.tryRestore(config: any, profile: any, habitatId: string): (bool
 	Economy.pay(profile, cost)
 	local level = Economy.restorationLevel(profile, habitatId) + 1
 	profile.restoration[habitatId] = level
-	return true, habitat.Restoration[level].Name .. " complete!"
+	return true, habitat.Restoration[level].Name .. ": done."
 end
 
 --------------------------------------------------------------------------------
@@ -640,8 +643,9 @@ function Economy.tryTogglePin(config: any, profile: any, foodId: string): (boole
 	if not profile.unlockedFoods[foodId] then
 		return false, "Learn or cook " .. food.Name .. " first."
 	end
-	if #profile.pinned >= config.FoodBar.MaxPinned then
-		return false, string.format("You can pin up to %d foods. Unpin one first.", config.FoodBar.MaxPinned)
+	local max = Passes.maxPinned(config, profile)
+	if #profile.pinned >= max then
+		return false, string.format("Your bar holds %d pinned foods. Unpin one first.", max)
 	end
 	table.insert(profile.pinned, foodId)
 	return true, food.Name .. " pinned to the food bar."
@@ -727,13 +731,13 @@ function Economy.tryCook(config: any, profile: any, recipeId: string): (boolean,
 	if output.Food then
 		profile.unlockedFoods[output.Food] = true
 		profile.inventory[output.Food] = cap((profile.inventory[output.Food] or 0) + amount, config.Caps.FoodStack)
-		made = string.format("Cooked %d %s!", amount, config.Foods[output.Food].Name)
+		made = string.format("Cooked %d %s.", amount, config.Foods[output.Food].Name)
 	elseif output.Lure then
 		profile.lures[output.Lure] = math.min((profile.lures[output.Lure] or 0) + amount, config.Visitors.MaxLures)
 		made = string.format("Made a %s. Use it from the Journal to call one.", recipe.Name)
 	else
 		profile.decorOwned[output.Decoration] = math.min((profile.decorOwned[output.Decoration] or 0) + amount, config.Decor.MaxOwnedEach)
-		made = string.format("Crafted a %s! Place it from the Decor tab.", config.Decorations[output.Decoration].Name)
+		made = string.format("Made a %s. Place it from the Decor tab.", config.Decorations[output.Decoration].Name)
 	end
 	profile.cooked[recipeId] = cap((profile.cooked[recipeId] or 0) + 1, config.Caps.Counter)
 	profile.stats.mealsCooked = cap((profile.stats.mealsCooked or 0) + 1, config.Caps.Counter)
@@ -857,7 +861,7 @@ function Economy.tryBuyDecoration(config: any, profile: any, decorationId: strin
 	end
 	Economy.pay(profile, deco.Cost)
 	profile.decorOwned[decorationId] = (profile.decorOwned[decorationId] or 0) + 1
-	return true, "Bought a " .. deco.Name .. "! Place it from the Decor tab."
+	return true, "Bought a " .. deco.Name .. ". Place it from the Decor tab."
 end
 
 -- Places an owned decoration on plot `slot` of its own island. An occupied plot is swapped (the
@@ -1061,7 +1065,7 @@ function Economy.tryClaimQuest(config: any, profile: any, questId: string): (boo
 		profile.decorOwned[reward.Decoration] = math.min((profile.decorOwned[reward.Decoration] or 0) + 1, config.Decor.MaxOwnedEach)
 		table.insert(extras, config.Decorations[reward.Decoration].Name)
 	end
-	local text = string.format("Quest complete: %s! +%d coins", quest.Name, coins)
+	local text = string.format("%s done: +%d coins", quest.Name, coins)
 	if research > 0 then
 		text ..= string.format(", +%d research", research)
 	end

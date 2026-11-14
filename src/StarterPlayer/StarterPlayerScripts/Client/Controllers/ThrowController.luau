@@ -35,6 +35,12 @@ raycastParams.FilterType = Enum.RaycastFilterType.Include
 
 ThrowController.power = 0
 ThrowController.charging = false
+ThrowController.source = "" -- input that is charging: "mouse" | "key" | "gamepad" | "touch"
+-- What the current arc will do, for the throw meter: the species whose mouth it passes, or how
+-- far away it lands (nil when the landing is beyond the preview).
+ThrowController.target = nil :: string?
+ThrowController.distance = nil :: number?
+ThrowController.cooldownTotal = 0
 
 local function head(): Vector3?
 	local character = player.Character
@@ -75,12 +81,23 @@ local function hidePreview()
 	catchGui.Enabled = false
 end
 
+-- "Tap to throw" (Settings): the first press starts aiming, the next press of the same input
+-- throws, so no button ever has to be held (Game Accessibility Guidelines: avoid holds).
+function ThrowController.tapMode(): boolean
+	return Store.setting("tapToThrow") == true
+end
+
 function ThrowController.begin(source: string)
+	if charging and source == chargeSource and ThrowController.tapMode() then
+		ThrowController.release(source, true)
+		return
+	end
 	if charging or Store.panelOpen or not Store.profile or not head() then
 		return
 	end
 	charging = true
 	chargeSource = source
+	ThrowController.source = source
 	chargeStart = os.clock()
 	ThrowController.charging = true
 	Store.emit("charge", true)
@@ -96,9 +113,12 @@ function ThrowController.cancel()
 	Store.emit("charge", false)
 end
 
-function ThrowController.release(source: string)
+function ThrowController.release(source: string, tapped: boolean?)
 	if not charging or source ~= chargeSource then
 		return
+	end
+	if ThrowController.tapMode() and not tapped then
+		return -- letting go of the first tap; the next tap throws
 	end
 	local profile = Store.profile
 	local power = Trajectory.chargePower(os.clock() - chargeStart, Config.Throw.ChargeTime, Config.Throw.PowerFloor, Config.Throw.PingPong)
@@ -117,7 +137,9 @@ function ThrowController.release(source: string)
 		Store.emit("toast", "Out of " .. Config.Foods[foodId].Name .. ". Prepare more in the Pantry, or use free Sunberries.", "warn")
 		return
 	end
-	cooldownUntil = os.clock() + Economy.throwCooldown(Config, profile)
+	ThrowController.cooldownTotal = Economy.throwCooldown(Config, profile)
+	cooldownUntil = os.clock() + ThrowController.cooldownTotal
+	Store.emit("thrown", power)
 	-- The head position is sent so the server launches from where this client previewed the arc
 	-- (its own copy of a moving character lags); the server only accepts it within a few studs.
 	ThrowRemote:FireServer(foodId, direction, power, origin)
@@ -152,6 +174,7 @@ local function updatePreview()
 		end
 	end
 	local catchTarget: BasePart? = nil
+	local catchName: string? = nil
 	local animals = workspace:FindFirstChild("WildFeastAnimals")
 	if animals then
 		for _, model in ipairs(animals:GetChildren()) do
@@ -161,11 +184,20 @@ local function updatePreview()
 			if root and typeof(offset) == "Vector3" and (state == "Idle" or state == "Anticipate" or state == "Approach") then
 				local mouth = root.CFrame * offset
 				if (mouth - start).Magnitude < 160 then
+					-- Same catch test as the server (FeedingService): mouth radius, anticipation,
+					-- the Mouth Reading upgrades for this archetype, plus the food's own radius.
+					local species = Config.Species[model:GetAttribute("Species") :: any]
+					local bonusPct = if species and Store.profile
+						then Economy.modifier(Config, Store.profile, "catchArchetype", species.Archetype)
+						else 0
 					local radius = (model:GetAttribute("CatchRadius") :: number? or 2)
-						* (if state == "Anticipate" then Config.Animal.AnticipateCatchBonus else 1)
+							* (if state == "Anticipate" then Config.Animal.AnticipateCatchBonus else 1)
+							* (1 + math.min(bonusPct, Config.Bonus.MaxCatchPct) / 100)
+						+ Config.Throw.ProjectileRadius
 					for i = 2, visibleCount do
 						if Trajectory.distanceToSegment(points[i - 1], points[i], mouth) <= radius then
 							catchTarget = root
+							catchName = if species then species.Name else nil
 							break
 						end
 					end
@@ -196,6 +228,8 @@ local function updatePreview()
 	else
 		marker.Transparency = 1
 	end
+	ThrowController.target = catchName
+	ThrowController.distance = if landed then Vector3.new(landed.X - origin.X, 0, landed.Z - origin.Z).Magnitude else nil
 	catchGui.Adornee = catchTarget :: any
 	catchGui.Enabled = catchTarget ~= nil
 end
@@ -265,7 +299,7 @@ function ThrowController.init()
 		Ui.new("TextLabel", {
 			Size = UDim2.fromScale(1, 1),
 			BackgroundTransparency = 1,
-			Text = "◎ CATCH!",
+			Text = "◎ Catch",
 			TextScaled = true,
 			FontFace = Ui.TitleFont,
 			TextColor3 = Color3.fromRGB(255, 240, 120),

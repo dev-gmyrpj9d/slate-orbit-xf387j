@@ -49,6 +49,8 @@ local shuttingDown = false
 -- would then strip the new session's lock and push it into unsaved mode.
 local releasing: { [string]: boolean } = {}
 -- Number of loads currently running (BindToClose waits for them so their locks are released).
+-- Keys with a load in progress on this server (see onPlayerAdded).
+local loading: { [string]: boolean } = {}
 local loadsInFlight = 0
 
 local function deepCopy(value: any): any
@@ -263,15 +265,18 @@ local function onPlayerAdded(player: Player)
 	end
 	local record: any, reason: string? = nil, nil
 	local deadline = os.clock() + Config.Data.ReleaseWait
-	while releasing[key] and os.clock() < deadline and player:IsDescendantOf(Players) do
+	-- Wait out both a final save and an earlier load of the same key still running here: two
+	-- loads at once would both see the lock as ours, and the stale one would release it.
+	while (releasing[key] or loading[key]) and os.clock() < deadline and player:IsDescendantOf(Players) do
 		task.wait(0.1)
 	end
-	if releasing[key] then
+	if releasing[key] or loading[key] then
 		reason = "previous_session_still_saving"
 	else
 		-- Counted until the lock is either handed to a session or released again, so BindToClose
 		-- keeps the server alive for both steps.
 		loadsInFlight += 1
+		loading[key] = true
 		local ok, loadedRecord, loadReason = pcall(loadRecord, key)
 		if ok then
 			record, reason = loadedRecord, loadReason
@@ -285,6 +290,7 @@ local function onPlayerAdded(player: Player)
 			releaseLockOnly(key)
 			releasing[key] = nil
 		end
+		loading[key] = nil
 		loadsInFlight -= 1
 	end
 	if not player:IsDescendantOf(Players) or shuttingDown then

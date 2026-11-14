@@ -10,7 +10,10 @@ local Effects = require(Controllers:WaitForChild("Effects"))
 local ThrowController = require(Controllers:WaitForChild("ThrowController"))
 local WorldVisuals = require(Controllers:WaitForChild("WorldVisuals"))
 local AnimalAnimator = require(Controllers:WaitForChild("AnimalAnimator"))
+local Companions = require(Controllers:WaitForChild("Companions"))
 local Hud = require(Controllers:WaitForChild("Hud"))
+local ThrowPose = require(Controllers:WaitForChild("ThrowPose"))
+local Discovery = require(Controllers:WaitForChild("Discovery"))
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local StateRemote = Remotes:WaitForChild("State") :: RemoteEvent
@@ -23,6 +26,9 @@ Effects.init()
 ThrowController.init()
 Hud.init()
 AnimalAnimator.init()
+Companions.init()
+ThrowPose.init()
+Discovery.init()
 task.spawn(WorldVisuals.init)
 
 -- The server sends one full snapshot and then numbered deltas. A delta that doesn't follow the

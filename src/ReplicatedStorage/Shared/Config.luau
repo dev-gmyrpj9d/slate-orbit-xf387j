@@ -6,7 +6,7 @@
 
 local Config = {}
 
-Config.Version = "1.1.0"
+Config.Version = "1.2.0"
 
 --------------------------------------------------------------------------------
 -- Persistence
@@ -14,7 +14,7 @@ Config.Version = "1.1.0"
 Config.Data = {
 	StoreName = "WildFeastIslands_Profiles_v1",
 	KeyPrefix = "player_",
-	SchemaVersion = 3, -- v3 adds kitchen, lures, quests, decorations and the pinned food bar
+	SchemaVersion = 4, -- v3 adds kitchen, lures, quests, decorations and the pinned food bar; v4 passes + cosmetics
 	LoadRetries = 4, -- bounded attempts per load
 	SaveRetries = 3, -- bounded attempts per save
 	RetryBaseDelay = 1.5, -- seconds, doubled per attempt
@@ -72,9 +72,9 @@ Config.Throw = {
 -- Feeding quality & reward tuning
 --------------------------------------------------------------------------------
 Config.Quality = {
-	Perfect = { Id = "Perfect", Label = "Perfect catch!", Multiplier = 2.0, Icon = "★" },
-	Good = { Id = "Good", Label = "Nice toss!", Multiplier = 1.35, Icon = "✓" },
-	Ground = { Id = "Ground", Label = "Found it!", Multiplier = 1.0, Icon = "•" },
+	Perfect = { Id = "Perfect", Label = "Clean catch", Multiplier = 2.0, Icon = "★" },
+	Good = { Id = "Good", Label = "Good throw", Multiplier = 1.35, Icon = "✓" },
+	Ground = { Id = "Ground", Label = "Found on the ground", Multiplier = 1.0, Icon = "•" },
 }
 
 Config.Preference = {
@@ -462,6 +462,9 @@ Config.Animal = {
 	ReachInset = 1.5, -- animals chasing food may walk to within this of the grass edge
 	EatDistance = 2.6,
 	FirstSpawnOffset = { 0, -16 }, -- a tutorial Puffhop waits this far from the spawn (x, z)
+	GreetTrustLevel = 3, -- idle animals come over to players whose trust with them is this high
+	GreetRadius = 34, -- studs; how far a trusted player can be noticed
+	GreetStopDistance = 5, -- studs from the player a greeting animal stops
 }
 
 --------------------------------------------------------------------------------
@@ -618,8 +621,10 @@ Config.Settings = {
 	sound = { Type = "boolean", Default = true, Label = "Sound effects" },
 	reducedEffects = { Type = "boolean", Default = false, Label = "Reduced effects" },
 	tutorial = { Type = "boolean", Default = true, Label = "Show tutorial hints" },
+	tapToThrow = { Type = "boolean", Default = false, Label = "Tap to aim, tap again to throw" },
+	largeUi = { Type = "boolean", Default = false, Label = "Larger interface" },
 }
-Config.SettingsOrder = { "sound", "reducedEffects", "tutorial" }
+Config.SettingsOrder = { "sound", "reducedEffects", "tutorial", "tapToThrow", "largeUi" }
 
 -- Tutorial steps the client may report as completed (server only stores the max step).
 Config.TutorialSteps = 4
@@ -777,6 +782,96 @@ Config.Bonus = {
 Config.FoodBar = {
 	Slots = 6, -- food buttons on the HUD bar (keys 1-6)
 	MaxPinned = 4, -- foods a player can pin to the bar
+}
+
+--------------------------------------------------------------------------------
+-- Optional passes. Every gameplay system stays free; passes add a companion, cosmetics or a
+-- small convenience and never change coins, research, trust or catch rules.
+--
+-- PassId is the numeric pass ID from Creator Hub > Monetization > Passes ("Copy Asset ID").
+-- 0 means "not configured": the Shop shows the pass as unavailable and the server refuses to
+-- prompt it. Prices are never stored here; the Shop reads the live price from Roblox.
+--------------------------------------------------------------------------------
+export type PassDef = {
+	Id: string,
+	Order: number,
+	PassId: number,
+	Name: string,
+	Kind: string, -- "companion" | "cosmetic" | "convenience"
+	Summary: string, -- one line under the name
+	Details: { string }, -- what exactly you get, shown before purchase
+	Companion: string?, -- companion id the egg always hatches
+	Trails: { string }?, -- trail ids unlocked
+	ExtraPins: number?, -- extra food bar pins
+}
+
+Config.Passes = {
+	lantern_egg = {
+		Id = "lantern_egg",
+		Order = 1,
+		PassId = 0,
+		Name = "Lantern Egg",
+		Kind = "companion",
+		Summary = "Hatches a Lanternkit that follows you around the islands.",
+		Details = {
+			"Always hatches a Lanternkit. There is no random outcome.",
+			"Hatch it once from the Shop, then show or hide it whenever you like.",
+			"Other players can see it. It doesn't change coins, research or catches.",
+		},
+		Companion = "lanternkit",
+	},
+	painters_kit = {
+		Id = "painters_kit",
+		Order = 2,
+		PassId = 0,
+		Name = "Painter's Kit",
+		Kind = "cosmetic",
+		Summary = "Three trails for the food you throw.",
+		Details = {
+			"Unlocks the Ribbon, Petal and Ink Line trails.",
+			"Pick one in the Shop. Everyone nearby sees it on your throws.",
+			"Cosmetic only. Throw range and accuracy are unchanged.",
+		},
+		Trails = { "ribbon", "petal", "inkline" },
+	},
+	field_satchel = {
+		Id = "field_satchel",
+		Order = 3,
+		PassId = 0,
+		Name = "Field Satchel",
+		Kind = "convenience",
+		Summary = "Pin two more foods to your food bar.",
+		Details = {
+			"Raises the pin limit from 4 to 6.",
+			"Every food is still in the Pantry for everyone; this only saves taps.",
+		},
+		ExtraPins = 2,
+	},
+} :: { [string]: PassDef }
+Config.PassOrder = { "lantern_egg", "painters_kit", "field_satchel" }
+
+Config.Companions = {
+	lanternkit = {
+		Id = "lanternkit",
+		Name = "Lanternkit",
+		Description = "A small fox-like kit with a paper lantern tail. It trots after you and perks up when you feed someone.",
+		Fur = { 214, 120, 72 },
+		Belly = { 246, 226, 196 },
+		Lantern = { 250, 196, 104 },
+		Ink = { 46, 40, 36 },
+	},
+}
+
+Config.Trails = {
+	ribbon = { Id = "ribbon", Name = "Ribbon", Colors = { { 200, 92, 64 }, { 236, 188, 120 } }, Width = 1, Lifetime = 0.4 },
+	petal = { Id = "petal", Name = "Petal", Colors = { { 236, 170, 180 }, { 250, 236, 220 } }, Width = 0.7, Lifetime = 0.55 },
+	inkline = { Id = "inkline", Name = "Ink Line", Colors = { { 46, 52, 60 }, { 46, 52, 60 } }, Width = 0.35, Lifetime = 0.7 },
+}
+
+Config.Shop = {
+	OwnershipRetries = 3, -- bounded ownership checks with Roblox per pass at join
+	CompanionRenderDistance = 160, -- clients only draw companions this close to the camera
+	MaxCompanionsDrawn = 12,
 }
 
 return Config

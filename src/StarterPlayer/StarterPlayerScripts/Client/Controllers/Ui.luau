@@ -1,23 +1,33 @@
 --!strict
 -- Tiny declarative helpers for building the HUD from code (no external UI assets).
+--
+-- Look: "island field notes" (docs/ART_DIRECTION.md). Flat unbleached-paper panels, ink text,
+-- moss for actions, clay for emphasis, tide blue for information. No gradients, glows or emoji;
+-- state is always spelled out in words, with colour only as a second cue. Text colours are
+-- picked for at least 4.5:1 contrast against the surface they sit on.
 
 local Ui = {}
 
-Ui.TitleFont = Font.fromEnum(Enum.Font.FredokaOne)
-Ui.BodyFont = Font.fromEnum(Enum.Font.GothamMedium)
-Ui.BoldFont = Font.fromEnum(Enum.Font.GothamBold)
+local BUILDER_SANS = "rbxasset://fonts/families/BuilderSans.json"
+Ui.TitleFont = Font.new(BUILDER_SANS, Enum.FontWeight.Bold)
+Ui.BodyFont = Font.new(BUILDER_SANS, Enum.FontWeight.Medium)
+Ui.BoldFont = Font.new(BUILDER_SANS, Enum.FontWeight.SemiBold)
 
 Ui.Colors = {
-	Panel = Color3.fromRGB(255, 250, 240),
-	PanelDark = Color3.fromRGB(60, 70, 100),
-	Ink = Color3.fromRGB(45, 50, 70),
-	Muted = Color3.fromRGB(110, 115, 135),
-	Primary = Color3.fromRGB(255, 170, 60),
-	Good = Color3.fromRGB(80, 190, 110),
-	Warn = Color3.fromRGB(240, 150, 60),
-	Bad = Color3.fromRGB(220, 90, 90),
-	Info = Color3.fromRGB(90, 160, 230),
-	Disabled = Color3.fromRGB(190, 190, 200),
+	Panel = Color3.fromRGB(244, 237, 224), -- paper
+	Card = Color3.fromRGB(252, 248, 240), -- a lighter sheet on the paper
+	PanelDark = Color3.fromRGB(38, 52, 48), -- deep ink green (HUD chips, side menu)
+	Ink = Color3.fromRGB(40, 36, 32),
+	Muted = Color3.fromRGB(98, 92, 82),
+	Primary = Color3.fromRGB(70, 112, 68), -- moss: the action colour
+	Accent = Color3.fromRGB(176, 84, 52), -- clay: selection and emphasis
+	Good = Color3.fromRGB(56, 120, 80),
+	Warn = Color3.fromRGB(150, 92, 24),
+	Bad = Color3.fromRGB(160, 58, 48),
+	Info = Color3.fromRGB(42, 92, 114), -- tide
+	Disabled = Color3.fromRGB(214, 207, 194),
+	DisabledInk = Color3.fromRGB(92, 86, 76),
+	Rule = Color3.fromRGB(196, 186, 168), -- hairlines and strokes
 	White = Color3.fromRGB(255, 255, 255),
 }
 
@@ -101,14 +111,15 @@ function Ui.label(props: { [string]: any }): TextLabel
 	return Ui.new("TextLabel", defaults)
 end
 
--- Buttons are at least 48px tall before scaling to remain comfortable touch targets.
+-- Buttons are at least 48px tall before scaling to remain comfortable touch targets. Disabled
+-- buttons switch to dark text on a pale fill so their label stays readable.
 function Ui.button(props: { [string]: any }, enabled: boolean?): TextButton
 	local isEnabled = enabled ~= false
 	local defaults: { [string]: any } = {
 		BackgroundColor3 = if isEnabled then Ui.Colors.Primary else Ui.Colors.Disabled,
 		FontFace = Ui.TitleFont,
-		TextColor3 = Ui.Colors.White,
-		TextSize = 20,
+		TextColor3 = if isEnabled then Ui.Colors.White else Ui.Colors.DisabledInk,
+		TextSize = 19,
 		TextWrapped = true,
 		AutoButtonColor = isEnabled,
 		Size = UDim2.new(0, 200, 0, 52),
@@ -116,12 +127,16 @@ function Ui.button(props: { [string]: any }, enabled: boolean?): TextButton
 	for key, value in pairs(props) do
 		defaults[key] = value
 	end
+	if not isEnabled then
+		defaults.BackgroundColor3 = Ui.Colors.Disabled
+		defaults.TextColor3 = Ui.Colors.DisabledInk
+	end
 	local button = Ui.new("TextButton", defaults, {
-		Ui.corner(12),
+		Ui.corner(8),
 		Ui.new("UIStroke", {
-			Color = Color3.fromRGB(40, 40, 60),
-			Thickness = 2,
-			Transparency = 0.6,
+			Color = Ui.Colors.Ink,
+			Thickness = 1.5,
+			Transparency = 0.75,
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 		}),
 		Ui.new("UITextSizeConstraint", { MaxTextSize = defaults.TextSize, MinTextSize = 12 }),

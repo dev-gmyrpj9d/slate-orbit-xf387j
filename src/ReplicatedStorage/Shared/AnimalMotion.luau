@@ -18,6 +18,12 @@ AnimalMotion.PARTS = {
 	Antenna = { role = "ear", parent = "Head" },
 	Stalk = { role = "ear", parent = "Head" },
 	EarInner = { parent = "Ear" },
+	EarTip = { parent = "Ear" }, -- dark tips ride on the ear, so they move with it
+	WingSpot = { parent = "Wing" }, -- moth eye-spots flap with their wing
+	WingTip = { parent = "Wing" }, -- bird flight-feather tips flap with their wing
+	PincerTip = { parent = "Claw" }, -- crab pincer tips snap with the claw
+	Throat = { parent = "Head" }, -- frog throat moves with the head
+	Glow = { parent = "Antenna" }, -- the lure bead rides on its stalk
 	Eye = { parent = "Head" },
 	Shine = { parent = "Eye" },
 	EyeBall = { parent = "Stalk" },
@@ -124,6 +130,9 @@ function AnimalMotion.jointAngles(role: string, side: number, front: boolean, p:
 			return sin(t * 12 + (if side > 0 then 0 else math.pi)) * 0.4 - 0.2, 0, 0
 		elseif state == "Refuse" then
 			return 0, s * 0.35, 0
+		elseif state == "Idle" and p.pose == "watch" then
+			-- Personality: a watching crab raises its claws and waves them, out of step.
+			return -0.35 + sin(t * 4 + side * 1.3) * 0.3, 0, 0
 		end
 		return sin(t * 2.5 + side) * 0.08, 0, 0
 	elseif role == "head" then
@@ -135,12 +144,20 @@ function AnimalMotion.jointAngles(role: string, side: number, front: boolean, p:
 			return 0.1, 0, sin(t * 7) * 0.16
 		elseif state == "Anticipate" then
 			return 0.12, p.lookYaw, sin(t * 4) * 0.06
+		elseif p.pose == "sniff" and p.archetype == "bird" then
+			-- Personality: birds peck at the ground in quick jabs instead of a slow sniff.
+			local jab = math.max(0, sin(t * 6)) ^ 6
+			return -0.15 - 0.75 * jab, sin(t * 1.1) * 0.15, 0
 		elseif p.pose == "sniff" then
 			return -0.28 + sin(t * 9) * 0.04, sin(t * 1.3) * 0.2, 0
 		elseif p.pose == "rest" then
 			return -0.12, sin(t * 0.5) * 0.1, 0.12
 		elseif p.pose == "watch" then
 			return 0.05, p.lookYaw, sin(t * 0.8) * 0.08
+		end
+		if p.archetype == "tortoise" then
+			-- Personality: a tortoise looks around slowly and deliberately.
+			return 0.05, sin(t * 0.3) * 0.28 + p.lookYaw * 0.5, 0
 		end
 		return 0, sin(t * 0.6) * 0.2 + p.lookYaw * 0.5, 0
 	elseif role == "fin" then
@@ -150,14 +167,93 @@ function AnimalMotion.jointAngles(role: string, side: number, front: boolean, p:
 end
 
 --------------------------------------------------------------------------------
+-- Body motion: what the server replicates vs. what each client adds locally
+--------------------------------------------------------------------------------
+-- The server writes an animal's root CFrame only when it changes by more than WriteEpsilon, so a
+-- resting or sniffing animal stops replicating every frame. Gameplay-visible motion (walking
+-- gaits, the anticipation hop, the happy spin, the refusal shake) stays on the server in
+-- `bodyMotion`; the small stationary bobs live in `idleBob`, which each client applies on top.
+
+AnimalMotion.WriteEpsilon = 0.002 -- studs / radians
+
+-- Offsets (dy, extraYaw, pitch, roll) the server bakes into the root. `happyProgress` is 0..1
+-- through the Happy state.
+function AnimalMotion.bodyMotion(
+	state: string,
+	archetype: string,
+	moving: boolean,
+	t: number,
+	happyProgress: number
+): (number, number, number, number)
+	if moving then
+		if archetype == "hopper" then
+			return math.abs(sin(t * 10)) * 0.9, 0, 0, 0
+		elseif archetype == "bird" then
+			return 0, 0, 0, sin(t * 9) * 0.14
+		elseif archetype == "crab" then
+			return math.abs(sin(t * 14)) * 0.15, 0, 0, sin(t * 14) * 0.06
+		end
+		return math.abs(sin(t * 8)) * 0.25, 0, 0, 0
+	elseif state == "Anticipate" then
+		return math.abs(sin(t * 6)) * 0.5, 0, 0.1, 0
+	elseif state == "Eat" then
+		return 0, 0, -0.12, 0 -- leaning in; the chewing nod is client-side (idleBob)
+	elseif state == "Happy" then
+		return math.abs(sin(t * 9)) * 1.2, happyProgress * math.pi * 2, 0, 0
+	elseif state == "Refuse" then
+		return 0, sin(t * 20) * 0.35, 0, 0
+	end
+	return 0, 0, 0, 0
+end
+
+-- Cosmetic (dy, pitch) a client adds to a stationary animal: breathing, sniffing, chewing.
+-- Never replicated, never used by gameplay. Amplitudes match the old server-side bob.
+-- `archetype` (optional) adds family personality on top: moths hover-bob while idle.
+function AnimalMotion.idleBob(state: string, pose: string?, t: number, archetype: string?): (number, number)
+	if archetype == "moth" and state == "Idle" then
+		local dy, pitch = AnimalMotion.idleBob(state, pose, t)
+		return dy + sin(t * 2.6) * 0.15, pitch + sin(t * 2.6 + 1) * 0.04
+	end
+	if state == "Eat" then
+		return 0, sin(t * 16) * 0.08
+	elseif state == "Anticipate" or state == "Happy" or state == "Refuse" then
+		return 0, 0 -- the server already moves the body for these
+	elseif pose == "rest" then
+		return sin(t * 1.2) * 0.04, 0
+	elseif pose == "sniff" then
+		return sin(t * 2) * 0.05, -0.06
+	end
+	return sin(t * 2) * 0.08, 0
+end
+
+-- True when a root pose { x, y, z, yaw, pitch, roll } differs from the last written one enough
+-- to be worth replicating.
+function AnimalMotion.needsWrite(last: { number }?, pose: { number }, epsilon: number?): boolean
+	if not last then
+		return true
+	end
+	local eps = epsilon or AnimalMotion.WriteEpsilon
+	for i = 1, 6 do
+		if math.abs(pose[i] - last[i]) > eps then
+			return true
+		end
+	end
+	return false
+end
+
+--------------------------------------------------------------------------------
 -- Idle behaviour (server)
 --------------------------------------------------------------------------------
 export type IdleChoice = { mode: string, min: number, max: number }
 
 -- `roll` is a uniform 0..1 number. Animals mostly wander, sometimes stop to sniff the grass,
--- watch a nearby player or lie down for a rest.
-function AnimalMotion.pickIdle(roll: number, archetype: string, hasWatchTarget: boolean): IdleChoice
-	if roll < 0.5 then
+-- watch a nearby player or lie down for a rest. An animal that trusts a nearby player
+-- (`hasFriend`) often trots over to greet them instead: trust shows in behaviour, not just a
+-- number in the journal. "greet" walks like "wander" (the server sends the pose as "wander").
+function AnimalMotion.pickIdle(roll: number, archetype: string, hasWatchTarget: boolean, hasFriend: boolean?): IdleChoice
+	if hasFriend and roll < 0.3 then
+		return { mode = "greet", min = 3, max = 5 }
+	elseif roll < 0.5 then
 		return { mode = "wander", min = 2.5, max = 6 }
 	elseif roll < 0.7 then
 		return { mode = "sniff", min = 1.8, max = 3.2 }

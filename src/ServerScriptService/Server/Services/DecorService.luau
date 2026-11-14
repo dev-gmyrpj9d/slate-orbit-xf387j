@@ -128,10 +128,13 @@ function DecorService.sync(player: Player)
 			end
 		end
 	end
-	local current = shown[player] or {}
-	if not any and next(current) == nil then
+	if not any then
+		-- Nothing to show: clear any models, give the lane to whoever waited longest and stop
+		-- waiting ourselves (a waiter with an empty garden would otherwise be handed the lane).
+		release(player)
 		return
 	end
+	local current = shown[player] or {}
 	local lane = assignLane(player)
 	if not lane then
 		if not waitingSince[player] then

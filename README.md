@@ -7,18 +7,60 @@ Source and build tooling for the Roblox place **Wild Feast Islands**.
 | `place/WildFeastIslands.original.rbxl` | The untouched uploaded place (md5 `c631449a540d771a2813b7ab8df8acef`). Never edited. |
 | `src/` | Every script in the place, Rojo layout (`X.luau` ModuleScript, `X.server.luau` Script, `X.client.luau` LocalScript), mirroring the instance tree. |
 | `build/WildFeastIslands.rbxl` | The playable place: the original plus `src/` plus `tools/scene.luau`. Open this in Studio. |
-| `tools/` | Lune scripts: `extract`, `build`, `roundtrip` (proves no original instance was lost), `sourcemap`, `check.sh`. |
+| `tools/` | Lune scripts: `extract`, `build`, `roundtrip` (proves no original instance was lost), `sourcemap`, `mapview` (top-down SVG of the built place), `check.sh`. |
 | `tests/` | Offline Lune tests (`lune run tests/run.luau`). |
 
 Tools are pinned in `mise.toml` (`mise install`). `tools/check.sh` runs StyLua, the tests, the build, the round-trip check and a strict `luau-lsp analyze` with Roblox definitions.
 
-To go back to the original, open `place/WildFeastIslands.original.rbxl`, or run `git checkout 611111d -- src` and rebuild.
+To go back to the original, open `place/WildFeastIslands.original.rbxl`. To go back to the first pass, run `git checkout a4246c5 -- src` and rebuild.
 
-## Gamepasses
+## Passes
 
-I searched every script in the place for `MarketplaceService`, `UserOwnsGamePass`, `PromptGamePassPurchase`, `PromptProductPurchase`, `ProcessReceipt` and any gamepass, VIP or premium checks. None exist. The only purchases spend in-game coins and research, so all features are already free to every player and no code needed changing. `tests/monetization.spec.luau` fails if a gamepass gate or purchase prompt is ever added. Marketplace settings on roblox.com were not touched. Any gamepasses listed on the game page don't grant anything in game.
+Earlier passes found no gamepasses in the original place. There is now a small optional lineup: the Lantern Egg (always hatches a Lanternkit companion), the Painter's Kit (throw trails) and the Field Satchel (+2 food bar pins). Ownership is checked on the server, prices come from Roblox, and buying stays disabled until real pass IDs go into `Config.Passes`. Design, configuration steps and Studio checks are in [`docs/MONETIZATION.md`](docs/MONETIZATION.md).
 
-## Improvements in this pass
+## Fifth pass (this branch)
+
+- **Fixes:**
+  - Visitor features now sit on the head or back each body plan actually builds; 18 parts on 11 visitors used to float or be buried.
+  - Fox tails are raised to meet their glowing tips.
+  - The snail spiral is now visible.
+- **New details:** bird wing tips and tail fan, tortoise scutes, otter tail rudder, crab pincer tips, frog throat and stripe, moth collar and antennae.
+- **Personality motion:** birds peck, tortoises look slowly, crabs wave, moths hover.
+- **Safer sound cues:** tunes can't stack, notes respect the Sound setting, and the shore loop starts once.
+- **Tests:** `tests/silhouette.spec.luau` checks all 106 species. Details are in the [audit](docs/AUDIT.md#fifth-pass).
+
+## Fourth pass
+
+- **Sound fix:** four engine sound files the game used are no longer shipped by the client, so most cues were likely silent. Every cue now uses a verified file (`Shared/EngineSounds`, enforced by a test). Chimes and fanfares are short pitched note sequences.
+- **Shore ambience:** surf near the shoreline.
+- **Silhouettes:** dark ear tips, pale bellies and chests, and a boar back ridge.
+- **Animation:** anticipating animals watch the incoming food.
+- Details are in the [audit](docs/AUDIT.md#fourth-pass). `tools/profileview.luau` renders animal side profiles.
+
+## Third pass
+
+Built from the owner's eight screenshots. The per-image analysis, what was observed versus inferred, and what was deliberately *not* copied are in [`docs/SCREENSHOT_ANALYSIS.md`](docs/SCREENSHOT_ANALYSIS.md). The licensed image references are in [`docs/ART_DIRECTION.md`](docs/ART_DIRECTION.md#image-references).
+
+- **Throw meter.** A segmented gauge beside the aim point, not over it. It shows the predicted outcome in words ("Catch: Puffhop", "Lands 24 studs away") and names the actual input ("Release R2 to throw"). The goal card and hint step aside while you aim.
+- **Throw feel.** The arm cocks back with power, whips over and follows through, and everyone sees it. Your own throws show a landing ring that closes in as the food falls.
+- **Discovery.** A journal-plate card for each new animal or favourite: side-profile animal, silhouette first, the name written in. Arriving on an island shows a banner with your tally there.
+- **World.**
+  - Stepping-stone paths from the spawn to both bridges and the Feast Cove pier, signposts that point the way, and zig-zag bridge lanterns.
+  - Tidier world labels.
+  - Placement is checked against the built place, and `tools/mapview.luau` renders a top-down map.
+- **Network.** Resting animals no longer replicate every frame. The idle bob moved to the client (see the [audit](docs/AUDIT.md#third-pass)).
+
+## Second pass
+
+- **Audit:** [`docs/AUDIT.md`](docs/AUDIT.md). Five defects fixed: rejoin lock race, free lure extension, decor lane stall, pin double-toggle, catch hint radius.
+- **Art direction and references:** [`docs/ART_DIRECTION.md`](docs/ART_DIRECTION.md). New palette and font (Builder Sans). Emoji, ALL CAPS and "!" hype removed from player-facing text. Every text colour pair is at least 4.5:1 contrast.
+- **New features:**
+  - Shop tab with 3D companion previews.
+  - Client-drawn companions that follow their owner.
+  - Trusted animals come over to greet you.
+  - Two settings: *Tap to aim, tap again to throw* and *Larger interface*.
+
+## First pass (PR #1)
 
 Benchmark: the public listing for *Throw Food For Animals* (Roblox search API) describes this loop: throw food far, attract and collect animals, earn, buy better food, train throw power, open new areas. Wild Feast Islands already has an equivalent loop. What it lacked was the animals *feeling alive*, so that's where this pass goes. No assets or code were copied.
 
@@ -36,18 +78,18 @@ Benchmark: the public listing for *Throw Food For Animals* (Roblox search API) d
 
 ## Validation
 
-Done offline:
+Done offline (both passes, `tools/check.sh`):
 - StyLua check.
 - `luau-lsp analyze` in strict mode with Roblox definitions on all of `src/`.
-- 13 Lune tests:
+- 44 Lune tests (fifth pass: every species' details attached and visible, ride on their joints, part budget, family personality; fourth pass: shipped-sound check, silhouette details; third pass: idle-bob split and write budget, throw meter copy, throw and landing curves, discovery rules, wayfinding placement against the built place; earlier: pass rules, save schema v4, companion rig, monetization boundaries, plus the first pass's tests):
   - pose curves are finite and mirrored
   - idle choices behave as intended
   - separation pushes animals apart
   - all 106 species plus the giant build a valid joint graph whose Motor6D C0/C1 reproduce the build pose
-  - no monetization hooks exist
+  - marketplace code only in PassService and Shop, no paid randomness or developer products
 - Round-trip check: the built place still contains every instance of the original.
 
-Needs Roblox Studio (not run here):
+Needs Roblox Studio (not run here; pass-specific checks are in `docs/MONETIZATION.md`):
 1. Play Solo and a 2-player local server.
    - Animals animate, blink and turn their heads on every client.
    - Idle animals sniff, rest and watch.
@@ -55,8 +97,28 @@ Needs Roblox Studio (not run here):
 2. Perfect, good, ground and refused throws all play their sounds and effects.
    - Hearts and the ring appear.
    - Reduced effects turns them off.
-3. `rbxasset://sounds/swoosh.wav`, `clickfast.wav` and `victory.wav` load on desktop and mobile. The other cues reuse files the original already used. A missing file is skipped silently.
+3. Sounds: see item 9 (the first pass's `swoosh.wav`, `clickfast.wav` and `victory.wav` turned out not to be shipped by the client and were replaced).
 4. Feast: the chime plays when the feast is ready, the fanfare plays when the giant leaves, and the giant's fins sway.
 5. The lighting grade and ShadowMap look right, and there's no frame-time regression on a low-end phone.
+6. New HUD on desktop, phone and gamepad:
+   - Builder Sans loads.
+   - The Shop and Settings tabs fit the panel.
+   - Larger interface still fits a phone screen.
+   - Tap to throw works with mouse, F, touch and R2.
+7. At trust level 3, idle animals walk up and stop about 5 studs away.
+8. Third pass:
+   - **Idle bob.** Resting animals still breathe on every client. Compare network receive with the Developer Console / MicroProfiler before and after.
+   - **Throw pose.** The arm wind-up and follow-through show on R15 and R6 avatars, and another player sees the swing. This needs `Motor6D.Transform` set in PreSimulation to layer over the default animations.
+   - **Throw meter and ring.** The meter clears the target on a phone in landscape and portrait. The landing ring sits on the ground and vanishes on impact.
+   - **Discovery.** The card's viewport frames the animal (side profile) and closes on tap. The island banner shows once per arrival.
+   - **Wayfinding.** Signposts read well from the path. Lanterns look right on the bridges. Stones don't z-fight with the grass.
+9. Fourth pass:
+   - **Sounds:** every cue is audible, with the note cues in tune, on desktop and mobile. The shore loop fades in on the beaches and is inaudible at the meadow centre.
+   - **Models:** ear tips, bellies and the boar ridge look right in 3D (the offline renders are 2D projections).
+   - **Anticipation:** heads track incoming food.
+10. Fifth pass:
+    - **Visitors:** a few visitors of each body plan look right in 3D, with features on the head or back and nothing floating. The offline projections are 2D, and their draw order is approximate.
+    - **Motion:** the bird peck, crab wave, tortoise look and moth hover read well and don't clip.
+    - **Sound:** a burst of rewards sounds clean.
 
 Ambient island audio (waves, birds) would need licensed audio from the Creator Store. It was left out rather than guessing asset IDs.

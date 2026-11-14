@@ -55,6 +55,7 @@ export type Animal = {
 	phase: number,
 	idleMode: string, -- wander | sniff | watch | rest (only meaningful while Idle)
 	sink: number, -- eased 0..1 for how far a resting animal has settled down
+	lastWrite: { number }?, -- last replicated root pose { x, y, z, yaw, pitch, roll }
 	-- visitor slots only
 	slot: { habitat: string, index: number, cursor: number, since: number, luredUntil: number, lockedUntil: number }?,
 }
@@ -65,6 +66,8 @@ type Deps = {
 }
 
 local AnimalService = {}
+-- Root CFrame writes (each one replicates to every client). Read by tests and debugging.
+AnimalService.stats = { writes = 0 }
 
 local animals: { Animal } = {}
 local folder: Folder
@@ -153,6 +156,7 @@ local function spawnModel(animal: Animal)
 	animal.emote = built.emote
 	animal.mouthOffset = built.mouthOffset
 	animal.halfHeight = built.halfHeight
+	animal.lastWrite = nil -- a fresh model must be placed on its next step
 	built.model:SetAttribute("Pose", animal.idleMode)
 	built.model.Parent = folder
 end
@@ -262,6 +266,29 @@ local function nearestCharacter(animal: Animal, radius: number): Vector3?
 	return bestPos
 end
 
+-- The nearest player (within GreetRadius, on this island) who has earned this species' trust.
+local function nearestFriend(animal: Animal): Vector3?
+	local bestPos: Vector3? = nil
+	local bestDist = Config.Animal.GreetRadius
+	for _, player in ipairs(Players:GetPlayers()) do
+		local character = player.Character
+		local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		local profile = hrp and deps.getProfile(player)
+		if hrp and profile then
+			local level = Economy.trustLevel(Config, profile.trust[animal.species.Id] or 0)
+			local d = (flat(hrp.Position) - animal.pos).Magnitude
+			if
+				level >= Config.Animal.GreetTrustLevel
+				and d < bestDist
+				and (flat(hrp.Position) - habitatCenter(animal.habitat)).Magnitude <= animal.habitat.Radius
+			then
+				bestPos, bestDist = hrp.Position, d
+			end
+		end
+	end
+	return bestPos
+end
+
 local function think(animal: Animal, now: number)
 	if animal.model.Parent == nil or animal.root.Parent == nil or not isFinite(animal.pos) then
 		resetAnimal(animal)
@@ -330,10 +357,22 @@ local function think(animal: Animal, now: number)
 	end
 	if now >= animal.nextWander or (animal.idleMode == "wander" and not animal.moveTarget) then
 		local watchTarget = nearestCharacter(animal, WATCH_RADIUS)
-		local choice = AnimalMotion.pickIdle(random:NextNumber(), animal.species.Archetype, watchTarget ~= nil)
-		setPose(animal, choice.mode)
+		local friend = nearestFriend(animal)
+		local choice = AnimalMotion.pickIdle(random:NextNumber(), animal.species.Archetype, watchTarget ~= nil, friend ~= nil)
 		animal.lookAt = if choice.mode == "watch" then watchTarget else nil
 		animal.moveTarget = nil
+		if choice.mode == "greet" and friend then
+			-- Trot over and stop a few studs short, facing them; the next idle pick (often "watch",
+			-- since they are close) follows once it arrives.
+			setPose(animal, "wander")
+			local away = animal.pos - flat(friend)
+			local stop = if away.Magnitude > 1e-3 then away.Unit * Config.Animal.GreetStopDistance else Vector3.zero
+			animal.moveTarget = clampToIsland(animal, flat(friend) + stop)
+			animal.lookAt = friend
+			animal.nextWander = now + random:NextNumber(choice.min, choice.max)
+			return
+		end
+		setPose(animal, choice.mode)
 		if choice.mode == "wander" then
 			local angle = random:NextNumber(0, math.pi * 2)
 			local dist = random:NextNumber(0.2, 1) * animal.wanderRadius
@@ -422,46 +461,26 @@ local function move(animal: Animal, dt: number, now: number)
 	animal.phase += dt
 
 	local t = animal.phase
-	local y = animal.habitat.GroundY + animal.halfHeight
-	local extraYaw, roll, pitch = 0, 0, 0
-	local archetype = animal.species.Archetype
-	if moving then
-		if archetype == "hopper" then
-			y += math.abs(math.sin(t * 10)) * 0.9
-		elseif archetype == "bird" then
-			roll = math.sin(t * 9) * 0.14
-		elseif archetype == "crab" then
-			roll = math.sin(t * 14) * 0.06
-			y += math.abs(math.sin(t * 14)) * 0.15
-		else
-			y += math.abs(math.sin(t * 8)) * 0.25
-		end
-	elseif state == "Anticipate" then
-		y += math.abs(math.sin(t * 6)) * 0.5
-		pitch = 0.1
-	elseif state == "Eat" then
-		pitch = -0.12 + math.sin(t * 16) * 0.08
-	elseif state == "Happy" then
-		local progress = math.clamp((now - animal.stateStarted) / Config.Animal.HappyDuration, 0, 1)
-		extraYaw = progress * math.pi * 2
-		y += math.abs(math.sin(t * 9)) * 1.2
-	elseif state == "Refuse" then
-		extraYaw = math.sin(t * 20) * 0.35
-	elseif animal.idleMode == "rest" then
-		y += math.sin(t * 1.2) * 0.04 -- slow breathing
-	elseif animal.idleMode == "sniff" then
-		pitch = -0.06
-		y += math.sin(t * 2) * 0.05
-	else
-		y += math.sin(t * 2) * 0.08
-	end
+	local progress = if state == "Happy" then math.clamp((now - animal.stateStarted) / Config.Animal.HappyDuration, 0, 1) else 0
+	local dy, extraYaw, pitch, roll = AnimalMotion.bodyMotion(state, animal.species.Archetype, moving, t, progress)
+	local y = animal.habitat.GroundY + animal.halfHeight + dy
 
 	local resting = if state == "Idle" and animal.idleMode == "rest" then 1 else 0
 	animal.sink += (resting - animal.sink) * math.min(1, dt * 4)
+	if math.abs(resting - animal.sink) < 1e-3 then
+		animal.sink = resting
+	end
 	y -= animal.halfHeight * REST_SINK * animal.sink
 
-	local cf = CFrame.new(animal.pos.X, y, animal.pos.Z) * CFrame.Angles(0, animal.yaw + extraYaw, 0) * CFrame.Angles(pitch, 0, roll)
-	animal.root.CFrame = cf
+	-- Only replicate real changes: a resting animal settles, then stops sending updates. The
+	-- breathing / sniffing / chewing bob is added by each client (AnimalAnimator, idleBob).
+	local yaw = animal.yaw + extraYaw
+	local pose = { animal.pos.X, y, animal.pos.Z, yaw, pitch, roll }
+	if AnimalMotion.needsWrite(animal.lastWrite, pose) then
+		animal.lastWrite = pose
+		animal.root.CFrame = CFrame.new(animal.pos.X, y, animal.pos.Z) * CFrame.Angles(0, yaw, 0) * CFrame.Angles(pitch, 0, roll)
+		AnimalService.stats.writes += 1
+	end
 end
 
 local function spotSpecies()
@@ -532,8 +551,9 @@ function AnimalService.summon(speciesId: string, _player: Player?): (boolean, st
 		local slot = animal.slot :: any
 		if slot.habitat == species.Habitat then
 			if animal.species.Id == speciesId then
-				slot.luredUntil = math.max(slot.luredUntil, now + Config.Visitors.LuredStaySeconds)
-				return false, species.Name .. " is already visiting " .. animal.habitat.Name .. ". Go say hi!"
+				-- No lure is spent here, so the stay is not extended either (that was a free,
+				-- repeatable way to pin a visitor in place).
+				return false, species.Name .. " is already at " .. animal.habitat.Name .. ". Your lure is kept."
 			end
 			if now >= slot.lockedUntil and (candidate == nil or slot.since < (candidate.slot :: any).since) then
 				candidate = animal
@@ -548,7 +568,7 @@ function AnimalService.summon(speciesId: string, _player: Player?): (boolean, st
 	slot.since = now
 	slot.luredUntil = now + Config.Visitors.LuredStaySeconds
 	slot.lockedUntil = now + Config.Visitors.LureLockSeconds
-	return true, string.format("A %s is on its way to %s!", species.Name, Config.Habitats[species.Habitat].Name)
+	return true, string.format("A %s is on its way to %s.", species.Name, Config.Habitats[species.Habitat].Name)
 end
 
 local function rotateVisitors(now: number)

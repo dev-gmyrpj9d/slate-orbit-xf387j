@@ -73,17 +73,9 @@ This pass answers playtest feedback: the plane was too hard to control, and ther
 
 The left panel also shows the presets (the current one highlighted) and `THR n%→km/h`. The 1–3 keys still pick shells in a tank.
 
-**Easy flight** is on by default. Press **L** in an aircraft to toggle it; the setting is saved. It only helps the player's plane; AI planes fly the normal model.
+Pass 3 also added an "easy flight" assist. It was removed in Pass 5 (see below).
 
-- **Stall protection:** when you get slow, it limits how hard the nose pulls, stops further climbing and adds power. The extra power shows as orange on the bar, with `+AUTO` and "STALL PROTECTION".
-- **Gentler climbs and dives:** they're capped at about 40°, so a big mouse swing can't put the plane into a vertical dive or loop.
-- **Steadier nose:** the mouse-aim target is smoothed slightly so the nose doesn't overshoot.
-
-With it off, the plane flies exactly as before.
-
-## Pass 4: lock-on rockets, no auto pull-up
-
-**Auto pull-up removed.** Playtest feedback asked for it to go. Easy flight no longer flies the plane for you: holding a dive takes you into the ground. The HUD still flashes PULL UP. Stall protection, the 40° climb/dive cap, nose smoothing and the throttle controls are unchanged. The dive cap also had a bug: aiming almost straight down slipped past it, because only the vertical component was clamped. It now caps the angle itself.
+## Pass 4: lock-on rockets
 
 **Lock-on rockets (arcade, game-only).** Two new player vehicles carry SF-G rockets that steer themselves:
 
@@ -98,20 +90,35 @@ How it works:
 
 Friendly units, wrecks, targets out of range and targets behind terrain or smoke never lock. AI units never use these vehicles, and an AI launcher could not home, so enemy difficulty is unchanged.
 
+## Pass 5: no flight assists
+
+Playtest feedback asked for all of easy flight to go, so it has been removed as a feature, not just switched off:
+
+- **Gone:** the auto pull-up (removed first, in Pass 4), stall protection, the automatic extra throttle, the 40° climb/dive cap and the steering smoothing. The L key, the easy-flight chip and the `EASY` / `+AUTO` labels on the HUD are gone too.
+- **Same model as the AI:** the player's plane now flies exactly the same model as AI pilots. Fly slow or pull too hard and you stall; hold a dive and you hit the ground.
+- **Old saved setting:** the `steelfront.easyflight` value an earlier build saved is deleted on load, so it can't turn anything back on.
+- **Kept:**
+  - mouse-aim, A/D roll and C free look
+  - the W/S throttle and the 1–4 presets
+  - the throttle bar with its cruise and stall ticks
+  - the STALL, PULL UP and RETURN TO THE BATTLE AREA warnings, which only warn
+  - the battle-area boundary: past the map edge or above 2,600 m the plane still turns back, as in the original game
+  - the lock-on rockets
+
 ## Testing
 
 ```sh
 node steelfront/tests/run-selftest.mjs    # exits 0 on PASS; set CHROME=/path/to/chrome if it isn't on PATH
 ```
 
-You can also open `steelfront.html?selftest` in any browser. The page runs 80 seeded checks and shows the results on screen. The checks cover:
+You can also open `steelfront.html?selftest` in any browser. The page runs 84 seeded checks and shows the results on screen. The checks cover:
 
 - the armour lookup and damage model
 - each fix above, as a regression check
 - crew effects, shell switching, HE and fire
 - the AI's zone and shell choices
 - spotting, the marker and arrow directions, and the enemy AI handicap
-- easy flight (no auto pull-up, 40° dive cap, stall protection, player only), throttle keys and level-flight speed per throttle
+- unassisted flight: no assist code or saved setting is left. A straight-down aim dives steeply into the ground, an idle-throttle climb stalls and the throttle stays put. The player's input path matches the raw flight model exactly. Also checked: the throttle keys, level-flight speed per throttle, and that L does nothing
 - lock-on rockets: which units can lock (friendly, out of range, outside the circle, destroyed), lock timing, tank→tank (moving), tank→aircraft, plane→aircraft and plane→tank hits, unguided fire without a lock, AI never homing, pod reload, the R key and the lock HUD
 - two 150 s simulated battles (Conquest and Last Stand) checked for exceptions, NaNs and zombie crews
 
@@ -127,7 +134,7 @@ Run this in a real browser after changes to gameplay, HUD or input.
 4. Aim at an enemy: the marker turns green, yellow, red or grey. In the sight it shows `pen/effective mm`. A Panther's front hull is red for the Sherman and its side is green.
 5. Get penetrated, or use the console. Crew chips cross out, the hit message lists the knocked-out crew, and "New gunner in Ns" appears and resolves.
 6. Catch fire: "ON FIRE — F to extinguish" appears. F puts the fire out without starting a repair. A second F starts the repair. During the repair the gun neither turns nor fires.
-7. Fly an aircraft: the panel shows throttle presets 1–4 and the easy-flight chip, not shells or crew. W/S and 1–4 change the throttle bar and the speed settles at the blue tick. Aim straight down: the dive stays at about 40° but the plane does not pull up by itself. Rockets on a heavy tank's front no longer kill it outright, while bombs still do.
+7. Fly an aircraft: the panel shows throttle presets 1–4, not shells or crew. W/S and 1–4 change the throttle bar and the speed settles at the blue tick. There are no assists: at 0% throttle in a climb the plane stalls (STALL warning, throttle stays at 0%), and aiming straight down dives into the ground. Rockets on a heavy tank's front no longer kill it outright, while bombs still do.
 8. Last Stand: let the timer run out with B neutral (console: `steelFront.battleTime = steelFront.mode.time`). The result is DEFEAT.
 9. Spotted enemies show a red marker with their range. Turn away and an edge arrow points back at them; M toggles both. Get hit and a red arc points to the shooter.
 10. Deploy the Hornet R-5, then the P-51D Kestrel. Hold an enemy inside the dashed circle: the yellow box turns red (LOCKED), R fires, and the rocket curves onto the target. A friendly unit never locks.

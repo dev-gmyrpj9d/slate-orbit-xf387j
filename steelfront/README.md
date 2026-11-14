@@ -105,13 +105,29 @@ Playtest feedback asked for all of easy flight to go, so it has been removed as 
   - the battle-area boundary: past the map edge or above 2,600 m the plane still turns back, as in the original game
   - the lock-on rockets
 
+## Pass 6: combat feedback and replay goals
+
+A polish pass to make each battle more rewarding and give reasons to play again. Difficulty is unchanged: the score system doesn't touch the enemy AI handicap, and flight still has no assists.
+
+- **In battle:**
+  - Every hit, critical hit, kill, assist, zone capture and cleared wave pops up to the right of the crosshair with its points. Repeat machine-gun hits on one target merge into one counting line.
+  - Kills show a banner with the target's name and vehicle, a red X and ring on the crosshair, and a short rising chime.
+  - Bonuses and callouts: first blood, long shots (500 m or more), double / triple / multi kills within 12 s, and kill streaks at 3, 5 and 8.
+  - The info panel shows the running score and the current streak.
+- **After a battle:** the rewards screen leads with the battle score and its personal-best badges. It also shows the vehicle's mastery stars and progress, and the medals earned. If you earned none, it suggests two you haven't earned yet.
+- **Medals:** 11 to collect: First Blood, Double Strike, Triple Strike, Unbroken, Marksman, Tank Hunter, Air Ace, Zone Captain, Wingman, Smart Shot (lock-on rocket kill) and Survivor. Each pays +300 Cr / +150 XP, and the hangar's Career panel shows the collection.
+- **Vehicle mastery:** a vehicle's battle scores add up to 5 stars (600, 1,800, 4,000, 8,000 and 14,000). Each star pays a one-off credit bonus. Stars show on every vehicle card, and the info panel shows progress, battles, kills and best score.
+- **Not added:** daily streaks, timers, loot boxes, or anything you lose by taking a break.
+- **Saves:** medals, mastery and bests are part of the existing profile and are read field by field, so old saves load unchanged.
+- **Readability:** clustered enemy markers no longer print their distances on top of each other. The nearest label wins, and every marker is still drawn.
+
 ## Testing
 
 ```sh
 node steelfront/tests/run-selftest.mjs    # exits 0 on PASS; set CHROME=/path/to/chrome if it isn't on PATH
 ```
 
-You can also open `steelfront.html?selftest` in any browser. The page runs 84 seeded checks and shows the results on screen. The checks cover:
+You can also open `steelfront.html?selftest` in any browser. The page runs 101 seeded checks and shows the results on screen. The checks cover:
 
 - the armour lookup and damage model
 - each fix above, as a regression check
@@ -120,6 +136,7 @@ You can also open `steelfront.html?selftest` in any browser. The page runs 84 se
 - spotting, the marker and arrow directions, and the enemy AI handicap
 - unassisted flight: no assist code or saved setting is left. A straight-down aim dives steeply into the ground, an idle-throttle climb stalls and the throttle stays put. The player's input path matches the raw flight model exactly. Also checked: the throttle keys, level-flight speed per throttle, and that L does nothing
 - lock-on rockets: which units can lock (friendly, out of range, outside the circle, destroyed), lock timing, tank→tank (moving), tank→aircraft, plane→aircraft and plane→tank hits, unguided fire without a lock, AI never homing, pod reload, the R key and the lock HUD
+- battle score: merged hit popups, kill / first blood / long-shot scoring, double kills, assists, streak reset on death, HUD drawing, medals, mastery stars and their one-off bonus, personal bests, the rewards screen and hangar, safe loading of medal and mastery data from a save, and that the enemy AI handicap is unchanged
 - two 150 s simulated battles (Conquest and Last Stand) checked for exceptions, NaNs and zombie crews
 
 The self-test uses a throwaway profile and never writes your save. `?nointro` skips the intro.
@@ -139,3 +156,4 @@ Run this in a real browser after changes to gameplay, HUD or input.
 9. Spotted enemies show a red marker with their range. Turn away and an edge arrow points back at them; M toggles both. Get hit and a red arc points to the shooter.
 10. Deploy the Hornet R-5, then the P-51D Kestrel. Hold an enemy inside the dashed circle: the yellow box turns red (LOCKED), R fires, and the rocket curves onto the target. A friendly unit never locks.
 11. Tab shows the scoreboard, P the FPS counter and Esc pauses. Leaving to the hangar pays no rewards.
+11. Destroy two enemies within 12 s: the banner reads DOUBLE KILL, and the popups list the kill points and bonuses without covering the hit report. At the end of the battle the rewards screen shows the score, mastery stars and medals, and the hangar card shows the vehicle's stars.

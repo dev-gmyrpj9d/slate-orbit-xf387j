@@ -186,6 +186,14 @@
   .vc svg { display: block; width: 64px; height: 26px; margin-bottom: 2px; opacity: .9; }
   .vc b { display: block; font-size: 12px; color: #ffcf5a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .vc .st { position: absolute; right: 6px; top: 5px; font: 10px ui-monospace, Menlo, Consolas, monospace; opacity: .75; }
+  .vc .ms { position: absolute; right: 6px; top: 18px; font-size: 10px; letter-spacing: -1px; color: #ffcf5a; }
+  .vc .ms.z { color: rgba(255,255,255,.28); }
+  .mas-l { margin: 8px 0 10px; font-size: 12px; } .mas-l .stars { color: #ffcf5a; letter-spacing: 1px; font-size: 14px; }
+  .pbar { height: 5px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; margin: 3px 0; } .pbar i { display: block; height: 100%; background: linear-gradient(90deg,#ffb84a,#ffe08a); }
+  .medgrid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .medgrid span { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 24px; padding: 0 4px; border-radius: 12px; background: rgba(255,207,90,.18); border: 1px solid rgba(255,207,90,.55); color: #ffe08a; font-size: 12px; }
+  .medgrid span.no { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.14); color: rgba(255,255,255,.3); }
+  .medgrid span small { font-size: 9px; margin-left: 2px; color: #fff; opacity: .8; }
   .vc .nat { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
   .lb-hint { position: absolute; left: 50%; bottom: 140px; transform: translateX(-50%); font-size: 11px; opacity: .6; pointer-events: none; white-space: nowrap; }
   #lbMenu { position: absolute; left: 10px; top: 52px; display: none; flex-direction: column; padding: 6px; gap: 4px; min-width: 220px; z-index: 2; }
@@ -221,6 +229,17 @@
   #rewards table { width: 100%; border-collapse: collapse; } #rewards td:last-child, #rewards th:last-child, #rewards td:nth-child(2), #rewards th:nth-child(2) { text-align: right; }
   #rewards tr.tot td { border-top: 1px solid rgba(255,255,255,.25); color: #ffcf5a; font-weight: bold; }
   #rewards .lvup { color: #8af0a0; }
+  #rewards .bscore { display: flex; gap: 14px; align-items: stretch; margin-bottom: 8px; font-family: system-ui, sans-serif; }
+  #rewards .bscore > div { flex: 1; padding: 8px 10px; border-radius: 6px; background: rgba(255,255,255,.06); }
+  #rewards .bscore small { display: block; opacity: .75; font-size: 11px; } #rewards .bscore b { font-size: 28px; color: #ffe08a; line-height: 1.1; }
+  #rewards .pb { display: inline-block; margin-left: 8px; padding: 1px 6px; border-radius: 4px; background: #ffcf5a; color: #1a1400; font: bold 10px system-ui, sans-serif; vertical-align: 4px; animation: pbPulse 1s ease-in-out infinite alternate; }
+  @keyframes pbPulse { from { filter: brightness(1); } to { filter: brightness(1.35); } }
+  @media (prefers-reduced-motion: reduce) { #rewards .pb { animation: none; } }
+  #rewards .stars { color: #ffcf5a; font-size: 18px; letter-spacing: 2px; }
+  #rewards .medals { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; font-family: system-ui, sans-serif; }
+  #rewards .medal { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 4px; border-radius: 14px; background: linear-gradient(180deg, rgba(255,207,90,.28), rgba(255,160,40,.14)); border: 1px solid rgba(255,207,90,.7); color: #ffe9b0; font-size: 12px; font-weight: 600; }
+  #rewards .medal i { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: 50%; background: #ffcf5a; color: #3a2600; font-style: normal; font-size: 12px; }
+  #rewards .none { opacity: .7; font-size: 12px; }
   @media (max-width: 1000px) { .lb-right { display: none; } .lb-left { width: 260px; } }
   @media (max-height: 640px) { .lb-left { max-height: calc(100vh - 210px); } }
 </style>
@@ -2281,7 +2300,7 @@ function spawnTank(t) {
   const x = base[0] + (t.slot - (TEAM_SIZE - 1) / 2) * 13 + rand(-2, 2), z = base[2] + rand(-8, 8);
   t.pos = [x, heightAt(x, z), z]; t.yaw = t.team === 0 ? 0 : Math.PI; t.speed = 0; t.up = [0, 1, 0];
   t.turretYaw = 0; t.gunElev = 0; t.hp = t.type.hp; t.alive = true; t.deadT = 0; t.trackT = 0; t.engineT = 0;
-  t.reloadT = 1; t.pop = 0; t.popV = 0; t.recoil = 0; t.lastHitBy = null; t.fireT = 0; t.wingDmg = 0; t.crashed = false;
+  t.reloadT = 1; t.pop = 0; t.popV = 0; t.pDmgT = undefined; t.pGuided = false; t.recoil = 0; t.lastHitBy = null; t.fireT = 0; t.wingDmg = 0; t.crashed = false;
   t.mag = t.type.auto ? t.type.auto.mag : 0; t.repairT = 0; t.repairCd = 0; t.breechT = 0; t.boostT = 0; t.reloadFull = 1; t.rg = null;
   t.rockets = t.type.rockets ? t.type.rockets.n : 0; t.rocketT = 0; t.rockRel = 0; t.lock = null; t.lockT = 0;
   setupCrew(t); t.extT = 0; if (!AMMO[t.ammo]) t.ammo = t.ai ? "aphe" : "ap"; t.loaded = t.ammo; // the player keeps their last shell choice across respawns
@@ -2559,6 +2578,7 @@ function drawEnemyCues(W, H) {
   }
   list.sort((a, b) => a.d - b.d);
   let arrows = 0;
+  const labels = [];
   for (const { e, d } of list) {
     const top = e.type.air ? vadd(e.pos, [0, 3, 0]) : vadd(e.pos, vscale(e.Y, e.type.hullTop + 2.4));
     const s = project(top), m = 30;
@@ -2569,8 +2589,13 @@ function drawEnemyCues(W, H) {
       const k = clamp(1.3 - d / 1500, 0.75, 1.3);
       hx.beginPath(); hx.moveTo(s[0] - 7 * k, s[1] - 10 * k); hx.lineTo(s[0] + 7 * k, s[1] - 10 * k); hx.lineTo(s[0], s[1]); hx.closePath(); hx.stroke(); hx.fill();
       hx.font = "bold 11px ui-monospace, monospace"; hx.lineWidth = 3;
-      const lbl = `${Math.round(d)} m`;
-      hx.strokeText(lbl, s[0], s[1] - 14 * k); hx.fillStyle = "#ffd2cc"; hx.fillText(lbl, s[0], s[1] - 14 * k);
+      // nearest first: a label that would overlap one already drawn is dropped (clustered enemies used to
+      // print their distances on top of each other); the marker itself always stays
+      const lbl = `${Math.round(d)} m`, lw = hx.measureText(lbl).width + 6, ly = s[1] - 14 * k;
+      if (!labels.some(r => Math.abs(r[0] - s[0]) < (r[2] + lw) / 2 && Math.abs(r[1] - ly) < 13)) {
+        labels.push([s[0], ly, lw]);
+        hx.strokeText(lbl, s[0], ly); hx.fillStyle = "#ffd2cc"; hx.fillText(lbl, s[0], ly);
+      }
       hx.globalAlpha = 1;
     } else if (arrows < 8) {
       arrows++;
@@ -2732,7 +2757,7 @@ function impact(s, hit) {
     if (hit.part === "turret" && Math.random() < 0.15 * sk) { t.breechT = 12; msgs.push("BREECH DAMAGED"); }
     if (Math.random() < 0.06 * sk * sk * (s.ammo === "aphe" ? 1.5 : 1)) { dmg = 999; msgs.push("AMMO RACK DETONATED"); }
     if (!s.small || Math.random() < 0.15) crewSpall(t, hit, s.small ? 0.25 : AM.crew * (1 + over), msgs);
-    t.hp -= dmg; t.lastHitBy = shooter; t.lastHitT = now;
+    t.hp -= dmg; t.lastHitBy = shooter; t.lastHitT = now; noteHit(t, shooter, s, msgs.length > 0);
     for (let i = 0; i < 8; i++) puff(p, [rand(-3, 3), rand(0, 5), rand(-3, 3)], [1, 0.6, 0.2], rand(0.3, 0.7), 0.25, 2, 1, -1);
   }
   if (result !== "PENETRATION") sparks(p, s.small ? 2 : 10);
@@ -2757,6 +2782,7 @@ function destroyTank(t, killer, crashed = false) {
   t.alive = false; t.hp = 0; t.deadT = 0; t.popV = rand(4, 8); t.deaths++; t.killedBy = killer && killer.team !== t.team ? killer : null;
   if (!t.type.air) t.speed = 0;
   if (killer && killer.team !== t.team) { killer.kills++; if (t.type.air) killer.aKills = (killer.aKills || 0) + 1; else killer.gKills = (killer.gKills || 0) + 1; }
+  noteKill(t, killer);
   tickets[t.team] = Math.max(0, tickets[t.team] - killCost(t));
   const p = center(t);
   for (let i = 0; i < 30; i++) puff(p, [rand(-6, 6), rand(2, 14), rand(-6, 6)], [1, rand(0.4, 0.7), 0.15], rand(0.4, 1.0), rand(0.5, 1.5), 1, 1, 0.8);
@@ -2851,7 +2877,7 @@ function updateZones(dt) {
     if (z.owner === before) continue;
     const L = z.label;
     if (z.owner === 0) {
-      if (playerIn) player.caps++;
+      if (playerIn) { player.caps++; award(`ZONE ${L} CAPTURED`, SCORE.cap, "#7cc0ff"); }
       if (M.key === "breakthrough") {
         z.locked = true; z.active = false;
         const next = zones[zi + 1];
@@ -2940,6 +2966,7 @@ function modeStep(dt) {
   ms.waveT += dt;
   if (ms.left === 0) {
     ms.done = ms.wave;
+    if (ms.wave > (ms.paid || 0)) { ms.paid = ms.wave; award(`WAVE ${ms.wave} DESTROYED`, SCORE.wave, "#9be38b"); }
     if (ms.wave >= M.waves) { ms.cleared = true; return; }
     ms.nextT = 15; tickets[0] += M.waveBonus; // relief arrives between waves: clearing waves fast is what keeps the line alive
     feed(`<span class="ally">+${M.waveBonus} reinforcements arrive</span>`);
@@ -3389,7 +3416,7 @@ function explode(p, he, owner, direct, s, hit) {
       if (A.tt === 0 && d < he.R * 0.6 && t.crew) for (const c of t.crew) if (!c.ko && SEAT_INFO[c.seat][1] === "turret" && Math.random() < 0.35 * (1 - d / he.R)) knockOut(t, c, msgs); // open-topped fighting compartment
       if (d < he.kill * 1.8 && t.trackT <= 0) { t.trackT = 7; msgs.push("TRACK DESTROYED"); }
     }
-    t.hp -= dmg; t.lastHitBy = owner; t.lastHitT = now;
+    t.hp -= dmg; t.lastHitBy = owner; t.lastHitT = now; if (dmg > 5) noteHit(t, owner, s, msgs.length > 0);
     if (t.isPlayer) { markHitFrom(owner); dmgFlash = 1; showHit(`Hit by ${!s ? "artillery" : s.kind === "rocket" ? "rocket" : s.kind === "bomb" ? "bomb" : s.ammo === "he" ? "HE shell" : "artillery"} — ${owner.name}`, "#ff7a6e"); }
     const crewOut = t.crew && crewLeft(t) < 2;
     if (t.hp <= 0 || crewOut) { destroyTank(t, owner); msgs.unshift(crewOut ? "CREW KNOCKED OUT" : "TARGET DESTROYED"); }
@@ -3407,7 +3434,7 @@ function planeImpact(s, hit) {
   else if (hit.part === "wing") { dmg *= 0.8; if (Math.random() < 0.05 && t.wingDmg < 1) { t.wingDmg = Math.min(1, t.wingDmg + 0.4); msgs.push("WING DAMAGED"); } }
   else if (hit.part === "tail") dmg *= 0.7;
   else if (Math.random() < (s.small ? 0.01 : 0.1) * (t.type.armorK || 1)) { dmg = 999; msgs.push("PILOT KNOCKED OUT"); }
-  t.hp -= dmg; t.lastHitBy = shooter; t.lastHitT = now;
+  t.hp -= dmg; t.lastHitBy = shooter; t.lastHitT = now; noteHit(t, shooter, s, msgs.length > 0);
   sparks(p, 3);
   if (t.isPlayer) { markHitFrom(shooter); dmgFlash = Math.max(dmgFlash, s.small ? 0.25 : 1); if (msgs.length) showHit(msgs.join("\n") + ` — ${shooter.name}`, "#ff7a6e"); }
   if (shooter.isPlayer) hitMarkT = 0.12;
@@ -3658,6 +3685,101 @@ function playerHit(result, shooter, msgs = []) {
   showHit(`${result === "PENETRATION" ? "You were penetrated" : result === "RICOCHET" ? "Ricochet off your armour" : "Your armour held"} — ${shooter.name}${rep.length ? "\n" + rep.join(" · ") : ""}`, result === "PENETRATION" ? "#ff7a6e" : "#9fd4ff");
   if (rep.length) announce(rep.join(". "));
 }
+// ---------------------------------------------------------------- battle score, streaks and award popups
+// Every hit, kill, assist, capture and cleared wave the player earns pops up under the crosshair with its
+// points; kills get a banner, a chime and a crosshair flash, and quick or unbroken kill runs get a callout.
+// The score only feeds personal bests and vehicle mastery (see the profile section): it changes nothing in
+// the fight, and no AI or difficulty value depends on it.
+const SCORE = { hit: 10, crit: 20, kill: 100, air: 120, assist: 40, cap: 150, wave: 120, long: 50, blood: 50, multi: 50 };
+const MULTI_WINDOW = 12, ASSIST_WINDOW = 20, LONG_SHOT = 500;
+const MULTI_NAME = ["", "", "DOUBLE KILL", "TRIPLE KILL", "MULTI KILL"];
+const STREAK_NAME = { 3: "KILL STREAK", 5: "UNSTOPPABLE", 8: "STEEL LEGEND" };
+let pops = [], banner = null, killFlashT = -99;
+function resetBattleScore(p) {
+  Object.assign(p, { score: 0, streak: 0, bestStreak: 0, multi: 0, bestMulti: 0, lastKillT: -99, longest: 0, assists: 0, guidedKills: 0, firstBlood: false });
+  pops = []; banner = null; killFlashT = -99;
+}
+// one popup line; `key` merges repeats (machine-gun hits on one target) into a single counting line
+function award(text, pts, col = "#ffe08a", key = null) {
+  if (!player || state !== "playing") return;
+  player.score = (player.score || 0) + pts;
+  const same = key && pops.find(q => q.key === key && now - q.t < 1.5);
+  if (same) { same.pts += pts; same.n++; same.t = now; return; }
+  pops.unshift({ text, pts, col, t: now, key, n: 1 });
+  if (pops.length > 5) pops.length = 5;
+}
+function noteHit(t, shooter, s, crit) {
+  if (!shooter || !shooter.isPlayer || t.team === shooter.team) return;
+  t.pDmgT = now; t.pGuided = !!(s && s.guided);
+  if (crit) award("CRITICAL HIT", SCORE.crit, "#ffb15a", "crit" + t.name);
+  else award("HIT", SCORE.hit, "#e6e6e6", "hit" + t.name);
+}
+function noteKill(t, killer) {
+  if (!player || state !== "playing") return;
+  const foeKill = killer && killer.team !== t.team, first = foeKill && !ms.blood;
+  if (foeKill) ms.blood = true;
+  if (t.isPlayer) { t.streak = 0; t.multi = 0; return; }
+  if (killer && killer.isPlayer && foeKill) { playerKill(t, first); return; }
+  // someone else finished a target you damaged recently: an assist
+  if (t.team !== player.team && t.pDmgT !== undefined && now - t.pDmgT < ASSIST_WINDOW) { player.assists++; award("ASSIST", SCORE.assist, "#9fd4ff"); }
+}
+function playerKill(t, first) {
+  const p = player, d = vlen(vsub(t.pos, p.pos));
+  p.streak++; p.bestStreak = Math.max(p.bestStreak, p.streak);
+  p.multi = now - p.lastKillT < MULTI_WINDOW ? p.multi + 1 : 1; p.lastKillT = now; p.bestMulti = Math.max(p.bestMulti, p.multi);
+  p.longest = Math.max(p.longest, d);
+  if (t.pGuided && now - t.pDmgT < 3) p.guidedKills++;
+  award(t.type.air ? "AIRCRAFT SHOT DOWN" : "TARGET DESTROYED", t.type.air ? SCORE.air : SCORE.kill, "#ffd34d");
+  if (first) { p.firstBlood = true; award("FIRST BLOOD", SCORE.blood, "#ff8a6e"); }
+  if (d >= LONG_SHOT) award(`LONG SHOT · ${Math.round(d)} m`, SCORE.long, "#7fe0ff");
+  if (p.multi >= 2) award(MULTI_NAME[Math.min(p.multi, 4)], SCORE.multi * (p.multi - 1), "#ff9ae0");
+  const streak = STREAK_NAME[p.streak];
+  banner = { title: p.multi >= 2 ? MULTI_NAME[Math.min(p.multi, 4)] : streak ? `${streak} ×${p.streak}` : t.type.air ? "SHOT DOWN" : "DESTROYED",
+    sub: `${t.name} · ${t.type.name}${d >= LONG_SHOT ? ` · ${Math.round(d)} m` : ""}`, t: now, col: p.multi >= 2 || streak ? "#ff9ae0" : "#ffd34d" };
+  killFlashT = now; hitMarkT = Math.max(hitMarkT, 0.35);
+  if (AC && AC.state === "running") { // a short rising chime, a third higher for every kill in a quick run
+    const f = 660 * Math.pow(1.26, Math.min(p.multi, 4) - 1);
+    tone("triangle", f, 0.08, 0.14, f * 1.5);
+    setTimeout(() => tone("triangle", f * 1.5, 0.07, 0.22, f * 2), 90);
+  }
+}
+function drawAwards(W, H) {
+  const cx = W / 2, cy = H / 2;
+  // kill flash: a quick red X and an expanding ring on the crosshair
+  const kf = now - killFlashT;
+  if (kf >= 0 && kf < 0.45 && player.alive) {
+    const a = 1 - kf / 0.45, r = 16 + kf * 90;
+    hx.strokeStyle = `rgba(255,70,50,${a})`; hx.lineWidth = 3;
+    hx.beginPath(); for (const [x, y] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { hx.moveTo(cx + x * 8, cy + y * 8); hx.lineTo(cx + x * 18, cy + y * 18); } hx.stroke();
+    hx.strokeStyle = `rgba(255,210,90,${a * 0.8})`; hx.lineWidth = 2; hx.beginPath(); hx.arc(cx, cy, r, 0, Math.PI * 2); hx.stroke();
+  }
+  // kill banner
+  if (banner && now - banner.t < 2.6) {
+    const e = now - banner.t, a = clamp(Math.min(e / 0.12, (2.6 - e) / 0.5), 0, 1), k = 1 + 0.25 * Math.max(0, 1 - e / 0.18);
+    const y = H * 0.19; // above the #center messages (zone captured, wave) at 28%
+    hx.save(); hx.globalAlpha = a; hx.textAlign = "center";
+    const g = hx.createLinearGradient(cx - 260, 0, cx + 260, 0);
+    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.5, "rgba(10,12,18,.62)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    hx.fillStyle = g; hx.fillRect(cx - 260, y - 34, 520, 58);
+    hx.font = `900 ${Math.round(30 * k)}px system-ui, sans-serif`; hx.lineWidth = 4; hx.strokeStyle = "rgba(0,0,0,.85)";
+    hx.strokeText(banner.title, cx, y); hx.fillStyle = banner.col; hx.fillText(banner.title, cx, y);
+    hx.font = "600 13px system-ui, sans-serif"; hx.lineWidth = 3; hx.strokeText(banner.sub, cx, y + 18); hx.fillStyle = "#f2f2f2"; hx.fillText(banner.sub, cx, y + 18);
+    hx.restore();
+  }
+  // popups right of the crosshair (clear of the hit report below it): newest on top, each slides in and fades after 2.4 s
+  let row = 0;
+  hx.save(); hx.textAlign = "left";
+  for (const q of pops) {
+    const e = now - q.t;
+    if (e > 2.4) continue;
+    const a = clamp(Math.min(e / 0.1, (2.4 - e) / 0.6), 0, 1), y = cy + (player.type.air ? 52 : 22) + row * 19, x = cx + 92 - Math.max(0, 0.15 - e) * 120;
+    const label = `${q.text}${q.n > 1 ? ` ×${q.n}` : ""}  +${q.pts}`;
+    hx.globalAlpha = a; hx.font = `bold ${row === 0 ? 15 : 13}px system-ui, sans-serif`; hx.lineWidth = 3; hx.strokeStyle = "rgba(0,0,0,.8)";
+    hx.strokeText(label, x, y); hx.fillStyle = q.col; hx.fillText(label, x, y);
+    row++;
+  }
+  hx.restore();
+}
 let menuTab = "ground";
 function buildCards() {
   const cards = $("cards"); cards.innerHTML = "";
@@ -3720,6 +3842,7 @@ function newBattle() {
   const PT = modeAllows(M, selectedType) ? selectedType : M.allow === "air" ? AIR.p51 : TYPES.sherman;
   player = makeTank(0, playerType(PT), "You", true, 3);
   player.tint = camoTint(PT); player.consCd = {}; player.consUsed = {}; player.boostT = 0; player.gKills = 0; player.aKills = 0;
+  resetBattleScore(player);
   const size = team => M.key === "laststand" ? (team === 0 ? 6 : 0) : TEAM_SIZE;
   for (let team = 0; team < 2; team++) for (let s = 0; s < size(team); s++) {
     if (team === 0 && s === 3) { tanks.push(player); continue; }
@@ -4299,7 +4422,7 @@ function drawHud() {
   if (state === "menu" || state === "cine") return;
   hx.font = "bold 12px system-ui, sans-serif"; hx.textAlign = "center";
   // spotted enemies get a marker / edge arrow (drawEnemyCues); zones stay unmarked and are found by eye
-  if (state === "playing" || state === "paused") drawEnemyCues(W, H);
+  if (state === "playing" || state === "paused") { drawEnemyCues(W, H); drawAwards(W, H); }
   if (player.alive && player.type.air) { drawAirHud(W, H); return; }
   if (player.alive) {
     // crosshair at camera aim
@@ -4477,7 +4600,7 @@ function updateDom(dt) {
     const guns = T.guns.map((g, i) => t.gunAmmo[i]).join("/");
     txt($("rltext"), rearm ? `Rearming all weapons — ${Math.ceil(t.rearmT)} s${now - (t.shotT ?? -1) <= 0.25 ? " (paused while firing)" : ""}` : [`Guns ${guns}`, T.bombs ? `Bombs ${t.bombs}×${T.bombs.kg} kg` : "", T.rockets ? `${lockOnType(T) ? "Lock-on rockets" : "Rockets"} ${t.rockets} (R)` : "", fullyArmed(t) ? "" : "T: rearm"].filter(Boolean).join(" · "));
     css($("rlbar").firstChild, "width", `${rearm ? (1 - t.rearmT / T.reload) * 100 : armedFrac(t) * 100}%`);
-    txt($("spd"), `IAS ${Math.round(t.speed * 3.6)} km/h  THR ${Math.round(t.throttle * 100)}%→${Math.round(cruiseSpeed(t) * 3.6)}  Alt ${Math.round(t.pos[1])} m   Kills ${t.kills}  Deaths ${t.deaths}`);
+    txt($("spd"), `IAS ${Math.round(t.speed * 3.6)} km/h  THR ${Math.round(t.throttle * 100)}%→${Math.round(cruiseSpeed(t) * 3.6)}  Alt ${Math.round(t.pos[1])} m   Kills ${t.kills}  Deaths ${t.deaths}  Score ${fmtN(t.score || 0)}${t.streak >= 2 ? `  Streak ${t.streak}` : ""}`);
     txt($("status"), [t.repairT > 0 ? "Repairing airframe" : "", t.engineT > 0 ? "Engine damaged" : "", t.fireT > 0 ? "ON FIRE" : "", t.wingDmg > 0 ? "Wing damaged" : ""].filter(Boolean).join(" · "));
     setHtml($("ammoRow"), FLIGHT.presets.map((v, i) => `<span class="${Math.abs(t.throttle - v) < 0.02 ? "sel" : ""}" title="Throttle ${Math.round(v * 100)}% (cruise about ${Math.round(cruiseSpeed(t, v) * 3.6)} km/h)"><b>${i + 1}</b>${Math.round(v * 100)}%</span>`).join("") + `<span class="tip">W/S throttle</span>`);
     setHtml($("crewRow"), "");
@@ -4490,7 +4613,7 @@ function updateDom(dt) {
   txt($("rltext"), (!seatManned(t, "gunner") ? "No gunner — gun silent" : t.reloadT > 0 ? `Loading${shell} ${t.reloadT.toFixed(1)} s` : `${shell ? shell.trim() + " loaded" : "Gun ready"}`) + rk);
   setHtml($("ammoRow"), hasShells(t.type) ? AMMO_KEYS.map((k, i) => `<span class="${k === t.ammo ? "sel" : ""}${k === t.loaded ? " ld" : ""}" title="${AMMO[k].long}"><b>${i + 1}</b>${AMMO[k].name} ${shellPen(t.type, k)}</span>`).join("") : "");
   setHtml($("crewRow"), t.crew ? t.crew.map(c => `<span class="${c.ko ? "ko" : c.seat !== c.role ? "mv" : ""}" title="${c.role}${c.seat !== c.role ? " as " + c.seat : ""}${c.ko ? " (knocked out)" : ""}">${SEAT_INFO[c.ko ? c.role : c.seat][0]}</span>`).join("") : "");
-  txt($("spd"), `Speed ${Math.round(Math.abs(t.speed) * 3.6)} km/h${t.speed < -0.3 ? " (R)" : ""}   Kills ${t.kills}  Deaths ${t.deaths}`);
+  txt($("spd"), `Speed ${Math.round(Math.abs(t.speed) * 3.6)} km/h${t.speed < -0.3 ? " (R)" : ""}   Kills ${t.kills}  Deaths ${t.deaths}  Score ${fmtN(t.score || 0)}${t.streak >= 2 ? `  Streak ${t.streak}` : ""}`);
   const st = [];
   if (t.trackT > 0) st.push(`Tracks broken ${t.trackT.toFixed(0)}s`);
   if (t.engineT > 0) st.push(`Engine damaged ${t.engineT.toFixed(0)}s`);
@@ -4593,19 +4716,40 @@ const CONTRACTS = [
   { id: "ann", text: "Win an Annihilation battle", goal: 1, reward: 2600 },
   { id: "kills", text: "Destroy 10 enemies", goal: 10, reward: 2600 },
 ];
+// battle medals: earned for how a battle was played, each pays a small bonus and is counted in the career
+// collection. None of them needs a streak of days or punishes missing a battle.
+const MEDALS = [
+  { id: "blood", name: "First Blood", icon: "&#10022;", d: "Score the first kill of the battle", f: p => p.firstBlood },
+  { id: "double", name: "Double Strike", icon: "&#10006;", d: `2 kills within ${MULTI_WINDOW} s`, f: p => p.bestMulti >= 2 },
+  { id: "triple", name: "Triple Strike", icon: "&#10038;", d: `3 kills within ${MULTI_WINDOW} s`, f: p => p.bestMulti >= 3 },
+  { id: "unbroken", name: "Unbroken", icon: "&#9819;", d: "5 kills without being destroyed", f: p => p.bestStreak >= 5 },
+  { id: "marksman", name: "Marksman", icon: "&#9678;", d: "A kill from 600 m or more", f: p => p.longest >= 600 },
+  { id: "hunter", name: "Tank Hunter", icon: "&#9881;", d: "4 ground kills in one battle", f: p => p.gKills >= 4 },
+  { id: "ace", name: "Air Ace", icon: "&#9992;", d: "3 air kills in one battle", f: p => p.aKills >= 3 },
+  { id: "captain", name: "Zone Captain", icon: "&#9873;", d: "Capture 3 zones in one battle", f: p => p.caps >= 3 },
+  { id: "wingman", name: "Wingman", icon: "&#10010;", d: "3 assists in one battle", f: p => p.assists >= 3 },
+  { id: "smart", name: "Smart Shot", icon: "&#10148;", d: "A kill with a lock-on rocket", f: p => p.guidedKills >= 1 },
+  { id: "survivor", name: "Survivor", icon: "&#9829;", d: "Win a battle of 5 min or more without being destroyed", f: (p, o) => o.result === "win" && p.deaths === 0 && battleTime >= 300 },
+];
+const MEDAL_PAY = [300, 150]; // credits, XP per medal
+// vehicle mastery: battle score adds up per vehicle; every star pays once and is shown on the vehicle card
+const MASTERY = [600, 1800, 4000, 8000, 14000], MASTERY_PAY = L => 600 * L;
+const masteryLvl = pts => MASTERY.filter(x => pts >= x).length;
+const vstat = T => profile.vstats[(T.base || T).key] || { b: 0, k: 0, pts: 0, best: 0 };
+const stars = L => "&#9733;".repeat(L) + "&#9734;".repeat(MASTERY.length - L);
 const MAX_LVL = 30, xpFor = L => 1500 + 750 * (L - 1); // XP to go from level L to L + 1
 const lvlBonus = L => 1000 + 250 * L;
 function freshProfile() {
   return { v: 1, credits: 6000, xp: 0, level: 1, mods: {}, camoOwned: ["std"], camo: {}, cons: { smoke: 2, toolkit: 1, arty: 1, boost: 1 }, crew: { ground: 0, air: 0 },
-    boost: { credit: 0, xp: 0 }, stats: { battles: 0, wins: 0, kills: 0, gKills: 0, aKills: 0, caps: 0, waves: 0, earned: 0 }, contracts: [], lastContract: "",
+    boost: { credit: 0, xp: 0 }, stats: { battles: 0, wins: 0, kills: 0, gKills: 0, aKills: 0, caps: 0, waves: 0, earned: 0 }, contracts: [], lastContract: "", medals: {}, vstats: {}, best: 0,
     mode: "conquest", sel: "sherman", nation: "all" };
 }
 let profile = freshProfile(), saveState = "new"; // new | loaded | saved | corrupt | unavailable
 const num = (v, d = 0) => typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : d;
 // reads the save field by field so a hand-edited or older save can't break the game
-function loadProfile() {
-  let raw = null;
-  try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { saveState = "unavailable"; return; }
+function loadProfile(raw = null) { // raw: a save text to read instead of localStorage (self-test)
+  const given = raw !== null;
+  if (!given) try { raw = localStorage.getItem(SAVE_KEY); } catch (e) { saveState = "unavailable"; return; }
   if (!raw) return;
   try {
     const p = JSON.parse(raw), f = freshProfile();
@@ -4620,6 +4764,9 @@ function loadProfile() {
     for (const k in f.stats) f.stats[k] = num(p.stats && p.stats[k]);
     if (Array.isArray(p.contracts)) f.contracts = p.contracts.filter((c, i, a) => c && CONTRACTS.some(d => d.id === c.id) && a.findIndex(x => x && x.id === c.id) === i).slice(0, 3).map(c => ({ id: c.id, prog: num(c.prog) }));
     if (typeof p.lastContract === "string") f.lastContract = p.lastContract;
+    if (p.medals && typeof p.medals === "object") for (const m of MEDALS) if (num(p.medals[m.id])) f.medals[m.id] = Math.floor(num(p.medals[m.id]));
+    if (p.vstats && typeof p.vstats === "object") for (const k in p.vstats) { const v = p.vstats[k]; if (TYPES[k] && v && typeof v === "object") f.vstats[k] = { b: Math.floor(num(v.b)), k: Math.floor(num(v.k)), pts: Math.floor(num(v.pts)), best: Math.floor(num(v.best)) }; }
+    f.best = Math.floor(num(p.best));
     if (MODES[p.mode]) f.mode = p.mode;
     if (TYPES[p.sel]) f.sel = p.sel;
     if (p.nation === "all" || GROUND_LIST.concat(AIR_LIST).some(T => T.nation === p.nation)) f.nation = p.nation;
@@ -4627,7 +4774,7 @@ function loadProfile() {
   } catch (e) {
     saveState = "corrupt";
     // the next save overwrites the unreadable one: keep its text so a hand-edit typo doesn't lose the progress for good
-    try { if (localStorage.getItem(SAVE_KEY + ".bak") === null) localStorage.setItem(SAVE_KEY + ".bak", raw); } catch (e2) { /* storage full */ }
+    if (!given) try { if (localStorage.getItem(SAVE_KEY + ".bak") === null) localStorage.setItem(SAVE_KEY + ".bak", raw); } catch (e2) { /* storage full */ }
   }
 }
 function saveProfile() {
@@ -4689,6 +4836,15 @@ function grantRewards(o) {
   if (M.key === "laststand" && ms.done) rows.push([`${pl(ms.done, "wave")} destroyed`, ms.done * 300, ms.done * 160]);
   const mins = Math.floor(Math.min(battleTime, M.time) / 60);
   if (mins) rows.push([`${mins} min in battle`, mins * 40, mins * 25]);
+  const medals = MEDALS.filter(m => m.f(p, o));
+  for (const m of medals) { rows.push([`Medal: ${m.name}`, MEDAL_PAY[0], MEDAL_PAY[1]]); profile.medals[m.id] = (profile.medals[m.id] || 0) + 1; }
+  // vehicle mastery and personal bests from the battle score
+  const VT = p.type.base || p.type, vs = profile.vstats[VT.key] || (profile.vstats[VT.key] = { b: 0, k: 0, pts: 0, best: 0 });
+  const score = Math.round(p.score || 0), lv0 = masteryLvl(vs.pts), vBest = score > vs.best && score > 0, best = score > profile.best && score > 0;
+  vs.b++; vs.k += p.kills; vs.pts += score; if (vBest) vs.best = score; if (best) profile.best = score;
+  const lv1 = masteryLvl(vs.pts);
+  for (let L = lv0 + 1; L <= lv1; L++) rows.push([`${VT.name} mastery ${"\u2605".repeat(L)}`, MASTERY_PAY(L), 0]);
+  const mastery = { name: VT.name, lvl: lv1, pts: vs.pts, next: MASTERY[lv1] || null, prev: MASTERY[lv1 - 1] || 0, up: lv1 > lv0 };
   let cr = rows.reduce((s, r) => s + r[1], 0), xp = rows.reduce((s, r) => s + r[2], 0);
   if (profile.boost.credit > 0) { const b = Math.round(cr * 0.5); rows.push([`Credit booster +50% (${profile.boost.credit - 1} left)`, b, 0]); cr += b; profile.boost.credit--; }
   if (profile.boost.xp > 0) { const b = Math.round(xp * 0.5); rows.push([`XP booster +50% (${profile.boost.xp - 1} left)`, 0, b]); xp += b; profile.boost.xp--; }
@@ -4706,14 +4862,18 @@ function grantRewards(o) {
     if (c.prog >= d.goal && was < d.goal) done.push(d);
   }
   const saved = saveProfile();
-  return { rows, cr, xp, ups, done, saved };
+  return { rows, cr, xp, ups, done, saved, medals, score, vBest, best, mastery };
 }
 function rewardsHtml(r) {
   if (!r) return "";
   const body = r.rows.map(([a, c, x]) => `<tr><td>${a}</td><td>${c ? `+${fmtN(c)} Cr` : ""}</td><td>${x ? `+${fmtN(x)} XP` : ""}</td></tr>`).join("");
   const ups = r.ups.map(([L, b]) => `<div class="lvup">&#9733; Commander level ${L} reached: +${fmtN(b)} Cr bonus${unlocksAt(L)}</div>`).join("");
   const done = r.done.map(d => `<div class="lvup">&#10003; Contract complete: ${d.text}. Claim ${fmtN(d.reward)} Cr in the hangar</div>`).join("");
-  return `<table><tr><th style="text-align:left">Battle rewards</th><th>Credits</th><th>XP</th></tr>${body}<tr class="tot"><td>Total</td><td>+${fmtN(r.cr)} Cr</td><td>+${fmtN(r.xp)} XP</td></tr></table>${ups}${done}
+  const ms_ = r.mastery, pct = ms_ ? (ms_.next ? (ms_.pts - ms_.prev) / (ms_.next - ms_.prev) * 100 : 100) : 0;
+  const head = r.score === undefined ? "" : `<div class="bscore"><div><small>Battle score</small><b>${fmtN(r.score)}</b>${r.best ? `<span class="pb">NEW PERSONAL BEST</span>` : r.vBest ? `<span class="pb">BEST IN THIS VEHICLE</span>` : ""}</div>
+    <div class="mas"><small>${esc(ms_.name)} mastery ${r.mastery.up ? `<span class="pb">STAR EARNED</span>` : ""}</small><span class="stars">${stars(ms_.lvl)}</span><div class="pbar"><i style="width:${clamp(pct, 0, 100).toFixed(0)}%"></i></div><small>${ms_.next ? `${fmtN(ms_.pts)} / ${fmtN(ms_.next)} for the next star` : `fully mastered · ${fmtN(ms_.pts)}`}</small></div></div>
+    <div class="medals">${r.medals.length ? r.medals.map(m => `<span class="medal" title="${m.d}"><i>${m.icon}</i>${m.name}</span>`).join("") : `<span class="none">No medals this time. Try: ${MEDALS.filter(m => !profile.medals[m.id]).slice(0, 2).map(m => `${m.name} (${m.d.toLowerCase()})`).join(" or ") || "any medal again"}.</span>`}</div>`;
+  return `${head}<table><tr><th style="text-align:left">Battle rewards</th><th>Credits</th><th>XP</th></tr>${body}<tr class="tot"><td>Total</td><td>+${fmtN(r.cr)} Cr</td><td>+${fmtN(r.xp)} XP</td></tr></table>${ups}${done}
     <div style="opacity:.7;margin-top:4px">Balance ${fmtN(profile.credits)} Cr · Level ${profile.level} (${fmtN(profile.xp)}/${fmtN(xpFor(profile.level))} XP) · ${r.saved ? "progress saved" : "saving unavailable in this browser: progress lasts this session"}</div>`;
 }
 function unlocksAt(L) {
@@ -5047,6 +5207,8 @@ function renderLobby() {
   $("lbInfo").innerHTML = `<h2>${esc(T.name)}</h2><div class="meta"><span class="nat" style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${NAT_COL[T.nation]}"></span> ${T.nation} · ${T.cls} · free to use</div>
     <div class="rate">${rate}</div>
     <table>${vehicleRows(T).slice(0, 4).map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("")}</table>
+    ${(() => { const v = vstat(T), L = masteryLvl(v.pts), nx = MASTERY[L], pv = MASTERY[L - 1] || 0;
+      return `<div class="mas-l">Mastery <span class="stars">${stars(L)}</span> <span style="opacity:.75">${nx ? `${fmtN(v.pts)} / ${fmtN(nx)} score · next star +${fmtN(MASTERY_PAY(L + 1))} Cr` : "fully mastered"}</span><div class="pbar"><i style="width:${nx ? (v.pts - pv) / (nx - pv) * 100 : 100}%"></i></div><span style="opacity:.7">${v.b ? `${v.b} battle${v.b > 1 ? "s" : ""} · ${v.k} kills · best score ${fmtN(v.best)}` : "Not played yet: every battle's score counts toward its stars"}</span></div>`; })()}
     <h3>Modifications ${have.length}/${mods.length}</h3>
     <div style="font-size:12px;opacity:.85">${have.length ? have.map(x => `&#10003; ${x.name} <span style="color:#8af0a0">${x.fx}</span>`).join("<br>") : "Stock vehicle: buy modifications in the shop."}${profile.crew[T.air ? "air" : "ground"] ? `<br>&#9733; ${CREW[T.air ? "air" : "ground"].name} level ${profile.crew[T.air ? "air" : "ground"]}` : ""}</div>
     <div class="row"><button id="lbMods" class="secondary">&#128295; Modifications…</button></div>
@@ -5071,7 +5233,8 @@ function renderLobby() {
   $("lbBuyCons").onclick = () => openShop("cons");
   const S = profile.stats, saveTxt = { unavailable: "Saving is blocked in this browser: progress lasts until you close the page.", corrupt: "The old save could not be read: started a new profile (its text is kept in localStorage as steelfront.profile.v1.bak).", new: "New profile: progress is saved in this browser.", loaded: "Progress is saved in this browser.", saved: "Progress is saved in this browser." }[saveState];
   $("lbCareer").innerHTML = `<h3>Career</h3><div class="kv"><span>Battles · wins</span><span>${S.battles} · ${S.wins}${S.battles ? ` (${Math.round(S.wins / S.battles * 100)}%)` : ""}</span><span>Ground · air kills</span><span>${S.gKills} · ${S.aKills}</span>
-    <span>Zones · waves</span><span>${S.caps} · ${S.waves}</span><span>Credits earned</span><span>${fmtN(S.earned)}</span></div><div style="font-size:11px;opacity:.65;margin-top:6px">${saveTxt} All vehicles are free. Credits come only from playing: battle rewards, contracts and level-ups.</div>`;
+    <span>Zones · waves</span><span>${S.caps} · ${S.waves}</span><span>Credits earned</span><span>${fmtN(S.earned)}</span><span>Best battle score</span><span>${fmtN(profile.best)}</span></div>
+    <div style="font-size:12px;margin-top:6px">Medals ${MEDALS.filter(m => profile.medals[m.id]).length}/${MEDALS.length}</div><div class="medgrid">${MEDALS.map(m => `<span class="${profile.medals[m.id] ? "" : "no"}" title="${m.name}: ${m.d}${profile.medals[m.id] ? ` · earned ${profile.medals[m.id]}×` : " · not earned yet"}">${m.icon}${profile.medals[m.id] > 1 ? `<small>${profile.medals[m.id]}</small>` : ""}</span>`).join("")}</div><div style="font-size:11px;opacity:.65;margin-top:6px">${saveTxt} All vehicles are free. Credits come only from playing: battle rewards, contracts and level-ups.</div>`;
   lobbyCards();
 }
 function lobbyCards() {
@@ -5089,7 +5252,7 @@ function lobbyCards() {
   $("lbCards").innerHTML = (lobbyCat === "air" ? AIR_LIST : GROUND_LIST).filter(T => profile.nation === "all" || T.nation === profile.nation).map(T => {
     const n = (profile.mods[T.key] || []).length, tot = MODS[T.air ? "air" : "ground"].length, c = camoOf(T);
     return `<button class="vc${T === selectedType ? " sel" : ""}${modeAllows(m, T) ? "" : " no"}" role="option" aria-selected="${T === selectedType}" data-k="${T.key}" title="${T.name} · ${T.cls} · ${T.nation}${modeAllows(m, T) ? "" : ` · not allowed in ${m.name}`}">
-      <span class="st">${n}/${tot} mods</span>${vehicleIcon(T)}<b>${esc(T.name)}</b><span class="nat" style="background:${NAT_COL[T.nation]}"></span>${T.cls}${c.col ? ` · <span style="color:rgb(${c.col.map(v => Math.round(v * 255)).join(",")})">&#9632;</span>` : ""}</button>`;
+      <span class="st">${n}/${tot} mods</span><span class="ms${masteryLvl(vstat(T).pts) ? "" : " z"}" aria-label="Mastery ${masteryLvl(vstat(T).pts)} of ${MASTERY.length}">${stars(masteryLvl(vstat(T).pts))}</span>${vehicleIcon(T)}<b>${esc(T.name)}</b><span class="nat" style="background:${NAT_COL[T.nation]}"></span>${T.cls}${c.col ? ` · <span style="color:rgb(${c.col.map(v => Math.round(v * 255)).join(",")})">&#9632;</span>` : ""}</button>`;
   }).join("");
   for (const el of $("lbCards").querySelectorAll(".vc")) el.onclick = () => { selectVehicle(TYPES[el.dataset.k]); renderLobby(); };
 }
@@ -5214,7 +5377,8 @@ function renderModal() {
     h = `<h3 style="color:#9fd4ff">Ground vehicles</h3>${$("ctlGround").outerHTML.replace(/ id="[^"]*"/, "").replace(/ style="[^"]*"/, "")}
       <h3 style="color:#9fd4ff">Aircraft</h3>${$("ctlAir").outerHTML.replace(/ id="[^"]*"/, "").replace(/ style="[^"]*"/, "")}<p class="note" style="opacity:.9">${$("hintAir").innerHTML}</p>
       <h3 style="color:#9fd4ff">Consumables</h3><table class="ctl">${CONS.map(c => `<tr><td>${c.key}</td><td>${c.name}: ${c.d}</td></tr>`).join("")}</table>
-      <h3 style="color:#9fd4ff">Credits, XP and unlocks</h3><p class="note" style="opacity:.9">Every finished battle pays credits (Cr) and XP: a base amount for the result, plus kills, zone captures, broken-through zones, destroyed Last Stand waves and time in battle. Boosters add 50%. XP raises your commander level; each level pays a credit bonus and unlocks some camouflage and crew training. Contracts in the hangar pay extra credits when completed. Leaving a battle early pays nothing. All 15 vehicles are free and always available. Credits buy modifications (per vehicle), camouflage, consumables, crew training and boosters. There is no real-money shop. Progress is saved in this browser (localStorage).</p>`;
+      <h3 style="color:#9fd4ff">Credits, XP and unlocks</h3><p class="note" style="opacity:.9">Every finished battle pays credits (Cr) and XP: a base amount for the result, plus kills, zone captures, broken-through zones, destroyed Last Stand waves and time in battle. Boosters add 50%. XP raises your commander level; each level pays a credit bonus and unlocks some camouflage and crew training. Contracts in the hangar pay extra credits when completed. Leaving a battle early pays nothing. All ${GROUND_LIST.length + AIR_LIST.length} vehicles are free and always available. Credits buy modifications (per vehicle), camouflage, consumables, crew training and boosters. There is no real-money shop. Progress is saved in this browser (localStorage).</p>
+      <h3 style="color:#9fd4ff">Battle score, medals and mastery</h3><p class="note" style="opacity:.9">Your hits (+${SCORE.hit}, critical +${SCORE.crit}), kills (+${SCORE.kill}, aircraft +${SCORE.air}), assists (+${SCORE.assist}: an enemy you damaged in the last ${ASSIST_WINDOW} s is finished by someone else), captures (+${SCORE.cap}) and cleared waves (+${SCORE.wave}) pop up under the crosshair. Bonuses: first blood, long shots from ${LONG_SHOT} m, and double / triple kills within ${MULTI_WINDOW} s. Kill streaks (kills without being destroyed) get a callout at 3, 5 and 8. At the end of a battle you can earn medals (${MEDALS.length} to collect, +${MEDAL_PAY[0]} Cr / +${MEDAL_PAY[1]} XP each). Your score also counts toward that vehicle's mastery: ${MASTERY.length} stars, each paying a one-off credit bonus, plus personal bests per vehicle and overall. The score changes nothing in the fight, the enemy does not get harder, and nothing is lost if you take a break.</p>`;
   } else if (modalKind === "reset") {
     h = `<p class="note" style="opacity:.9">This deletes your credits, level, purchases, contracts and career stats in this browser and starts again with 6,000 Cr. Graphics settings are kept.</p>`;
     acts["reset:yes"] = () => { profile = freshProfile(); ensureContracts(); saveProfile(); selectVehicle(TYPES.sherman); hv.key = ""; closeModal(); renderLobby(); toast("Progress reset", "good"); };
@@ -5967,8 +6131,14 @@ function runSelfTest() {
     const aimAt = (t, e) => vnorm(vsub(center(e), seekerFrom(t)));
     const hold = (t, aim, secs) => { for (let i = 0; i < secs * 30; i++) updateLock(t, 1 / 30, typeof aim === "function" ? aim() : aim); };
     // tank vs tank, with the target driving sideways so only a steering rocket hits it
-    // a lane with a clear view over 320 m (the map is hilly)
-    const lx = [-900, -700, -500, -300, -100, 100, 300, 500, 700, 900].find(x => los([x, heightAt(x, 0) + 2.1, 0], [x, heightAt(x, 320) + 1.5, 320]) && los([x, heightAt(x, 0) + 2.1, 0], [x + 40, heightAt(x + 40, 200) + 1.5, 200])) ?? 0;
+    // a lane with a clear view over 320 m: the map, its buildings and trees are random, so each candidate is tested
+    // with the seeker itself (was: a terrain-only check at 10 lanes, which failed on some maps)
+    const laneOk = x => {
+      const pr = unit(H, 0, x, 0), from = seekerFrom(pr), sees = e => lockValid(pr, e, aimAt(pr, e), LOCK.cone, from);
+      if (![0, 6, 12, 20, 30].every(dx => sees(unit(HIST.sherman, 1, x + dx, 320, Math.PI / 2)))) return false;
+      return [-250, -150, -50, 50].every(dx => los(from, [x + dx, heightAt(x, 500) + 180, 500]));
+    };
+    const lx = Array.from({ length: 37 }, (_, i) => i % 2 ? -(i + 1) * 25 : i * 25).find(laneOk) ?? 0;
     const hn = unit(H, 0, lx, 0), foe = unit(HIST.sherman, 1, lx, 320, Math.PI / 2), mate = unit(HIST.sherman, 0, lx + 40, 200), far = unit(HIST.sherman, 1, lx, 1300);
     hn.isPlayer = true; shells = [];
     ok("a new Hornet has 4 rockets", hn.rockets === 4, hn.rockets);
@@ -6040,6 +6210,50 @@ function runSelfTest() {
     ok("R key in the Hornet fires a lock-on rocket", player.rockets === 3 && shells.some(s => s.guided && s.owner === player), player.rockets);
     let hudOk = true; try { drawHud(); } catch (e) { hudOk = String(e); }
     ok("lock HUD draws", hudOk === true, hudOk);
+  });
+  guard("battle score, medals and mastery", () => {
+    battle("conquest");
+    const AI0 = JSON.stringify(ENEMY_AI);
+    const foes = tanks.filter(t => t.team === 1 && !t.type.air), [f1, f2, f3] = foes, p = player;
+    ok("a battle starts with a zero score and no streak", p.score === 0 && p.streak === 0 && !pops.length);
+    now = 100; f1.pos = vadd(p.pos, [0, 0, 650]);
+    noteHit(f1, p, null, false); noteHit(f1, p, null, false);
+    ok("repeat hits on one target merge into one counting popup", pops.length === 1 && pops[0].n === 2 && p.score === 2 * SCORE.hit, JSON.stringify(pops));
+    destroyTank(f1, p);
+    ok("the first kill of the battle scores kill + first blood + long shot and shows a banner", p.firstBlood && p.streak === 1 && p.longest >= 600 && banner && banner.title === "DESTROYED"
+      && p.score === 2 * SCORE.hit + SCORE.kill + SCORE.blood + SCORE.long, `${p.score} ${banner && banner.title}`);
+    now = 105; f2.pos = vadd(p.pos, [0, 0, 80]); destroyTank(f2, p);
+    ok("a second kill within the window is a DOUBLE KILL", p.multi === 2 && p.bestMulti === 2 && banner.title === "DOUBLE KILL", banner.title);
+    now = 140; noteHit(f3, p, null, true); const ally = tanks.find(t => t.team === 0 && t !== p); destroyTank(f3, ally);
+    ok("a target you damaged and someone else finished is an assist", p.assists === 1 && p.kills === 2 && pops[0].text === "ASSIST", pops[0] && pops[0].text);
+    const killer = tanks.find(t => t.team === 1 && t.alive); destroyTank(p, killer);
+    ok("being destroyed ends the kill streak (the best streak is kept)", p.streak === 0 && p.bestStreak === 2);
+    let hudOk = true; try { drawAwards(hud.width, hud.height); } catch (e) { hudOk = String(e); }
+    ok("score popups, banner and kill flash draw", hudOk === true, hudOk);
+    p.caps = 3; profile.medals = {}; profile.vstats = {}; profile.best = 0;
+    const r = grantRewards({ result: "win", reason: "tickets", a: 1, e: 0 }), ids = r.medals.map(m => m.id).sort().join(",");
+    ok("medals are earned for how the battle was played", ids === "blood,captain,double,marksman", ids);
+    ok("each medal pays and is counted in the profile", r.rows.filter(x => x[0].startsWith("Medal:")).every(x => x[1] === MEDAL_PAY[0]) && profile.medals.blood === 1);
+    const vs = profile.vstats[(p.type.base || p.type).key];
+    ok("the battle score counts toward vehicle mastery and sets a personal best", r.best && r.vBest && vs.pts === r.score && vs.best === r.score && profile.best === r.score && r.score > 0, JSON.stringify(vs));
+    const r2 = grantRewards({ result: "loss", reason: "tickets", a: 0, e: 1 });
+    ok("a repeat score is not a new best", !r2.best && !r2.vBest);
+    ok("mastery stars come from the total score", masteryLvl(599) === 0 && masteryLvl(600) === 1 && masteryLvl(14000) === MASTERY.length);
+    vs.pts = MASTERY[0] - 60; p.score = 65; const r3 = grantRewards({ result: "win", reason: "time", a: 1, e: 0 });
+    ok("reaching a mastery star pays its bonus once", r3.mastery.up && r3.mastery.lvl === 1 && r3.rows.some(x => /mastery/.test(x[0]) && x[1] === MASTERY_PAY(1)), JSON.stringify(r3.mastery));
+    ok("the rewards screen shows score, mastery and medals", /Battle score/.test(rewardsHtml(r)) && /NEW PERSONAL BEST/.test(rewardsHtml(r)) && /class="medal"/.test(rewardsHtml(r)));
+    // saves: bad medal / mastery entries are dropped, good ones kept
+    const keep = profile;
+    { const st = saveState;
+      loadProfile(JSON.stringify({ medals: { blood: 2, bogus: 5, ace: -1 }, vstats: { sherman: { b: 3, k: 4, pts: 900, best: 400 }, nope: { b: 1 } }, best: "x" }));
+      saveState = st;
+      ok("a save's medals and mastery are read safely", profile.medals.blood === 2 && !("bogus" in profile.medals) && !("ace" in profile.medals) && profile.vstats.sherman.pts === 900 && !profile.vstats.nope && profile.best === 0, JSON.stringify([profile.medals, profile.vstats, profile.best]));
+    }
+    profile = keep;
+    ok("the score system does not touch the enemy AI handicap", JSON.stringify(ENEMY_AI) === AI0);
+    showMenu("start"); const lob = $("lbCareer").innerHTML + $("lbCards").innerHTML + $("lbInfo").innerHTML;
+    ok("the hangar shows medals, best score and mastery stars", /Medals \d+\/\d+/.test(lob) && /Best battle score/.test(lob) && /Mastery/.test(lob) && /class="ms/.test(lob));
+    state = "playing";
   });
   guard("battle soak", () => {
     for (const mode of ["conquest", "laststand"]) {

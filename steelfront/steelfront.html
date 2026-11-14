@@ -39,6 +39,7 @@
   #ammoRow span.ld { opacity: 1; }
   #crewRow span { flex: 1; padding: 1px 0; text-align: center; border-radius: 3px; font-size: 10px; background: rgba(125,255,122,.18); color: #c8ffc6; }
   #crewRow span.ko { background: rgba(255,90,70,.28); color: #ff9a8a; text-decoration: line-through; }
+  #ammoRow span.tip, #crewRow span.tip { flex: 2.4; border: none; background: none; color: #cfd8c8; opacity: .8; }
   #crewRow span.mv { background: rgba(255,212,121,.2); color: #ffe2a0; }
   #repair { position: relative; overflow: hidden; display: block; width: 100%; margin: 6px 0 0; padding: 6px 8px; font: bold 12px system-ui, sans-serif; letter-spacing: .5px;
     pointer-events: auto; background: #3c4a3a; box-shadow: 0 2px 0 #222a21; border: 1px solid rgba(255,255,255,.18); }
@@ -269,7 +270,8 @@
     </table>
     <table class="ctl" id="ctlAir" style="display:none">
       <tr><td>Mouse</td><td>Mouse-aim: the plane flies toward the circle</td><td>Left click</td><td>Fire guns</td></tr>
-      <tr><td>W / S</td><td>Throttle up / down</td><td>Space</td><td>Drop bomb</td></tr>
+      <tr><td>W / S</td><td>Throttle up / down (speed)</td><td>Space</td><td>Drop bomb</td></tr>
+      <tr><td>1 / 2 / 3 / 4</td><td>Throttle 25 / 50 / 75 / 100%</td><td>L</td><td>Easy flight on / off</td></tr>
       <tr><td>A / D</td><td>Manual roll</td><td>R</td><td>Fire rockets</td></tr>
       <tr><td>C (hold)</td><td>Free look</td><td>Shift / RMB</td><td>Zoom</td></tr>
       <tr><td>T</td><td>Rearm all weapons (15 s)</td><td>F</td><td>Repair airframe (15 s)</td></tr>
@@ -278,7 +280,7 @@
       <tr><td>P</td><td>Frame-rate counter</td><td></td><td></td></tr>
     </table>
     <p class="hint" id="hintGround" style="margin:-4px 0 10px">Spotted enemies (seen by you or an ally, or just fired near your side) get a red marker with their range, a red arrow at the screen edge when off-screen and a red square on the minimap; a red arc around the crosshair points to whoever just hit you. The small circle shows where your gun is really pointed; over an enemy it turns green (shell gets through), yellow (maybe), red (no) or grey (ricochet). Angle your front armour, hit enemy sides &amp; rear, shoot tracks to immobilise. Penetrations knock out crew: lose all but one and the tank is lost. APHE wrecks crews, AP gets through thicker plate, HE is for open-topped vehicles.</p>
-    <p class="hint" id="hintAir" style="margin:-4px 0 10px;display:none">Aircraft spawn in the air behind your base. The cross is where your guns point; lead moving targets using the lead marker. The diamond on the ground is where a bomb would land.</p>
+    <p class="hint" id="hintAir" style="margin:-4px 0 10px;display:none">Aircraft spawn in the air behind your base. Point the mouse where you want to go and the plane follows. Easy flight (on by default, L toggles) stops stalls, pulls up before the ground and keeps climbs and dives gentle. Set your speed with W/S or the 1–4 presets; the throttle bar shows the setting, the blue tick the speed it settles at and the red tick the stall speed. The cross is where your guns point; lead moving targets using the lead marker. The diamond on the ground is where a bomb would land.</p>
     <div id="rewards" aria-live="polite"></div>
     <button id="play">Deploy</button>
     <button id="restart" class="secondary" style="display:none">New battle</button>
@@ -3175,6 +3177,7 @@ function flyPlane(t, D, dt, manRoll = 0) {
   let rollCmd = clamp(bErr * 2.2, -1, 1);
   if (manRoll) rollCmd = clamp(rollCmd * 0.15 + manRoll, -1, 1);
   let pitchCmd = dz < 0 ? 1 : clamp(Math.atan2(dy, dz) * 5, -0.45, 1);
+  if (t.assist && s < T.stall * FLIGHT.slow) pitchCmd = Math.min(pitchCmd, clamp((s - T.stall) / (T.stall * (FLIGHT.slow - 1)), 0.1, 1)); // no hard pulls near the stall
   // bank first, then pull; blended in smoothly (a hard switch at 0.3 rad made the nose twitch)
   if (Math.abs(D[1]) < 0.6 && !manRoll) pitchCmd *= lerp(1, clamp(1.25 - Math.abs(bErr) * 1.5, 0.1, 1), smoothstep(0.2, 0.4, off));
   const yawCmd = clamp(Math.atan2(dx, Math.max(dz, 0.2)) * 4, -1, 1) * lerp(1, 0.3, smoothstep(0.2, 0.4, off));
@@ -3191,7 +3194,8 @@ function flyPlane(t, D, dt, manRoll = 0) {
     t.X = R(t.X); t.Y = R(t.Y); t.Z = R(t.Z); rotPlane(t, 0, 0, 0);
   }
   if (s < T.stall) rotPlane(t, -(1 - s / T.stall) * 0.9 * dt * Math.sign(t.Y[1] || 1), 0, 0);
-  const thrust = T.acc * t.throttle * (t.engineT > 0 ? 0.55 : 1) * (t.fireT > 0 ? 0.8 : 1) * (t.boostT > 0 ? 1.45 : 1);
+  const thr = flightThrottle(t);
+  const thrust = T.acc * thr * (t.engineT > 0 ? 0.55 : 1) * (t.fireT > 0 ? 0.8 : 1) * (t.boostT > 0 ? 1.45 : 1);
   const drag = T.acc / (T.vmax * T.vmax) * s * s, induced = 7 * Math.pow(Math.abs(t.pr) / T.pitchRate, 2) * (s / T.corner);
   t.speed = Math.max(20, s + (thrust - drag - induced - G * t.Z[1]) * dt);
   t.sink = approach(t.sink, s < T.stall * 1.1 ? G * (1 - s / (T.stall * 1.1)) * 3 : 0, dt * 6);
@@ -3203,6 +3207,56 @@ function flyPlane(t, D, dt, manRoll = 0) {
 function flySubsteps(t, D, dt, manRoll = 0) {
   const n = Math.max(1, Math.ceil(dt / (1 / 120) - 1e-6)), h = dt / n;
   for (let i = 0; i < n; i++) flyPlane(t, D, h, manRoll);
+}
+// ---------------------------------------------------------------- player flight assist & throttle
+// Easy flight (L, on by default, saved) only ever helps the player's own aircraft (t.assist); AI planes fly the
+// normal model. It caps climb and dive angles, pulls up before the ground, stops the plane stalling by limiting
+// the pull and adding throttle when slow, and smooths the mouse-aim target so the nose doesn't overshoot.
+const FLIGHT = { climb: 0.64, dive: -0.64, floor: 45, look: [0.5, 1, 1.5, 2, 3, 4], slow: 1.3, smooth: 6, rate: 0.6, presets: [0.25, 0.5, 0.75, 1] };
+let easyFlight = true;
+try { easyFlight = localStorage.getItem("steelfront.easyflight") !== "off"; } catch (e) { /* storage blocked: default on */ }
+// throttle the engine actually gets: with the assist, a slow plane gets extra power so it can't stall
+function flightThrottle(t) {
+  if (!t.assist) return t.throttle;
+  const need = clamp((t.type.stall * (FLIGHT.slow + 0.05) - t.speed) / (t.type.stall * 0.3), 0, 1);
+  t.autoThr = need > t.throttle; t.effThr = Math.max(t.throttle, need);
+  return t.effThr;
+}
+// level-flight speed at a throttle setting (thrust = drag), for the HUD's cruise readout
+function cruiseSpeed(t, thr = t.throttle) {
+  const v = t.type.vmax * Math.sqrt(Math.max(0, thr) * (t.engineT > 0 ? 0.55 : 1));
+  return t.assist ? Math.max(v, t.type.stall * FLIGHT.slow) : v;
+}
+function setThrottle(t, v) { t.throttle = clamp(v, 0, 1); }
+function assistDir(t, D, dt) {
+  const T = t.type; let d = D.slice(); t.assistNote = "";
+  d[1] = clamp(d[1], FLIGHT.dive, FLIGHT.climb);
+  if (t.speed < T.stall * FLIGHT.slow) { d[1] = Math.min(d[1], 0.02); t.assistNote = "STALL PROTECTION"; }
+  // ground avoidance: sample the flight path ahead; pull up if any point is too close to the terrain
+  let danger = t.pos[1] - heightAt(t.pos[0], t.pos[2]) < FLIGHT.floor && t.vel[1] < 0;
+  for (const k of FLIGHT.look) { if (danger) break; const q = vadd(t.pos, vscale(t.vel, k)); danger = q[1] < heightAt(q[0], q[2]) + FLIGHT.floor; }
+  if (danger) {
+    let h = [d[0], 0, d[2]]; if (vlen(h) < 0.2) h = [t.Z[0], 0, t.Z[2]]; if (vlen(h) < 0.05) h = [0, 0, 1];
+    h = vnorm(h); d = [h[0] * 0.8, 0.6, h[2] * 0.8]; t.assistNote = "AUTO PULL-UP";
+  }
+  d = vnorm(d);
+  t.dS = t.dS && !danger ? vnorm(vlerp(t.dS, d, 1 - Math.exp(-FLIGHT.smooth * dt))) : d;
+  return t.dS;
+}
+// the player's per-frame flight input: W/S throttle, A/D roll, mouse-aim direction, guns
+function playerFlight(p, dt) {
+  if (keys.has("KeyW") || keys.has("ArrowUp")) setThrottle(p, p.throttle + dt * FLIGHT.rate);
+  if (keys.has("KeyS") || keys.has("ArrowDown")) setThrottle(p, p.throttle - dt * FLIGHT.rate);
+  const man = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
+  p.assist = easyFlight;
+  let D = boundaryDir(p) || freeDir || lookDir();
+  if (p.assist) D = assistDir(p, D, dt); else { p.assistNote = ""; p.autoThr = false; p.dS = null; }
+  flySubsteps(p, D, dt, man);
+  planeGuns(p, dt, mouseDown);
+}
+function toggleEasyFlight() {
+  easyFlight = !easyFlight; centerMsg(`EASY FLIGHT ${easyFlight ? "ON" : "OFF"} (L)`, "#9fd4ff"); announce(`Easy flight ${easyFlight ? "on" : "off"}`);
+  if (!SELFTEST) try { localStorage.setItem("steelfront.easyflight", easyFlight ? "on" : "off"); } catch (err) { /* not persisted */ }
 }
 function boundaryDir(t) {
   const p = t.pos;
@@ -3735,6 +3789,9 @@ document.addEventListener("keydown", e => {
   }
   const ak = { Digit1: "ap", Digit2: "aphe", Digit3: "he", Numpad1: "ap", Numpad2: "aphe", Numpad3: "he" }[e.code];
   if (ak && player.alive && hasShells(player.type)) selectAmmo(player, ak);
+  const tk = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3 }[e.code];
+  if (tk !== undefined && player.alive && player.type.air) { setThrottle(player, FLIGHT.presets[tk]); centerMsg(`THROTTLE ${Math.round(player.throttle * 100)}%`, "#9fd4ff"); }
+  if (e.code === "KeyL" && player.type.air) toggleEasyFlight();
   const ck = { KeyG: "smoke", KeyV: "toolkit", KeyB: "arty", KeyX: "boost" }[e.code];
   if (ck) useCons(ck);
   if (player.type.air && player.alive) {
@@ -3839,12 +3896,7 @@ function step(dt) {
   const p = player;
   updateRepair(p, dt);
   if (p.alive && p.type.air) {
-    if (keys.has("KeyW") || keys.has("ArrowUp")) p.throttle = Math.min(1, p.throttle + dt * 0.7);
-    if (keys.has("KeyS") || keys.has("ArrowDown")) p.throttle = Math.max(0, p.throttle - dt * 0.7);
-    const man = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
-    const D = boundaryDir(p) || freeDir || lookDir();
-    flySubsteps(p, D, dt, man);
-    planeGuns(p, dt, mouseDown);
+    playerFlight(p, dt);
   } else if (p.alive) {
     const thr = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
     const st = (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0) - (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0);
@@ -4253,7 +4305,8 @@ function drawAirHud(W, H) {
   // instruments
   const agl = p.pos[1] - heightAt(p.pos[0], p.pos[2]);
   hx.font = "13px ui-monospace, monospace"; hx.textAlign = "right"; hx.fillStyle = "#e8ffe0";
-  hx.fillText(`IAS ${Math.round(p.speed * 3.6)} km/h`, cx - 70, cy - 6); hx.fillText(`THR ${Math.round(p.throttle * 100)}%`, cx - 70, cy + 12);
+  hx.fillText(`IAS ${Math.round(p.speed * 3.6)} km/h`, cx - 70, cy - 6); hx.fillText(`THR ${Math.round(p.throttle * 100)}%${p.autoThr ? " +AUTO" : ""}`, cx - 70, cy + 12);
+  drawThrottle(p, cx - 240, cy - 60, 120);
   hx.textAlign = "left"; hx.fillText(`ALT ${Math.round(p.pos[1])} m`, cx + 70, cy - 6); hx.fillText(`AGL ${Math.round(agl)} m`, cx + 70, cy + 12);
   hx.textAlign = "center"; hx.font = "bold 16px system-ui, sans-serif";
   const warn = [];
@@ -4261,12 +4314,31 @@ function drawAirHud(W, H) {
   const ahead = vadd(p.pos, vscale(p.vel, 3));
   if (ahead[1] < heightAt(ahead[0], ahead[2]) + 10) warn.push("PULL UP");
   if (p.speed < p.type.stall * 1.05) warn.push("STALL");
+  if (p.assistNote) warn.push(p.assistNote);
   if (freeDir) warn.push("FREE LOOK");
   if (warn.length && (now * 3) % 1 < 0.7) { hx.fillStyle = "#ff6a5a"; warn.forEach((w, i) => hx.fillText(w, cx, cy + 70 + i * 20)); }
   // bank indicator
   const bank = Math.atan2(-p.X[1], p.Y[1]);
   hx.save(); hx.translate(cx, H - 70); hx.rotate(bank); hx.strokeStyle = "rgba(255,255,255,.8)"; hx.lineWidth = 2;
   hx.beginPath(); hx.moveTo(-26, 0); hx.lineTo(-8, 0); hx.lineTo(0, 6); hx.lineTo(8, 0); hx.lineTo(26, 0); hx.moveTo(0, -8); hx.lineTo(0, -16); hx.stroke(); hx.restore();
+}
+// throttle gauge: the fill is the throttle setting, the white tick the current speed against top speed,
+// the blue tick the level-flight speed the throttle will settle at; presets are the 1-4 keys
+function drawThrottle(p, x, y, h) {
+  const w = 12, T = p.type, top = T.vmax * 1.05, yy = v => y + h - clamp(v / top, 0, 1) * h;
+  hx.fillStyle = "rgba(0,0,0,.45)"; hx.fillRect(x, y, w, h);
+  if (p.autoThr) { hx.fillStyle = "#ffb84d"; hx.fillRect(x, y + h * (1 - p.effThr), w, h * p.effThr); } // extra power added by stall protection
+  hx.fillStyle = "#7dff7a"; hx.fillRect(x, y + h * (1 - p.throttle), w, h * p.throttle);
+  hx.strokeStyle = "rgba(255,255,255,.7)"; hx.lineWidth = 1; hx.strokeRect(x, y, w, h);
+  hx.font = "10px ui-monospace, monospace"; hx.textAlign = "right"; hx.fillStyle = "rgba(232,255,224,.75)";
+  FLIGHT.presets.forEach((v, i) => { const q = y + h * (1 - v); hx.fillRect(x - 4, q, 4, 1); hx.fillText(String(i + 1), x - 6, q + 4); });
+  const st = yy(T.stall); hx.fillStyle = "#ff6a5a"; hx.fillRect(x + w, st, 8, 2);
+  hx.fillStyle = "#9fd4ff"; hx.fillRect(x + w, yy(cruiseSpeed(p)) - 1, 10, 2);
+  hx.fillStyle = "#fff"; hx.fillRect(x + w, yy(p.speed) - 1.5, 14, 3);
+  hx.textAlign = "center"; hx.font = "11px ui-monospace, monospace"; hx.fillStyle = "#e8ffe0";
+  hx.fillText("THR", x + w / 2, y - 18); hx.fillText(`${Math.round(p.throttle * 100)}%`, x + w / 2, y - 5);
+  hx.fillStyle = "#9fd4ff"; hx.fillText(`→${Math.round(cruiseSpeed(p) * 3.6)}`, x + w / 2, y + h + 14);
+  hx.fillStyle = easyFlight ? "#7dff7a" : "rgba(232,255,224,.6)"; hx.fillText(easyFlight ? "EASY" : "MANUAL", x + w / 2, y + h + 28);
 }
 function drawMinimap() {
   mm.drawImage(minimapBg, 0, 0);
@@ -4312,9 +4384,10 @@ function updateDom(dt) {
     const guns = T.guns.map((g, i) => t.gunAmmo[i]).join("/");
     txt($("rltext"), rearm ? `Rearming all weapons — ${Math.ceil(t.rearmT)} s${now - (t.shotT ?? -1) <= 0.25 ? " (paused while firing)" : ""}` : [`Guns ${guns}`, T.bombs ? `Bombs ${t.bombs}×${T.bombs.kg} kg` : "", T.rockets ? `Rockets ${t.rockets}` : "", fullyArmed(t) ? "" : "T: rearm"].filter(Boolean).join(" · "));
     css($("rlbar").firstChild, "width", `${rearm ? (1 - t.rearmT / T.reload) * 100 : armedFrac(t) * 100}%`);
-    txt($("spd"), `IAS ${Math.round(t.speed * 3.6)} km/h  Alt ${Math.round(t.pos[1])} m   Kills ${t.kills}  Deaths ${t.deaths}`);
+    txt($("spd"), `IAS ${Math.round(t.speed * 3.6)} km/h  THR ${Math.round(t.throttle * 100)}%→${Math.round(cruiseSpeed(t) * 3.6)}  Alt ${Math.round(t.pos[1])} m   Kills ${t.kills}  Deaths ${t.deaths}`);
     txt($("status"), [t.repairT > 0 ? "Repairing airframe" : "", t.engineT > 0 ? "Engine damaged" : "", t.fireT > 0 ? "ON FIRE" : "", t.wingDmg > 0 ? "Wing damaged" : ""].filter(Boolean).join(" · "));
-    setHtml($("ammoRow"), ""); setHtml($("crewRow"), "");
+    setHtml($("ammoRow"), FLIGHT.presets.map((v, i) => `<span class="${Math.abs(t.throttle - v) < 0.02 ? "sel" : ""}" title="Throttle ${Math.round(v * 100)}% (cruise about ${Math.round(cruiseSpeed(t, v) * 3.6)} km/h)"><b>${i + 1}</b>${Math.round(v * 100)}%</span>`).join("") + `<span class="tip">W/S throttle</span>`);
+    setHtml($("crewRow"), `<span class="${easyFlight ? "" : "ko"}" title="Easy flight: stall protection, auto pull-up, gentler climbs and dives. Press L to toggle.">L</span><span class="tip">Easy flight ${easyFlight ? "ON" : "OFF"}</span>`);
   } else {
   txt($("hpbar").previousSibling, "Hull integrity");
   css($("hpbar").firstChild, "width", `${Math.max(0, t.hp / t.type.hp * 100)}%`);
@@ -5045,7 +5118,7 @@ function renderModal() {
     }
   } else if (modalKind === "help") {
     h = `<h3 style="color:#9fd4ff">Ground vehicles</h3>${$("ctlGround").outerHTML.replace(/ id="[^"]*"/, "").replace(/ style="[^"]*"/, "")}
-      <h3 style="color:#9fd4ff">Aircraft</h3>${$("ctlAir").outerHTML.replace(/ id="[^"]*"/, "").replace(/ style="[^"]*"/, "")}
+      <h3 style="color:#9fd4ff">Aircraft</h3>${$("ctlAir").outerHTML.replace(/ id="[^"]*"/, "").replace(/ style="[^"]*"/, "")}<p class="note" style="opacity:.9">${$("hintAir").innerHTML}</p>
       <h3 style="color:#9fd4ff">Consumables</h3><table class="ctl">${CONS.map(c => `<tr><td>${c.key}</td><td>${c.name}: ${c.d}</td></tr>`).join("")}</table>
       <h3 style="color:#9fd4ff">Credits, XP and unlocks</h3><p class="note" style="opacity:.9">Every finished battle pays credits (Cr) and XP: a base amount for the result, plus kills, zone captures, broken-through zones, destroyed Last Stand waves and time in battle. Boosters add 50%. XP raises your commander level; each level pays a credit bonus and unlocks some camouflage and crew training. Contracts in the hangar pay extra credits when completed. Leaving a battle early pays nothing. All 15 vehicles are free and always available. Credits buy modifications (per vehicle), camouflage, consumables, crew training and boosters. There is no real-money shop. Progress is saved in this browser (localStorage).</p>`;
   } else if (modalKind === "reset") {
@@ -5739,6 +5812,44 @@ function runSelfTest() {
     ok("handicap values make enemies slower and less accurate, never better", ENEMY_AI.see <= 1 && ENEMY_AI.react >= 1 && ENEMY_AI.aim >= 1 && ENEMY_AI.air >= 1 && ENEMY_AI.cadence[0] >= 0.2);
     const sh = unit(HIST.sherman, 0, 0, 0);
     ok("enemy tanks load AP (less spall) against armour, allies still pick APHE when it works", aiAmmo(foe, sh) === "ap" && aiAmmo(ally, unit(HIST.sherman, 1, 40, 0)) === "aphe");
+  });
+  guard("flight assist and throttle", () => {
+    // a plane at `alt` m above the ground flying along `dir`, AI off
+    const flyer = (T, x, z, alt, dir, thr = 1) => {
+      const u = unit(T, 0, x, z); spawnPlane(u); u.ai = null; u.Z = vnorm(dir); u.X = vnorm(vcross([0, 1, 0], u.Z)); u.Y = vcross(u.Z, u.X);
+      u.pos = [x, heightAt(x, z) + alt, z]; u.speed = T.vmax * 0.85; u.vel = vscale(u.Z, u.speed); u.throttle = thr; updateTankMatrices(u); return u;
+    };
+    const sim = (u, assist, D, secs) => {
+      u.assist = assist; u.dS = null; let agl = Infinity, vmin = Infinity; const dt = 1 / 60;
+      for (let i = 0; i < secs / dt; i++) {
+        const d = assist ? assistDir(u, D, dt) : D; flySubsteps(u, d, dt);
+        agl = Math.min(agl, u.pos[1] - heightAt(u.pos[0], u.pos[2])); if (i * dt > 3) vmin = Math.min(vmin, u.speed);
+      }
+      return { agl, vmin };
+    };
+    const P = AIR.p51, DOWN = [0, -1, 0.05], UP = [0, 0.9, 0.44];
+    const d1 = sim(flyer(P, 300, -200, 250, [0, 0, 1]), true, DOWN, 14), d0 = sim(flyer(P, 300, -200, 250, [0, 0, 1]), false, DOWN, 14);
+    ok("easy flight: mouse-aiming straight down pulls up before the ground", d1.agl > 15, `lowest ${d1.agl.toFixed(0)} m AGL`);
+    ok("…without it the same input flies into the ground", d0.agl < 1.2, `lowest ${d0.agl.toFixed(0)} m AGL`);
+    const s1 = sim(flyer(P, 0, 0, 1200, [0, 0, 1], 0), true, UP, 25), s0 = sim(flyer(P, 0, 0, 1200, [0, 0, 1], 0), false, UP, 25);
+    ok("easy flight: a steep climb at idle throttle never stalls", s1.vmin > P.stall, `min ${(s1.vmin * 3.6).toFixed(0)} km/h, stall ${(P.stall * 3.6).toFixed(0)}`);
+    ok("…without it the plane stalls", s0.vmin < P.stall, `min ${(s0.vmin * 3.6).toFixed(0)} km/h`);
+    const slow = flyer(P, 0, 0, 1500, [0, 0, 1], 0.25), fast = flyer(P, 200, 0, 1500, [0, 0, 1], 1);
+    sim(slow, true, [0, 0, 1], 60); sim(fast, true, [0, 0, 1], 60);
+    ok("throttle sets the speed: level flight settles near the cruise readout", Math.abs(slow.speed / cruiseSpeed(slow) - 1) < 0.12 && Math.abs(fast.speed / cruiseSpeed(fast) - 1) < 0.12 && slow.speed < fast.speed * 0.7,
+      `25%: ${(slow.speed * 3.6).toFixed(0)} vs ${(cruiseSpeed(slow) * 3.6).toFixed(0)} km/h, 100%: ${(fast.speed * 3.6).toFixed(0)} vs ${(cruiseSpeed(fast) * 3.6).toFixed(0)}`);
+    battle("conquest", AIR.p51);
+    const key = (code, up) => document.dispatchEvent(new KeyboardEvent(up ? "keyup" : "keydown", { code }));
+    key("Digit2"); key("Digit2", true);
+    ok("1-4 set the aircraft throttle presets", player.throttle === 0.5, player.throttle);
+    keys.add("KeyW"); playerFlight(player, 0.5); keys.delete("KeyW");
+    ok("holding W opens the throttle", Math.abs(player.throttle - (0.5 + 0.5 * FLIGHT.rate)) < 1e-6, player.throttle);
+    const was = easyFlight; key("KeyL"); key("KeyL", true);
+    ok("L toggles easy flight", easyFlight === !was); if (easyFlight !== was) toggleEasyFlight();
+    for (let i = 0; i < 30; i++) step(1 / 30);
+    ok("only the player's aircraft gets the assist", tanks.every(t => !t.type.air || t.isPlayer || !t.assist) && player.assist === easyFlight);
+    battle("conquest"); key("Digit3"); key("Digit3", true);
+    ok("in a tank 1-3 still pick shells", player.ammo === "he", player.ammo);
   });
   guard("battle soak", () => {
     for (const mode of ["conquest", "laststand"]) {

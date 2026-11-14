@@ -60,19 +60,42 @@ This pass answers playtest feedback: it was hard to tell where the enemy was, an
 
 Over 3 × 180 s simulated Conquest battles, the enemy used to out-kill your side 27 to 17. With the handicap your side leads 26 to 18.
 
+## Pass 3: easier flying, adjustable speed
+
+This pass answers playtest feedback: the plane was too hard to control, and there was no easy way to set its speed.
+
+**Speed.** Hold **W / S** to open or close the throttle, or press **1 / 2 / 3 / 4** for 25 / 50 / 75 / 100%. A throttle bar sits left of the crosshair:
+
+- the green fill is the throttle setting
+- the white tick is your current speed
+- the blue tick and the `→` number are the speed (km/h) you'll settle at in level flight
+- the red tick is the stall speed
+
+The left panel also shows the presets (the current one highlighted) and `THR n%→km/h`. The 1–3 keys still pick shells in a tank.
+
+**Easy flight** is on by default. Press **L** in an aircraft to toggle it; the setting is saved. It only helps the player's plane; AI planes fly the normal model.
+
+- **Stall protection:** when you get slow, it limits how hard the nose pulls, stops further climbing and adds power. The extra power shows as orange on the bar, with `+AUTO` and "STALL PROTECTION".
+- **Auto pull-up:** it looks up to 4 s ahead along your flight path and climbs away if that path comes within 45 m of the ground ("AUTO PULL-UP").
+- **Gentler climbs and dives:** they're capped at about 40°, so a big mouse swing can't put the plane into a vertical dive or loop.
+- **Steadier nose:** the mouse-aim target is smoothed slightly so the nose doesn't overshoot.
+
+With it off, the plane flies exactly as before.
+
 ## Testing
 
 ```sh
 node steelfront/tests/run-selftest.mjs    # exits 0 on PASS; set CHROME=/path/to/chrome if it isn't on PATH
 ```
 
-You can also open `steelfront.html?selftest` in any browser. The page runs 46 seeded checks and shows the results on screen. The checks cover:
+You can also open `steelfront.html?selftest` in any browser. The page runs 56 seeded checks and shows the results on screen. The checks cover:
 
 - the armour lookup and damage model
 - each fix above, as a regression check
 - crew effects, shell switching, HE and fire
 - the AI's zone and shell choices
 - spotting, the marker and arrow directions, and the enemy AI handicap
+- easy flight (pull-up, stall protection, player only), throttle keys and level-flight speed per throttle
 - two 150 s simulated battles (Conquest and Last Stand) checked for exceptions, NaNs and zombie crews
 
 The self-test uses a throwaway profile and never writes your save. `?nointro` skips the intro.
@@ -87,7 +110,7 @@ Run this in a real browser after changes to gameplay, HUD or input.
 4. Aim at an enemy: the marker turns green, yellow, red or grey. In the sight it shows `pen/effective mm`. A Panther's front hull is red for the Sherman and its side is green.
 5. Get penetrated, or use the console. Crew chips cross out, the hit message lists the knocked-out crew, and "New gunner in Ns" appears and resolves.
 6. Catch fire: "ON FIRE — F to extinguish" appears. F puts the fire out without starting a repair. A second F starts the repair. During the repair the gun neither turns nor fires.
-7. Fly an aircraft: the ammo and crew rows are hidden. Rockets on a heavy tank's front no longer kill it outright, while bombs still do.
+7. Fly an aircraft: the panel shows throttle presets 1–4 and the easy-flight chip, not shells or crew. W/S and 1–4 change the throttle bar and the speed settles at the blue tick. Aim straight down and the plane pulls up by itself; L turns that off. Rockets on a heavy tank's front no longer kill it outright, while bombs still do.
 8. Last Stand: let the timer run out with B neutral (console: `steelFront.battleTime = steelFront.mode.time`). The result is DEFEAT.
 9. Spotted enemies show a red marker with their range. Turn away and an edge arrow points back at them; M toggles both. Get hit and a red arc points to the shooter.
 10. Tab shows the scoreboard, P the FPS counter and Esc pauses. Leaving to the hangar pays no rewards.

@@ -225,13 +225,40 @@ Playtest request: improve every aspect (VFX, SFX, UX, UI and the rest) so the ga
 - **No music:** battles have no soundtrack; the intro keeps its own score.
 - **Test hook:** `steelFront.timeScale` (console only) slows the simulation to capture short effects in screenshots.
 
+## Pass 10: second polish pass
+
+Playtest request, again: improve VFX, SFX, UI and UX so the game is more attractive. This pass adds new feedback rather than retuning the first one; gameplay, difficulty, the enemy AI handicap, saves, unlocks and unassisted flight are unchanged.
+
+**VFX**
+- **Track marks:** ground vehicles near the camera press dark strips into the ground under both tracks, following the slope. They fade over 35 s, are capped per graphics preset (900 on Medium/High, 360 on Low) and are cleared for every battle.
+- **Shell trails:** cannon shells in flight draw a faint hot streak and a glowing head. They are drawn from the shells themselves, so they cost no particles.
+- **Exhaust:** a short dark exhaust puff when a vehicle near the camera pulls away.
+
+**SFX** (all on the existing buses, so volume, mute and gesture start apply)
+- **Breech clack:** a two-part metallic clack the moment your cannon is loaded, paired with a green pulse on the gun marker.
+- **Track clatter:** link noise whose rate follows your ground speed and stops when you stop.
+- **Near misses:** an enemy shell passing within about 14 m of you gives a placed, falling whizz, once per shell.
+- **Zone stings:** a rising three-note chime when your team captures a zone and two low notes when one is lost (interface volume).
+
+**UI and UX**
+- **Capture ring:** standing in a zone that is not yet yours shows a ring with the zone letter over the hull indicator: blue while capturing, orange and pulsing when contested, red when the enemy is taking it. It replaces the centre-screen "CAPTURING A 43%" text.
+- **Health bar:** green, amber below 60%, red below 35%. A pale segment shows what the last hit took and drains away.
+- **Stat row:** speed (large), kills, deaths, score and streak are laid out as chips instead of one long line.
+- **Edge arrows:** enemy markers and edge arrows no longer sit under the top score bar, the info panel or the minimap.
+- **Hangar:** **← / →** pick the previous or next vehicle in the line-up and **Enter** goes to battle (not while a window or menu is open, and a focused button keeps its own Enter). The drag-to-rotate hint no longer hides behind the vehicle tabs.
+
+**Known limits**
+- **Track-mark scope:** marks are flat strips laid only within 260 m of the camera; they do not deform the terrain.
+- **Trail distance:** shell trails are thin, so they read best from the side and up close.
+- **Same audio limits:** sound is still stereo, not HRTF, and there is still no battle music.
+
 ## Testing
 
 ```sh
 node steelfront/tests/run-selftest.mjs    # exits 0 on PASS; set CHROME=/path/to/chrome if it isn't on PATH
 ```
 
-You can also open `steelfront.html?selftest` in any browser. The page runs 185 seeded checks and shows the results on screen. The checks cover:
+You can also open `steelfront.html?selftest` in any browser. The page runs 206 seeded checks and shows the results on screen. The checks cover:
 
 - the armour lookup and damage model
 - each fix above, as a regression check
@@ -245,6 +272,7 @@ You can also open `steelfront.html?selftest` in any browser. The page runs 185 s
 - match flow: every mode runs to a timed result with rewards, a final-push kill can win the battle, and a 90 s Air Superiority battle with a supply column runs clean
 - vehicle models and premium vehicles: every model builds (with low-detail copies, and a prop-less jet), the weathering pass, premium stats beat the stock line-up, premium vehicles never appear in AI slots or Last Stand waves, failed and two-step purchases, the exact deduction, no double buy, ownership through save and load (junk dropped, old saves fine), locked vehicles falling back to stock at spawn and respawn, a 20 s Talon flight, rendering every premium vehicle with the HUD, and the hangar's price, shortfall, locked TO BATTLE and owned states
 - audio, settings and effects: safe settings loading, the audio buses, nothing queued while suspended, stereo placement, shake off / capped / fading / reduced and never moving the aim, effect particles within budget and expiring, a clean start for each battle, the low-integrity glow and its setting, the H card, N mute, the pause bar, the settings window and live sliders, and that the enemy AI handicap is untouched
+- polish pass 2: track marks (both tracks, on the ground, capped, expiring, none far away, cleared each battle), exhaust only when pulling away, the breech clack once per reload, a near-miss whizz once per enemy shell (none for your own), track clatter following speed, the capture ring and zone sting, the health bar's lost segment and colours, the stat chips, edge-arrow clearance, rendering marks and trails without GL errors, hangar ← / → and Enter (not from a button or with a window open), and that `ENEMY_AI` is unchanged
 - lock-on test setup: the lane must be visible from the rocket pods as well as the seeker, and the test aircraft flies at an altitude the seeker can see (both used to fail on some random maps)
 - two 150 s simulated battles (Conquest and Last Stand) checked for exceptions, NaNs and zombie crews
 
@@ -266,6 +294,7 @@ Run this in a real browser after changes to gameplay, HUD or input.
 10. Deploy the Hornet R-5, then the P-51D Kestrel. Hold an enemy inside the dashed circle: the yellow box turns red (LOCKED), R fires, and the rocket curves onto the target. A friendly unit never locks.
 11. Tab shows the scoreboard, P the FPS counter and Esc pauses. Leaving to the hangar pays no rewards.
 12. Wait about a minute in Conquest: a field objective is announced and the gold line under the clock tracks it. Drive into a supply crate (full repair), hold a relay for 12 s (enemies revealed, enemy −15 tickets), and in an aircraft find the gold trucks or the ★ commander. With 4 minutes left, FINAL PUSH appears and the line under the clock says so.
-15. Open Menu → Settings: move Master volume and Camera shake, reload the page, and they are kept. In battle, N mutes, H shows the controls card, firing gives a muzzle flash and a dust ring, and below 35% integrity the edges glow red.
-14. In the hangar, pick the Titan HX-9 with too few credits: the card shows 🔒 75,000 Cr, the panel shows the shortfall and TO BATTLE is disabled. With enough credits, Unlock → Confirm takes exactly the price, the card shows ★ owned, and the Titan deploys. Reload the page: it is still owned.
 13. Destroy two enemies within 12 s: the banner reads DOUBLE KILL, and the popups list the kill points and bonuses without covering the hit report. At the end of the battle the rewards screen shows the score, mastery stars and medals, and the hangar card shows the vehicle's stars.
+14. In the hangar, pick the Titan HX-9 with too few credits: the card shows 🔒 75,000 Cr, the panel shows the shortfall and TO BATTLE is disabled. With enough credits, Unlock → Confirm takes exactly the price, the card shows ★ owned, and the Titan deploys. Reload the page: it is still owned.
+15. Open Menu → Settings: move Master volume and Camera shake, reload the page, and they are kept. In battle, N mutes, H shows the controls card, firing gives a muzzle flash and a dust ring, and below 35% integrity the edges glow red.
+16. In a tank: drive and look back to see the track marks fade; fire and listen for the breech clack when loaded (the gun marker pulses green); stand in a zone to see the capture ring fill and hear the chime when it is taken; take a hit to see the pale segment drain off the health bar. In the hangar, ← / → change vehicle and Enter deploys.

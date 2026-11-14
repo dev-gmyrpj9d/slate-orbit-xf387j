@@ -28,7 +28,13 @@
   #info .name { font: bold 14px system-ui, sans-serif; color: #ffd479; }
   .bar { height: 8px; background: rgba(255,255,255,.15); margin: 3px 0 6px; }
   .bar i { display: block; height: 100%; }
-  #hpbar i { background: #6ad26a; }
+  #hpbar { position: relative; }
+  #hpbar i { background: #6ad26a; position: relative; z-index: 1; transition: background-color .3s; }
+  #hpbar b { position: absolute; left: 0; top: 0; height: 100%; background: rgba(255,236,200,.55); }
+  #spd { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; opacity: .9; }
+  #spd .kv b { color: #fff; font-size: 13px; }
+  #spd .kv.big b { font-size: 19px; color: #ffd479; }
+  #spd .kv.hot b { color: #ff9ae0; }
   #rlbar i { background: #ffd479; }
   #status { color: #ff8a6a; min-height: 1.5em; }
   #ammoRow, #crewRow { display: flex; gap: 4px; margin: 2px 0 5px; }
@@ -220,7 +226,7 @@
   .medgrid span.no { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.14); color: rgba(255,255,255,.3); }
   .medgrid span small { font-size: 9px; margin-left: 2px; color: #fff; opacity: .8; }
   .vc .nat { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
-  .lb-hint { position: absolute; left: 50%; bottom: 140px; transform: translateX(-50%); font-size: 11px; opacity: .6; pointer-events: none; white-space: nowrap; }
+  .lb-hint { position: absolute; left: 50%; bottom: 168px; transform: translateX(-50%); font-size: 11px; opacity: .6; pointer-events: none; white-space: nowrap; }
   #lbMenu { position: absolute; left: 10px; top: 52px; display: none; flex-direction: column; padding: 6px; gap: 4px; min-width: 220px; z-index: 2; }
   #lbMenu.open { display: flex; } #lbMenu button { text-align: left; background: rgba(255,255,255,.07); }
   /* modal (shop, battle modes, help) */
@@ -286,7 +292,7 @@
 <div id="hitmsg"></div>
 <div id="info">
   <div class="name" id="tname"></div>
-  <div>Hull integrity</div><div class="bar" id="hpbar"><i></i></div>
+  <div>Hull integrity</div><div class="bar" id="hpbar"><i></i><b></b></div>
   <div id="rltext">Reload</div><div class="bar" id="rlbar"><i></i></div>
   <div id="ammoRow" aria-label="Shell selection (1, 2, 3)"></div>
   <div id="crewRow" aria-label="Crew"></div>
@@ -363,7 +369,7 @@
     <div class="pn" id="lbLoadout"></div>
     <div class="pn" id="lbCareer"></div>
   </div>
-  <div class="lb-hint" id="lbHint">Drag to rotate the view · wheel to zoom</div>
+  <div class="lb-hint" id="lbHint">Drag to rotate the view · wheel to zoom · &larr; &rarr; pick a vehicle · Enter: to battle</div>
   <div class="lb-bot">
     <div class="lb-tabs" id="lbTabs"></div>
     <div id="lbCards" role="listbox" aria-label="Vehicle lineup"></div>
@@ -2778,6 +2784,8 @@ function drawObjectiveCue(W, H) {
   }
   hx.restore();
 }
+// screen space kept free for the top score bar / mode line and the bottom panels
+const HUD_TOP = 104, edgeY = (y, H, x = -1, W = 0) => clamp(y, HUD_TOP + 8, H - (x >= 0 && (x < 320 || x > W - 260) ? 270 : 120)); // corners: info panel, minimap
 function drawEnemyCues(W, H) {
   const cx = W / 2, cy = H / 2, list = [];
   for (const e of tanks) {
@@ -2789,18 +2797,18 @@ function drawEnemyCues(W, H) {
   const labels = [];
   for (const { e, d } of list) {
     const top = e.type.air ? vadd(e.pos, [0, 3, 0]) : vadd(e.pos, vscale(e.Y, e.type.hullTop + 2.4));
-    const s = project(top), m = 30;
+    const s = project(top), m = 30, sy = s && Math.max(s[1], HUD_TOP); // markers never sit under the top score bar
     const fade = clamp((e.spottedUntil - now) / 0.6, 0.35, 1);
     if (s && s[0] > m && s[0] < W - m && s[1] > m && s[1] < H - m) {
       hx.globalAlpha = fade;
       const gold = e.hvt || e.conv; // field-objective targets are gold, and always labelled
       hx.fillStyle = gold ? "#ffc23d" : "#ff3b2f"; hx.strokeStyle = "rgba(0,0,0,.8)"; hx.lineWidth = 2;
       const k = clamp(1.3 - d / 1500, 0.75, 1.3) * (e.hvt ? 1.3 : 1);
-      hx.beginPath(); hx.moveTo(s[0] - 7 * k, s[1] - 10 * k); hx.lineTo(s[0] + 7 * k, s[1] - 10 * k); hx.lineTo(s[0], s[1]); hx.closePath(); hx.stroke(); hx.fill();
+      hx.beginPath(); hx.moveTo(s[0] - 7 * k, sy - 10 * k); hx.lineTo(s[0] + 7 * k, sy - 10 * k); hx.lineTo(s[0], sy); hx.closePath(); hx.stroke(); hx.fill();
       hx.font = "bold 11px ui-monospace, monospace"; hx.lineWidth = 3;
       // nearest first: a label that would overlap one already drawn is dropped (clustered enemies used to
       // print their distances on top of each other); the marker itself always stays
-      const lbl = `${e.hvt ? "★ COMMANDER " : e.conv ? "TRUCK " : ""}${Math.round(d)} m`, lw = hx.measureText(lbl).width + 6, ly = s[1] - 14 * k;
+      const lbl = `${e.hvt ? "★ COMMANDER " : e.conv ? "TRUCK " : ""}${Math.round(d)} m`, lw = hx.measureText(lbl).width + 6, ly = sy - 14 * k;
       // gold labels draw last and only give way to each other, never to an ordinary marker
       if (!labels.some(r => (!gold || r[3]) && Math.abs(r[0] - s[0]) < (r[2] + lw) / 2 && Math.abs(r[1] - ly) < 13)) {
         labels.push([s[0], ly, lw, gold]);
@@ -2809,7 +2817,7 @@ function drawEnemyCues(W, H) {
       hx.globalAlpha = 1;
     } else if (arrows < 8) {
       arrows++;
-      const [x, y] = screenDir(top), a = Math.atan2(-y, x), rx = W * 0.44, ry = H * 0.4, ax = cx + Math.cos(a) * rx, ay = cy + Math.sin(a) * ry;
+      const [x, y] = screenDir(top), a = Math.atan2(-y, x), rx = W * 0.44, ry = H * 0.4, ax = cx + Math.cos(a) * rx, ay = edgeY(cy + Math.sin(a) * ry, H, cx + Math.cos(a) * rx, W);
       hx.save(); hx.globalAlpha = fade; hx.translate(ax, ay); hx.rotate(a);
       hx.fillStyle = e.hvt || e.conv ? "#ffc23d" : "#ff3b2f"; hx.strokeStyle = "rgba(0,0,0,.8)"; hx.lineWidth = 2;
       hx.beginPath(); hx.moveTo(14, 0); hx.lineTo(-4, -9); hx.lineTo(0, 0); hx.lineTo(-4, 9); hx.closePath(); hx.stroke(); hx.fill();
@@ -2925,6 +2933,7 @@ function updateShells(dt) {
     if (tg && tg.alive && tg.type.air && segSphere(p0, p1, center(tg), LOCK.fuse)) { explode(center(tg), s.he, s.owner, tg, s, null); shells.splice(i, 1); continue; }
     const hit = trace(p0, p1, s.owner);
     if (hit) { impact(s, hit); shells.splice(i, 1); continue; }
+    if (!s.whiz && !s.small && s.kind !== "bomb" && player && player.alive && s.owner && s.owner.team !== player.team && segSphere(p0, p1, center(player), 14)) { s.whiz = true; sfxWhiz(p1); }
     s.p = p1;
     if (s.life <= 0 || Math.abs(p1[0]) > OUTER || Math.abs(p1[2]) > OUTER) shells.splice(i, 1);
   }
@@ -3088,6 +3097,7 @@ function updateZones(dt) {
     else if ((z.owner === 0 && z.prog <= 0) || (z.owner === 1 && z.prog >= 0)) z.owner = -1;
     if (z.owner === before) continue;
     const L = z.label;
+    if (z.owner === 0 || z.owner === 1) sfxSting(z.owner === 0);
     if (z.owner === 0) {
       if (playerIn) { player.caps++; award(`ZONE ${L} CAPTURED`, SCORE.cap, "#7cc0ff"); }
       if (M.key === "breakthrough") {
@@ -4178,6 +4188,83 @@ function impactFx(p, result, dir) {
     for (let i = 0; i < 8; i++) puff(p, vadd(vscale(r, rand(14, 30)), [rand(-4, 4), rand(-2, 4), rand(-4, 4)]), [1, 0.95, 0.7], rand(0.12, 0.25), 0.08, 4, 1, -0.1);
   }
 }
+// ---- pass 10: track marks, shell trails and exhaust; reload, track, near-miss and zone sounds
+// Track marks are flat, fading strips in a capped ring (markCap() per graphics preset, emptied by newBattle and
+// expired after MARK_LIFE). Shell trails are drawn straight from the shells in flight, so they cost no particles.
+// fxStats counts the sound cues the game asked for even while the browser keeps audio blocked (for the self-test).
+const MARK_LIFE = 35, MARK_STEP = 1.4;
+let marks = [], readyFlashT = 0, clackAcc = 0;
+const fxStats = { ready: 0, whiz: 0, sting: 0, clack: 0, exhaust: 0 };
+const markCap = () => Q.partCap >= 900 ? 900 : 360;
+function trackMarks(t, dt) {
+  t.markD = (t.markD || 0) + Math.abs(t.speed) * dt;
+  if (t.markD < MARK_STEP) return;
+  t.markD = 0;
+  if (dist2d(t.pos, cam.pos) > 260) return; // only where someone can see them
+  const T = t.type, half = T.W / 2 - 0.35, F = [Math.sin(t.yaw), 0, Math.cos(t.yaw)];
+  for (const sd of [-1, 1]) {
+    const q = tp(t.M, [sd * half, 0, -T.L * 0.3]), N = normalAt(q[0], q[2]);
+    const Z = vnorm(vsub(F, vscale(N, vdot(F, N)))), X = vcross(N, Z);
+    marks.push({ X, Y: N, Z, p: [q[0], heightAt(q[0], q[2]) - 0.02, q[2]], w: clamp(T.W * 0.17, 0.4, 0.75), t: now });
+  }
+  const cap = markCap(); if (marks.length > cap) marks.splice(0, marks.length - cap);
+}
+function expireMarks() { let i = 0; while (i < marks.length && now - marks[i].t > MARK_LIFE) i++; if (i) marks.splice(0, i); }
+// a short dark exhaust puff when a vehicle pulls away (near the camera only)
+function exhaustFx(t, dt) {
+  const sp = Math.abs(t.speed), acc = (sp - (t.prevSp ?? sp)) / Math.max(dt, 1e-3); t.prevSp = sp;
+  t.exT = (t.exT || 0) - dt;
+  if (acc < 1 || t.exT > 0 || dist2d(t.pos, cam.pos) > 180) return;
+  t.exT = 0.16; fxStats.exhaust++;
+  const T = t.type, e = tp(t.M, [rand(-0.25, 0.25) * T.W, T.hullTop + 0.15, -T.L / 2 + 0.4]);
+  puff(e, vadd(vscale(t.Y, rand(1.2, 2)), [rand(-0.4, 0.4), 0, rand(-0.4, 0.4)]), [0.17, 0.17, 0.16], rand(0.9, 1.4), 0.32, -0.5, 0, 2.2, 0.5);
+}
+// the breech closing: a two-part metallic clack the moment your gun is loaded again
+function sfxReady() { fxStats.ready++; readyFlashT = 0.4; tone("square", 240, 0.045, 0.05, 150); noiseHit(0.1, 4200, 1800, 0.05, null, "highpass"); setTimeout(() => noiseHit(0.08, 2600, 900, 0.07, null, "highpass"), 70); }
+// an enemy shell passing close: a falling, placed whizz
+function sfxWhiz(p) { fxStats.whiz++; const o = spat(p); noiseHit(0.24, 3800, 700, 0.35, o, "bandpass"); tone("sine", 1500, 0.05, 0.3, 450, o); }
+// zone captured (a rising three-note chime) or lost (two low falling notes): interface volume
+function sfxSting(good) {
+  fxStats.sting++;
+  const play = (f, i, type, vol, dur, f1) => setTimeout(() => tone(type, f, vol, dur, f1, BUS.ui), i);
+  if (good) [523, 659, 784].forEach((f, i) => play(f, i * 90, "triangle", 0.07, 0.4, 0));
+  else [392, 330].forEach((f, i) => play(f, i * 150, "square", 0.035, 0.45, f * 0.94));
+}
+// track clatter: link noise ticks whose rate follows your ground speed
+function trackClatter(p, dt) {
+  if (!p.alive || p.type.air || state !== "playing") { clackAcc = 0; return; }
+  const sp = Math.abs(p.speed); clackAcc += dt * sp * 1.3;
+  if (clackAcc < 1) return;
+  clackAcc = Math.min(clackAcc - 1, 1); fxStats.clack++;
+  noiseHit(0.025 + 0.04 * Math.min(1, sp / 12), rand(1200, 1600), 500, 0.045, BUS.eng, "bandpass");
+}
+// zone capture ring (bottom centre, over the hull indicator) while you stand in a zone that is not yet yours
+function captureState() {
+  const z = player && player.alive && !player.type.air && zones.find(q => q.playerIn);
+  if (!z || z.locked || !z.active || (z.owner === 0 && !z.contested && z.prog >= 1)) return null;
+  const f = (z.prog + 1) / 2;
+  return { z, f, kind: z.contested ? "contested" : z.threat[0] > 0 ? "losing" : "capturing", label: z.contested ? `CONTESTED ${z.label}` : `CAPTURING ${z.label}  ${Math.round(f * 100)}%` };
+}
+function drawCapture(W, H) {
+  const c = captureState();
+  if (!c) return;
+  const x = W / 2, y = H - 150, r = 24, col = c.kind === "capturing" ? "#5aa8ff" : c.kind === "contested" ? "#ffb347" : "#ff5a48";
+  hx.fillStyle = "rgba(0,0,0,.5)"; hx.beginPath(); hx.arc(x, y, r + 6, 0, Math.PI * 2); hx.fill();
+  hx.lineWidth = 5; hx.strokeStyle = "rgba(255,255,255,.18)"; hx.beginPath(); hx.arc(x, y, r, 0, Math.PI * 2); hx.stroke();
+  hx.strokeStyle = col; hx.globalAlpha = c.kind === "contested" ? 0.7 + 0.3 * Math.sin(now * 6) : 1;
+  hx.beginPath(); hx.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * c.f); hx.stroke(); hx.globalAlpha = 1;
+  hx.font = "bold 18px system-ui, sans-serif"; hx.fillStyle = "#fff"; hx.textAlign = "center"; hx.fillText(c.z.label, x, y + 6);
+  hx.font = "bold 12px system-ui, sans-serif"; hx.lineWidth = 3; hx.strokeStyle = "rgba(0,0,0,.8)";
+  hx.strokeText(c.label, x, y - r - 12); hx.fillStyle = col; hx.fillText(c.label, x, y - r - 12); hx.lineWidth = 1.5;
+}
+// health bar: green / amber / red, with a pale "just lost" segment that drains away after a hit
+function hpBar(t, dt) {
+  const f = t.alive ? clamp(t.hp / t.type.hp, 0, 1) : 0, el = $("hpbar");
+  t.hpGhost = t.hpGhost === undefined || f > t.hpGhost ? f : Math.max(f, t.hpGhost - dt * 0.3);
+  css(el.firstChild, "width", `${(f * 100).toFixed(1)}%`); css(el.lastChild, "width", `${(t.hpGhost * 100).toFixed(1)}%`);
+  css(el.firstChild, "background", f > 0.6 ? "#6ad26a" : f > 0.35 ? "#e8c14a" : "#ff5a48");
+}
+const kv = (v, unit = "", cls = "") => `<span class="kv${cls ? " " + cls : ""}"><b>${v}</b>${unit ? " " + unit : ""}</span>`;
 // ---- settings window (hangar menu, pause screen, or N for a quick mute)
 function toggleMute() { SET.mute = !SET.mute; applyAudioSettings(); saveSettings(); if (state === "playing") centerMsg(`SOUND ${SET.mute ? "MUTED" : "ON"} (N)`, "#9fd4ff"); else toast(SET.mute ? "Sound muted (N)" : "Sound on (N)"); announce(SET.mute ? "Sound muted" : "Sound on"); }
 function toggleKeycard() {
@@ -4391,7 +4478,7 @@ function newBattle() {
     evNext: 60, evN: 0, evLast: null, objWon: 0, reveal: 0, push: false };
   ev = null;
   setupZones();
-  shells = []; parts = []; smokes = []; strikes = [];
+  shells = []; parts = []; smokes = []; strikes = []; marks = []; readyFlashT = 0; clackAcc = 0;
   for (const t of trees) { t.falling = false; t.fall = 0; t.M = chain(trans(t.x, t.y, t.z), scl(t.s, t.s, t.s)); }
   const names = NAMES.slice().sort(() => Math.random() - 0.5);
   tanks = [];
@@ -4663,7 +4750,9 @@ function step(dt) {
     }
   }
   for (const t of tanks) {
+    const loading = t.reloadT > 0;
     t.reloadT = Math.max(0, t.reloadT - dt);
+    if (loading && t.reloadT === 0 && t.isPlayer && t.alive && !t.type.auto && !t.type.air) sfxReady();
     t.trackT = Math.max(0, t.trackT - dt); t.engineT = Math.max(0, t.engineT - dt); t.breechT = Math.max(0, (t.breechT || 0) - dt);
     t.recoil = Math.max(0, t.recoil - dt * 1.2);
     if (t.type.auto && t.mag <= 0 && t.reloadT <= 0) t.mag = t.type.auto.mag;
@@ -4678,6 +4767,8 @@ function step(dt) {
       if (t.type.rockets) tankRockets(t, dt);
       updateCrew(t, dt); updateFire(t, dt);
       if (!t.alive) { updateTankMatrices(t); continue; }
+      if (Math.abs(t.speed) > 1) trackMarks(t, dt);
+      exhaustFx(t, dt);
       t.dustT -= dt;
       if (Math.abs(t.speed) > 4 && t.dustT <= 0) {
         t.dustT = 0.12;
@@ -4713,6 +4804,7 @@ function step(dt) {
   }
   updateShells(dt);
   updateParticles(dt);
+  expireMarks();
   updateZones(dt);
   modeStep(dt);
   eventStep(dt);
@@ -4726,6 +4818,8 @@ function step(dt) {
   const left = M.time - battleTime;
   for (const [mark, text] of [[300, "5 MINUTES REMAINING"], [60, "1 MINUTE REMAINING"]]) if (left <= mark && left + dt > mark) centerMsg(text, "#ffd34d");
   checkEnd(left);
+  trackClatter(p, dt);
+  readyFlashT = Math.max(0, readyFlashT - dt);
   // engine audio
   if (engGain) {
     if (p.type.air) {
@@ -4941,6 +5035,25 @@ function render() {
   draw(cloudMesh, IDENT, WHITE, 0.4, 0.82);
   for (const [M, a] of discs) draw(discMesh, M, [0.2, 0.2, 0.2], 0, a);
   use(P.fx);
+  // track marks: dark, fading strips pressed into the ground
+  if (marks.length) {
+    gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1, -4);
+    for (const m of marks) {
+      const a = 0.4 * (1 - (now - m.t) / MARK_LIFE);
+      if (a <= 0.01 || !sphereVisible(FR, m.p[0], m.p[1], m.p[2], 1.2)) continue;
+      pushInst(basisScaled(m.X, m.Y, m.Z, m.p, m.w, 0.16, MARK_STEP * 1.05), 0.2, 0.16, 0.1, 0, Math.min(a, 0.4));
+    }
+    flushInst(cubeMesh); gl.disable(gl.POLYGON_OFFSET_FILL);
+  }
+  // cannon shell trails: a faint hot streak behind each shell and a glowing head (no particles needed)
+  for (const s of shells) {
+    if (s.small || s.kind !== "shell" || !sphereVisible(FR, s.p[0], s.p[1], s.p[2], 12)) continue;
+    const sp = Math.hypot(s.v[0], s.v[1], s.v[2]) || 1, Z = [s.v[0] / sp, s.v[1] / sp, s.v[2] / sp];
+    const X = vnorm(vcross(Math.abs(Z[1]) > 0.99 ? [1, 0, 0] : [0, 1, 0], Z)), Y = vcross(Z, X), L = Math.min(24, vlen(vsub(s.p, s.start)));
+    if (L > 1) pushInst(basisScaled(X, Y, Z, vsub(s.p, vscale(Z, L / 2)), 0.42, 0.42, L), 1, 0.72, 0.38, 1, 0.32);
+    pushInst(basisScaled(X, Y, Z, s.p, 0.7, 0.7, 1.3), 1, 0.9, 0.6, 1, 0.7);
+  }
+  flushInst(puffMesh);
   for (const q of parts) {
     const sz = q.size;
     if (!sphereVisible(FR, q.p[0], q.p[1], q.p[2], sz)) continue;
@@ -5048,6 +5161,7 @@ function drawHud() {
         hx.strokeText(label, g[0] + 16, g[1] + 22); hx.fillStyle = PC[pv.v]; hx.fillText(label, g[0] + 16, g[1] + 22); hx.textAlign = "center";
         hx.font = "bold 12px system-ui, sans-serif";
       }
+      if (ready && readyFlashT > 0) { hx.strokeStyle = `rgba(125,255,122,${(readyFlashT / 0.4).toFixed(2)})`; hx.lineWidth = 2; hx.beginPath(); hx.arc(g[0], g[1], 9 + (0.4 - readyFlashT) * 40, 0, Math.PI * 2); hx.stroke(); } // "loaded" pulse
       if (!ready) { hx.strokeStyle = "#ffd479"; hx.beginPath(); hx.arc(g[0], g[1], 13, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(1 - player.reloadT / (player.reloadFull || player.type.reload), 0, 1)); hx.stroke(); }
     }
     // hull direction indicator (small tank icon)
@@ -5055,6 +5169,7 @@ function drawHud() {
     hx.save(); hx.translate(ix, iy); hx.rotate(rel); hx.strokeStyle = "rgba(255,255,255,.8)"; hx.lineWidth = 2; hx.strokeRect(-9, -15, 18, 30); hx.restore();
     hx.save(); hx.translate(ix, iy); hx.rotate(trel); hx.fillStyle = "rgba(255,255,255,.8)"; hx.fillRect(-1.5, -24, 3, 20); hx.beginPath(); hx.arc(0, 0, 6, 0, Math.PI * 2); hx.fill(); hx.restore();
     drawLockHud(player, W, H);
+    drawCapture(W, H);
   }
 }
 // lock-on rockets: dashed seeker circle round the crosshair; a yellow box closes in on the target while locking
@@ -5186,31 +5301,32 @@ function updateRepairButton(t) {
   btn.setAttribute("aria-disabled", busy || need ? "false" : "true");
   btn.setAttribute("aria-label", busy ? `Cancel repair, ${Math.ceil(t.repairT)} seconds left (F)` : need ? "Repair vehicle (F)" : label.replace("&#128295; ", ""));
 }
+const statChips = t => `<span class="kv">K <b>${t.kills}</b></span><span class="kv">D <b>${t.deaths}</b></span><span class="kv">Score <b>${fmtN(t.score || 0)}</b></span>${t.streak >= 2 ? kv(`×${t.streak}`, "streak", "hot") : ""}`;
 function updateDom(dt) {
   const t = player;
   txt($("tname"), `${t.type.name} — ${t.type.cls}`);
   hitMarkT -= dt;
   if (t.type.air) {
     txt($("hpbar").previousSibling, "Airframe integrity");
-    css($("hpbar").firstChild, "width", `${Math.max(0, t.hp / t.type.hp * 100)}%`);
+    hpBar(t, dt);
     const T = t.type, rearm = t.rearmT > 0;
     const guns = T.guns.map((g, i) => t.gunAmmo[i]).join("/");
     txt($("rltext"), rearm ? `Rearming all weapons — ${Math.ceil(t.rearmT)} s${now - (t.shotT ?? -1) <= 0.25 ? " (paused while firing)" : ""}` : [`Guns ${guns}`, T.bombs ? `Bombs ${t.bombs}×${T.bombs.kg} kg` : "", T.rockets ? `${lockOnType(T) ? "Lock-on rockets" : "Rockets"} ${t.rockets} (R)` : "", fullyArmed(t) ? "" : "T: rearm"].filter(Boolean).join(" · "));
     css($("rlbar").firstChild, "width", `${rearm ? (1 - t.rearmT / T.reload) * 100 : armedFrac(t) * 100}%`);
-    txt($("spd"), `IAS ${Math.round(t.speed * 3.6)} km/h  THR ${Math.round(t.throttle * 100)}%→${Math.round(cruiseSpeed(t) * 3.6)}  Alt ${Math.round(t.pos[1])} m   Kills ${t.kills}  Deaths ${t.deaths}  Score ${fmtN(t.score || 0)}${t.streak >= 2 ? `  Streak ${t.streak}` : ""}`);
+    setHtml($("spd"), kv(Math.round(t.speed * 3.6), "km/h", "big") + `<span class="kv">THR <b>${Math.round(t.throttle * 100)}%</b>→${Math.round(cruiseSpeed(t) * 3.6)}</span>` + kv(Math.round(t.pos[1]), "m alt") + statChips(t));
     txt($("status"), [t.repairT > 0 ? "Repairing airframe" : "", t.engineT > 0 ? "Engine damaged" : "", t.fireT > 0 ? "ON FIRE" : "", t.wingDmg > 0 ? "Wing damaged" : ""].filter(Boolean).join(" · "));
     setHtml($("ammoRow"), FLIGHT.presets.map((v, i) => `<span class="${Math.abs(t.throttle - v) < 0.02 ? "sel" : ""}" title="Throttle ${Math.round(v * 100)}% (cruise about ${Math.round(cruiseSpeed(t, v) * 3.6)} km/h)"><b>${i + 1}</b>${Math.round(v * 100)}%</span>`).join("") + `<span class="tip">W/S throttle</span>`);
     setHtml($("crewRow"), "");
   } else {
   txt($("hpbar").previousSibling, "Hull integrity");
-  css($("hpbar").firstChild, "width", `${Math.max(0, t.hp / t.type.hp * 100)}%`);
+  hpBar(t, dt);
   css($("rlbar").firstChild, "width", `${t.alive ? clamp(1 - t.reloadT / (t.reloadFull || t.type.reload), 0, 1) * 100 : 0}%`);
   const shell = hasShells(t.type) ? ` ${AMMO[t.loaded || "ap"].name}` : "";
   const rk = lockOnType(t.type) ? ` · Rockets ${t.rockets}/${t.type.rockets.n} (R)${t.rockets < t.type.rockets.n ? ` +1 in ${Math.ceil(t.type.rockets.regen - (t.rockRel || 0))} s` : ""}` : "";
   txt($("rltext"), (!seatManned(t, "gunner") ? "No gunner — gun silent" : t.reloadT > 0 ? `Loading${shell} ${t.reloadT.toFixed(1)} s` : `${shell ? shell.trim() + " loaded" : "Gun ready"}`) + rk);
   setHtml($("ammoRow"), hasShells(t.type) ? AMMO_KEYS.map((k, i) => `<span class="${k === t.ammo ? "sel" : ""}${k === t.loaded ? " ld" : ""}" title="${AMMO[k].long}"><b>${i + 1}</b>${AMMO[k].name} ${shellPen(t.type, k)}</span>`).join("") : "");
   setHtml($("crewRow"), t.crew ? t.crew.map(c => `<span class="${c.ko ? "ko" : c.seat !== c.role ? "mv" : ""}" title="${c.role}${c.seat !== c.role ? " as " + c.seat : ""}${c.ko ? " (knocked out)" : ""}">${SEAT_INFO[c.ko ? c.role : c.seat][0]}</span>`).join("") : "");
-  txt($("spd"), `Speed ${Math.round(Math.abs(t.speed) * 3.6)} km/h${t.speed < -0.3 ? " (R)" : ""}   Kills ${t.kills}  Deaths ${t.deaths}  Score ${fmtN(t.score || 0)}${t.streak >= 2 ? `  Streak ${t.streak}` : ""}`);
+  setHtml($("spd"), kv(Math.round(Math.abs(t.speed) * 3.6), `km/h${t.speed < -0.3 ? " (R)" : ""}`, "big") + statChips(t));
   const st = [];
   if (t.trackT > 0) st.push(`Tracks broken ${t.trackT.toFixed(0)}s`);
   if (t.engineT > 0) st.push(`Engine damaged ${t.engineT.toFixed(0)}s`);
@@ -5240,7 +5356,7 @@ function updateDom(dt) {
   if (!t.alive) { txt($("center"), `${t.killedBy ? `DESTROYED by ${t.killedBy.name}` : t.crashed ? "CRASHED" : "DESTROYED"}\nRespawning in ${Math.max(0, respawnT).toFixed(0)}…${M.key === "laststand" ? ` · ${tickets[0]} reinforcements left` : ""}`); css($("center"), "color", "#ff8a6a"); centerTimer = 0.2; }
   else if (zi >= 0 && centerTimer <= 0) {
     const z = zones[zi];
-    txt($("center"), z.locked ? "" : !z.active ? `ZONE ${z.label} IS NOT OPEN YET` : z.contested ? `ZONE ${z.label} CONTESTED` : z.owner === 0 ? "" : `CAPTURING ${z.label}  ${Math.round((z.prog + 1) / 2 * 100)}%`);
+    txt($("center"), z.locked || z.active ? "" : `ZONE ${z.label} IS NOT OPEN YET`); // capture progress is the ring over the hull indicator
     css($("center"), "color", "#fff");
   }
   else if (centerTimer <= 0) txt($("center"), "");
@@ -5899,7 +6015,17 @@ function toast(text, kind = "") {
 function uiSnd(good) { if (!AC || AC.state !== "running") return; if (good) tone("triangle", 660, 0.06, 0.18, 990); else tone("square", 180, 0.05, 0.2, 120); }
 function lobbyMenu(open) { const m = $("lbMenu"); m.classList.toggle("open", open); $("lbMenuBtn").setAttribute("aria-expanded", String(open)); }
 function lobbyKey(e) {
-  if (e.code === "Escape") { if ($("modal").classList.contains("open")) closeModal(); else lobbyMenu(false); }
+  if (e.code === "Escape") { if ($("modal").classList.contains("open")) closeModal(); else lobbyMenu(false); return; }
+  // arrows cycle the vehicles shown in the line-up; Enter deploys (only when no window, menu or control has focus)
+  const tag = (e.target && e.target.tagName) || "", free = !/^(INPUT|SELECT|TEXTAREA)$/.test(tag);
+  if (!document.body.classList.contains("lobby-on") || $("modal").classList.contains("open") || $("lbMenu").classList.contains("open") || !free || e.repeat && e.code === "Enter") return;
+  if (e.code === "ArrowRight" || e.code === "ArrowLeft") {
+    const list = (lobbyCat === "air" ? AIR_LIST : GROUND_LIST).filter(T => profile.nation === "all" || T.nation === profile.nation);
+    if (!list.length) return;
+    const i = list.indexOf(selectedType), n = list[(i + (e.code === "ArrowRight" ? 1 : -1) + list.length) % list.length];
+    e.preventDefault(); selectVehicle(n); renderLobby(); sfxUi("tick");
+    const el = document.querySelector("#lbCards .vc.sel"); if (el && el.scrollIntoView) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+  } else if (e.code === "Enter" && !/^(BUTTON|A)$/.test(tag)) { e.preventDefault(); goBattle(); } // a focused button keeps its own Enter
 }
 function goBattle() {
   const m = MODES[profile.mode];
@@ -6013,7 +6139,8 @@ function renderModal() {
           <li><b>Camera:</b> mouse sensitivity and camera shake (off / reduced / full). Shake is short and capped, never moves your aim, and starts off if your system asks for reduced motion.</li>
           <li><b>Display:</b> the red edge glow at low integrity (a slow pulse, never a flash), the enemy markers (<b>M</b>) and graphics quality.</li>
         </ul>
-        In battle, <b>H</b> shows a controls card for your current vehicle. Settings are saved in this browser and kept when you reset progress.</p>
+        In battle, <b>H</b> shows a controls card for your current vehicle. Settings are saved in this browser and kept when you reset progress.
+        <br>Battle feedback: tanks leave fading track marks, cannon shells trail a faint glow, the breech clacks and the gun marker pulses green the moment you are loaded, enemy shells passing close whizz by, and a chime or a low note tells you a zone was captured or lost. Standing in a zone shows a capture ring above the hull indicator (blue capturing, orange contested, red losing). The health bar turns amber and red and briefly shows what the last hit took. In the hangar, <b>&larr; / &rarr;</b> pick the next vehicle and <b>Enter</b> goes to battle.</p>
       <h3 style="color:#9fd4ff">Field objectives and the final push</h3><p class="note" style="opacity:.9">About a minute into a battle, and again every minute or so after one ends, an optional <b>field objective</b> appears. It is announced on screen, shown in the gold line under the clock with its range, direction and time left, marked with coloured smoke in the world, a gold marker and a ring on the minimap. A couple of enemies (and sometimes allies) head for it too. Ignoring one costs nothing; completing it scores +${SCORE.obj} and pays ${fmtN(250)} Cr / 120 XP at the end.</p><table class="ctl">
         <tr><td>Supply drop</td><td>A crate parachutes down (green smoke). Be the first to drive into it: full repair, a fresh crew, instant reload, rockets refilled and consumable cooldowns reset. In Last Stand one lands near B after every destroyed wave.</td></tr>
         <tr><td>Radio relay</td><td>A mast (yellow smoke). Hold it alone for ${OBJ.relay.hold} s (enemies inside pause it): every enemy is revealed for 30 s and the enemy loses ${OBJ_PAY.relay} tickets.</td></tr>
@@ -7104,6 +7231,66 @@ function runSelfTest() {
     closeModal(); state = "playing";
     ok("effects and settings do not touch the enemy AI handicap", JSON.stringify(ENEMY_AI) === AI0);
     SET = keepSet; applyAudioSettings();
+  });
+  guard("polish pass 2: track marks, trails, cues and hangar keys", () => {
+    const AI0 = JSON.stringify(ENEMY_AI);
+    battle("conquest"); const p = player; cam.pos = vadd(p.pos, [0, 8, -12]);
+    marks = []; p.speed = 10; for (let i = 0; i < 30; i++) trackMarks(p, 1 / 30);
+    ok("a moving tank leaves track marks under both tracks", marks.length >= 4 && marks.length % 2 === 0, marks.length);
+    const m0 = marks[0];
+    ok("…pressed onto the ground and following its slope", Math.abs(m0.p[1] - heightAt(m0.p[0], m0.p[2])) < 0.1 && Math.abs(vlen(m0.Y) - 1) < 1e-6 && Math.abs(vdot(m0.Y, m0.Z)) < 1e-6);
+    for (let i = 0; i < 3000; i++) { p.markD = MARK_STEP; trackMarks(p, 0); }
+    ok("track marks stay within their cap", marks.length <= markCap(), `${marks.length}/${markCap()}`);
+    now += MARK_LIFE + 1; expireMarks(); ok("…and expire after they have faded", marks.length === 0, marks.length);
+    cam.pos = vadd(p.pos, [0, 10, 600]); p.markD = MARK_STEP; trackMarks(p, 0); ok("no marks are made far from the camera", marks.length === 0);
+    cam.pos = vadd(p.pos, [0, 8, -12]); p.markD = MARK_STEP; trackMarks(p, 0); battle("conquest"); ok("a new battle starts with no track marks", marks.length === 0);
+    const q = player, e0 = fxStats.exhaust; cam.pos = vadd(q.pos, [0, 8, -12]);
+    q.prevSp = 0; q.speed = 3; q.exT = 0; exhaustFx(q, 1 / 30); q.exT = 0; exhaustFx(q, 1 / 30);
+    ok("pulling away puffs exhaust, cruising does not", fxStats.exhaust === e0 + 1, fxStats.exhaust - e0);
+    // sounds (counted even while the browser keeps audio blocked)
+    q.speed = 0; const r0 = fxStats.ready; q.reloadT = 0.01; step(1 / 30); const r1 = fxStats.ready; step(1 / 30);
+    ok("the breech clack sounds once, the moment your gun is loaded", r1 === r0 + 1 && fxStats.ready === r1 && readyFlashT > 0, fxStats.ready - r0);
+    const foe = tanks.find(t => t.team !== q.team), c = center(q), w0 = fxStats.whiz;
+    shells = [{ kind: "shell", p: vadd(c, [-40, 7, 0]), v: [900, 0, 0], owner: foe, pen: 1, dmg: 0, life: 2, start: vadd(c, [-40, 7, 0]) },
+      { kind: "shell", p: vadd(c, [-40, 7, 2]), v: [900, 0, 0], owner: q, pen: 1, dmg: 0, life: 2, start: vadd(c, [-40, 7, 2]) }];
+    for (let i = 0; i < 4; i++) updateShells(1 / 30);
+    ok("an enemy shell passing close whizzes once (your own shells do not)", fxStats.whiz === w0 + 1, fxStats.whiz - w0);
+    const k0 = fxStats.clack; q.speed = 10; for (let i = 0; i < 30; i++) trackClatter(q, 1 / 30); const k1 = fxStats.clack - k0;
+    q.speed = 0; for (let i = 0; i < 30; i++) trackClatter(q, 1 / 30);
+    ok("track clatter follows your speed and stops when you stop", k1 >= 8 && k1 <= 16 && fxStats.clack - k0 === k1, k1);
+    // zone ring and stings
+    const z = zones[0], s0 = fxStats.sting;
+    for (const t of tanks) if (t !== q) t.pos = [HALF * 3, 0, HALF * 3];
+    q.pos = z.pos.slice(); z.prog = 0; z.owner = -1; updateZones(0.01);
+    const cs = captureState();
+    ok("standing in a zone shows the capture ring with its progress", cs && cs.kind === "capturing" && Math.abs(cs.f - 0.5) < 0.05 && /CAPTURING/.test(cs.label), cs && cs.label);
+    drawHud(); ok("…and the old centre-screen capture text is gone", !/CAPTURING/.test($("center").textContent));
+    z.prog = 0.999; updateZones(1);
+    ok("capturing a zone plays a sting and clears the ring", fxStats.sting === s0 + 1 && z.owner === 0 && !captureState(), fxStats.sting - s0);
+    // health bar
+    q.hp = q.type.hp; q.hpGhost = undefined; updateDom(1 / 30); q.hp = q.type.hp * 0.3; updateDom(1 / 30);
+    const hw = el => parseFloat(el.style.width);
+    ok("a hit leaves a pale 'just lost' segment and turns the bar red", hw($("hpbar").lastChild) > hw($("hpbar").firstChild) + 50 && /255, 90, 72|ff5a48/i.test($("hpbar").firstChild.style.background), $("hpbar").firstChild.style.background);
+    for (let i = 0; i < 10; i++) updateDom(0.5);
+    ok("…that drains down to the real value", Math.abs(hw($("hpbar").lastChild) - hw($("hpbar").firstChild)) < 0.2);
+    ok("the speed / kills / score row is laid out as chips", $("spd").querySelectorAll(".kv").length >= 4 && $("spd").querySelector(".kv.big"));
+    ok("enemy edge arrows keep clear of the top score bar and the bottom panels", edgeY(0, 900) > HUD_TOP && edgeY(900, 900) <= 780 && edgeY(900, 900, 100, 1440) <= 630);
+    // trails and marks render
+    cam.pos = vadd(q.pos, [0, 6, -14]); cam.dir = vnorm([0, -0.2, 1]); q.speed = 10; q.markD = MARK_STEP; trackMarks(q, 0);
+    shells = [{ kind: "shell", p: vadd(cam.pos, [0, 0, 40]), v: [0, 0, 800], owner: q, start: cam.pos.slice(), pen: 1, dmg: 0, life: 1 }];
+    while (gl.getError() !== gl.NO_ERROR);
+    render(); ok("track marks and shell trails render without GL errors", gl.getError() === gl.NO_ERROR);
+    shells = [];
+    // hangar keys
+    showMenu("start"); const realGo = goBattle; let went = 0; goBattle = () => went++;
+    const key = (code, target = document.body) => lobbyKey({ code, target, repeat: false, preventDefault() {} });
+    const s1 = selectedType; key("ArrowRight"); const s2 = selectedType; key("ArrowLeft");
+    ok("← / → in the hangar pick the next and previous vehicle", s2 !== s1 && selectedType === s1, `${s1.key} → ${s2.key}`);
+    key("Enter", document.createElement("button")); const viaBtn = went; key("Enter"); const viaBody = went;
+    openShop("mods"); key("Enter"); key("ArrowRight"); const inModal = went === viaBody && selectedType === s1; closeModal();
+    ok("Enter deploys, but not from a focused button or with a window open", viaBtn === 0 && viaBody === 1 && inModal, `${viaBtn} ${viaBody} ${inModal}`);
+    goBattle = realGo; state = "playing";
+    ok("the second polish pass leaves the enemy AI handicap alone", JSON.stringify(ENEMY_AI) === AI0);
   });
   guard("battle soak", () => {
     for (const mode of ["conquest", "laststand"]) {

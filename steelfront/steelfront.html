@@ -132,7 +132,7 @@
   #cineCap span { font: 300 clamp(18px, 2.2vw, 30px)/1.3 Georgia, "Times New Roman", serif; letter-spacing: .5px; }
   #cineTitle { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transition: opacity 1.8s ease; }
   #cine.title #cineTitle { opacity: 1; }
-  #cineTitle h1 { margin: 0; padding-left: .3em; font: 800 clamp(44px, 9vw, 128px)/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .55em; color: #ffcf5a;
+  #cineTitle h1 { margin: 0; padding-left: .3em; white-space: nowrap; font: 800 clamp(40px, 7.5vw, 120px)/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .42em; color: #ffcf5a;
     text-shadow: 0 4px 0 #6a4a0c, 0 0 46px rgba(255,160,50,.45); transform: scale(1.12); transition: transform 7s cubic-bezier(.2,.7,.2,1), letter-spacing 7s cubic-bezier(.2,.7,.2,1); }
   #cine.title #cineTitle h1 { transform: none; letter-spacing: .3em; }
   #cineTitle p { margin: 20px 0 0; font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 5px; opacity: .85; text-align: center; text-shadow: 0 2px 6px #000; }
@@ -145,7 +145,49 @@
   #cineSound { position: absolute; left: 2vw; bottom: 0; height: 10.5vh; display: flex; align-items: center; font: 12px ui-monospace, Menlo, Consolas, monospace; letter-spacing: 1px; opacity: .75; }
   #cineProg { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: rgba(255,255,255,.08); }
   #cineProg i { display: block; height: 100%; width: 0; background: #ffcf5a; opacity: .7; }
-  @media (prefers-reduced-motion: reduce) { #cine .lb, #cineCap, #cineTitle h1 { transition: opacity .8s ease; } #cineTitle h1 { transform: none; letter-spacing: .3em; } }
+  #cineCap small::after { content: ""; display: block; width: 0; height: 2px; margin-top: 6px; background: linear-gradient(90deg, #ffcf5a, rgba(255,207,90,0)); transition: width 1.2s ease .6s; }
+  #cineCap.on small::after { width: 180px; }
+  #cineTitle .row { display: flex; gap: 10px; margin-top: 26px; pointer-events: auto; opacity: 0; transition: opacity .8s ease 1.2s; }
+  #cine.title #cineTitle .row { opacity: 1; }
+  #cineTitle h1, #cineGate h1 { position: relative; }
+  /* light sweep across the name: a copy of the text filled with a moving highlight (no blend modes over the canvas) */
+  #cineTitle h1::after, #cineGate h1::after { content: attr(data-t); position: absolute; inset: 0; padding: inherit; font: inherit; letter-spacing: inherit; text-shadow: none; color: transparent;
+    background: linear-gradient(105deg, rgba(255,250,230,0) 40%, rgba(255,250,230,.95) 50%, rgba(255,250,230,0) 60%) no-repeat; background-size: 300% 100%; background-position: 100% 0;
+    -webkit-background-clip: text; background-clip: text; }
+  #cine.title #cineTitle h1::after { animation: shine 1.8s ease-out 1.6s 1 both; }
+  #cineGate h1::after { animation: shine 3.2s ease-in-out .8s infinite; }
+  @keyframes shine { 0% { background-position: 100% 0; } 60%, 100% { background-position: 0 0; } }
+  #cineLeft { font: 12px ui-monospace, Menlo, Consolas, monospace; letter-spacing: 1px; opacity: .7; margin-right: 4px; }
+  #cineSkip { font-weight: 600; }
+  #cineProg b { position: absolute; top: -3px; width: 2px; height: 8px; background: rgba(255,255,255,.35); }
+  /* start card: first launch only. It waits for a click or key, which also lets the browser start the sound */
+  #cineGate { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; pointer-events: auto; cursor: pointer;
+    background: radial-gradient(ellipse at center, rgba(5,7,11,.05) 0%, rgba(5,7,11,.55) 70%, rgba(5,7,11,.85) 100%); animation: gateIn 1.2s ease both; }
+  #cineGate[hidden] { display: none; }
+  @keyframes gateIn { from { opacity: 0; } to { opacity: 1; } }
+  #cineGate small { font: 600 12px/1.4 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 6px; color: #ffcf5a; text-shadow: 0 2px 6px #000; }
+  #cineGate h1 { margin: 14px 0 10px; padding-left: .3em; white-space: nowrap; font: 800 clamp(40px, 8vw, 112px)/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .3em; color: #ffcf5a; text-shadow: 0 4px 0 #6a4a0c, 0 0 46px rgba(255,160,50,.45); }
+  #cineGate p { margin: 0 0 26px; font: 13px/1.6 ui-monospace, Menlo, Consolas, monospace; letter-spacing: 3px; opacity: .85; text-shadow: 0 2px 6px #000; }
+  #cineGate .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  #cineGate button { margin: 0; }
+  #gatePlay { font-size: 18px; font-weight: 700; padding: 14px 30px; letter-spacing: 1px; animation: gatePulse 1.4s ease-in-out infinite alternate; }
+  @keyframes gatePulse { from { box-shadow: 0 3px 0 #6e470d, 0 0 0 0 rgba(255,207,90,0); } to { box-shadow: 0 3px 0 #6e470d, 0 0 26px 4px rgba(255,207,90,.45); } }
+  #gateSkip { background: rgba(255,255,255,.12); box-shadow: none; border: 1px solid rgba(255,255,255,.35); }
+  #cineGate button:focus-visible { outline: 2px solid #ffd479; outline-offset: 3px; }
+  #cineGate kbd, #cineTitle kbd { font: 11px ui-monospace, Menlo, Consolas, monospace; padding: 1px 5px; margin-left: 8px; border: 1px solid rgba(255,255,255,.45); border-radius: 3px; opacity: .85; }
+  #gateHint { margin-top: 18px; font: 12px ui-monospace, Menlo, Consolas, monospace; letter-spacing: 1px; opacity: .7; text-shadow: 0 1px 4px #000; }
+  #cine.gate .lb { height: 10.5vh; } #cine.gate #cineUi, #cine.gate #cineProg, #cine.gate #cineSound, #cine.gate #cineCap, #cine.gate #cineGrade { display: none; }
+  /* returning players go straight to the hangar; the name fades over it once, without blocking anything */
+  #hello { position: fixed; left: 0; right: 0; top: 22vh; text-align: center; pointer-events: none; z-index: 3; opacity: 0; }
+  #hello[hidden] { display: none; }
+  #hello b { display: block; font: 800 clamp(24px, 3.4vw, 46px)/1 system-ui, -apple-system, "Segoe UI", sans-serif; letter-spacing: .3em; padding-left: .3em; color: #ffcf5a; text-shadow: 0 3px 0 #6a4a0c, 0 0 30px rgba(255,160,50,.4); }
+  #hello span { display: block; margin-top: 10px; font: 12px ui-monospace, Menlo, Consolas, monospace; letter-spacing: 4px; text-shadow: 0 2px 6px #000; }
+  #hello.on { animation: hello 2.6s ease both; }
+  @keyframes hello { 0% { opacity: 0; transform: translateY(8px); } 20%, 65% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #cine .lb, #cineCap, #cineTitle h1 { transition: opacity .8s ease; } #cineTitle h1 { transform: none; letter-spacing: .3em; }
+    #gatePlay, #cineTitle h1::after, #cineGate h1::after { animation: none !important; } #cineGate { animation: none; } #cineCap small::after { transition: none; }
+    #hello.on { animation: helloFade 2.6s linear both; } }
+  @keyframes helloFade { 0% { opacity: 0; } 15%, 70% { opacity: 1; } 100% { opacity: 0; } }
   /* battle HUD additions: mode objective line, consumables */
   #modeLbl { font: 600 11px/1.3 system-ui, sans-serif; padding: 2px 8px; background: rgba(0,0,0,.45); border-radius: 3px; text-align: center; max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #evLbl { font: 700 12px/1.3 system-ui, sans-serif; padding: 3px 10px; background: rgba(40,30,0,.6); border: 1px solid rgba(255,207,90,.55); border-radius: 3px; color: #ffcf5a; max-width: 600px; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -385,16 +427,25 @@
   <div id="cineGrade"></div>
   <div id="cineFlash"></div>
   <div id="cineCap" aria-live="polite"><small id="cineKicker"></small><span id="cineLine"></span></div>
-  <div id="cineTitle"><h1>STEEL FRONT</h1><p>Tanks · SPAA · aircraft — 8 vs 8 combined-arms battles<br>Capture the zones · 20 minutes on the clock</p></div>
+  <div id="cineTitle"><h1 data-t="STEEL FRONT">STEEL FRONT</h1><p>Tanks · SPAA · aircraft — 8 vs 8 combined-arms battles<br>Capture the zones · 20 minutes on the clock</p>
+    <div class="row"><button id="cineDeploy" type="button" hidden>&#9654; Deploy now</button><button id="cineHangar" type="button" class="secondary" hidden>Enter the hangar<kbd>Esc</kbd></button></div></div>
   <div id="cineFade"></div>
   <div class="lb t"></div><div class="lb b"></div>
   <div id="cineSound">&#128264; Click anywhere or press a key for sound</div>
   <div id="cineUi">
-    <button id="cineDeploy" type="button" hidden>Deploy now</button>
+    <span id="cineLeft"></span>
     <button id="cineSkip" type="button" aria-keyshortcuts="Escape Enter Space" title="Skip to the main menu (Esc, Enter or Space)">Skip intro &#9656;&#9656;<kbd>Esc</kbd></button>
   </div>
   <div id="cineProg"><i></i></div>
+  <div id="cineGate" hidden role="dialog" aria-label="Steel Front">
+    <small>A COMBINED-ARMS BATTLE GAME</small>
+    <h1 data-t="STEEL FRONT">STEEL FRONT</h1>
+    <p>Tanks · anti-air · aircraft — 8 vs 8 in one valley</p>
+    <div class="row"><button id="gatePlay" type="button">&#9654; Play the intro</button><button id="gateSkip" type="button">Skip to the hangar<kbd>Esc</kbd></button></div>
+    <div id="gateHint"></div>
+  </div>
 </div>
+<div id="hello" hidden><b>STEEL FRONT</b><span id="helloSub"></span></div>
 <div id="nogl"><div><h2>WebGL2 is not available</h2><p>Please open this file in a recent version of Chrome, Edge, Firefox or Safari.</p></div></div>
 
 <script>
@@ -4600,9 +4651,19 @@ document.addEventListener("keydown", e => {
   if (e.code === "Tab") e.preventDefault();
   if (e.code === "KeyP" && !e.repeat) { const f = $("fps"); f.style.display = f.style.display === "block" ? "none" : "block"; }
   if (state === "cine") {
-    if (e.code === "Escape" || e.code === "Enter" || e.code === "NumpadEnter" || e.code === "Space") {
-      e.preventDefault(); cine.skipKey = e.code; endCinematic(false);
-    } else if (e.code !== "Tab") { initAudio(); cineAudio(); }
+    const skipKey = e.code === "Escape" || e.code === "Enter" || e.code === "NumpadEnter" || e.code === "Space";
+    // Enter / Space on a focused card button (Play, Skip, Deploy, Enter the hangar) just presses it
+    if (skipKey && e.code !== "Escape" && e.target && e.target.closest && e.target.closest("#cineGate button, #cineTitle button")) return;
+    if (skipKey) e.preventDefault();
+    if (e.repeat) return; // the key that started the film, still held, must not skip it straight away
+    if (e.code === "KeyN") { initAudio(); toggleMute(); return; }
+    if (cine.gate) { // start card: Esc goes to the hangar, any other key plays the intro
+      if (e.code === "Escape") { cine.skipKey = e.code; endCinematic(false); }
+      else if (e.code !== "Tab" && !e.ctrlKey && !e.metaKey && !e.altKey) cineGateStart();
+      return;
+    }
+    if (skipKey) { cine.skipKey = e.code; endCinematic(false); }
+    else if (e.code !== "Tab") { initAudio(); cineAudio(); }
     return;
   }
   if (state === "menu") { if (e.code === "KeyN" && !e.repeat && !/INPUT|SELECT|TEXTAREA/.test((e.target && e.target.tagName) || "")) toggleMute(); lobbyKey(e); return; }
@@ -4646,7 +4707,17 @@ function resize() {
   hud.width = innerWidth; hud.height = innerHeight;
   frozen = false;
 }
-window.addEventListener("resize", resize);
+// Changing the canvas size (a resize, or a quality step that changes resolution) clears it. Done after a
+// frame was drawn, the browser presents that cleared, transparent canvas: one black frame over the whole
+// screen. Auto quality used to step at the end of frame(), right after drawing, which gave the intermittent
+// black flicker in the hangar. Both are now only requested and are applied at the start of the next frame,
+// just before it is drawn (applyPendingGfx). A window drag-resize also coalesces into one resize per frame.
+let gfxPending = false, resizePending = false;
+function applyPendingGfx() {
+  if (gfxPending) { gfxPending = resizePending = false; applyGfx(); }
+  else if (resizePending) { resizePending = false; resize(); }
+}
+window.addEventListener("resize", () => { resizePending = true; });
 
 // ---------------------------------------------------------------- graphics settings & adaptive quality
 const GFX_MODES = ["auto", "high", "medium", "low"];
@@ -4674,9 +4745,9 @@ function adaptQuality(ms, active) {
     if (perf.skip > 0) perf.skip--; // the first window after a change pays for shader compiles and buffer reallocation
     else if (fps < 42 && ladder < QLADDER.length - 1) {
       if (perf.lastUp) perf.need = Math.min(40, perf.need * 2); // the last step up was too much: probe less often
-      ladder = Math.min(QLADDER.length - 1, ladder + (fps < 22 ? 2 : 1)); perf.good = 0; perf.lastUp = false; perf.skip = 1; applyGfx();
+      ladder = Math.min(QLADDER.length - 1, ladder + (fps < 22 ? 2 : 1)); perf.good = 0; perf.lastUp = false; perf.skip = 1; gfxPending = true;
     } else if (fps > 56 && ladder > 0) {
-      if (++perf.good >= perf.need) { ladder--; perf.good = 0; perf.lastUp = true; perf.skip = 1; applyGfx(); }
+      if (++perf.good >= perf.need) { ladder--; perf.good = 0; perf.lastUp = true; perf.skip = 1; gfxPending = true; }
     } else { perf.good = 0; perf.lastUp = false; }
   }
   gfxLabel();
@@ -5662,14 +5733,35 @@ function buildHangar() {
   const b = builder(), R = (lo, hi) => rand(lo, hi), pick = a => a[(Math.random() * a.length) | 0];
   const CONC = [0.60, 0.59, 0.56], DARK = [0.08, 0.08, 0.09], WALL = [0.55, 0.52, 0.46], ROOF = [0.36, 0.38, 0.40], RUST = [0.48, 0.30, 0.18], WOOD = [0.45, 0.34, 0.22];
   const OLIVE = [0.36, 0.38, 0.26], YEL = [0.86, 0.70, 0.18], WHITE = [0.9, 0.9, 0.88];
-  // concrete slabs in 5 m panels (slight shade changes give the panel seams and weathering)
+  // Concrete slabs in 5 m panels; the shade change from panel to panel draws the seams. The panels
+  // touch: 6 cm gaps between them used to show the shadowed grass below as broken dark dashes that
+  // crawled and flickered whenever the camera moved (they are far thinner than a pixel).
   const slab = (x0, z0, w, l, p = 5, y = APRON_Y) => {
     for (let x = x0; x < x0 + w - 0.01; x += p) for (let z = z0; z < z0 + l - 0.01; z += p) {
       const k = R(0.9, 1.06), stain = Math.random() < 0.08 ? 0.82 : 1;
-      addBox(b, chain(trans(x + p / 2, y / 2, z + p / 2), scl(p - 0.06, y, p - 0.06)), CONC.map(v => v * k * stain));
+      addBox(b, chain(trans(x + p / 2, y / 2, z + p / 2), scl(p, y, p)), CONC.map(v => v * k * stain));
     }
   };
-  const line = (x, z, w, l, col = YEL) => addBox(b, chain(trans(x, APRON_Y + 0.006, z), scl(w, 0.01, l)), col);
+  // Painted markings stand DECAL (2-5 cm) proud of the concrete. At 1 mm they z-fought with it in the
+  // distance (striped, flickering lines); 2 cm is invisible from the camera's closest point.
+  const DECAL = 0.02;
+  const line = (x, z, w, l, col = YEL) => addBox(b, chain(trans(x, APRON_Y + DECAL, z), scl(w, 0.03, l)), col);
+  // Shed roof: a low gable of corrugated strips that share their edges. It used to be nine tilted boxes
+  // overlapping each other, whose crossing faces and slivers drew dark jagged stripes along the roof.
+  const shedRoof = (x, zc) => {
+    const hw = 9.6, eave = 8.05, ridge = 9.7, half = 8.8, n = 6;
+    for (const side of [-1, 1]) for (let i = 0; i < n; i++) {
+      const a = i / n, c = (i + 1) / n, za = zc + side * half * a, zb = zc + side * half * c;
+      const ya = lerp(ridge, eave, a), yb = lerp(ridge, eave, c);
+      const q = [[x - hw, ya, za], [x + hw, ya, za], [x + hw, yb, zb], [x - hw, yb, zb]];
+      addPoly(b, q, ROOF.map(v => v * (i % 2 ? 0.93 : 1.02)), [x, 0, zc]);   // top: faces up, away from below
+      addPoly(b, q.slice().reverse(), [0.2, 0.2, 0.2], [x, 60, zc]);        // underside of the overhang
+    }
+    for (const sx of [-1, 1]) addPoly(b, [[x + sx * 9, 8, zc - 8], [x + sx * 9, 8, zc + 8], [x + sx * 9, 9.55, zc]], WALL, [x, 8.5, zc]); // gable ends
+    addBox(b, chain(trans(x, ridge + 0.05, zc), scl(hw * 2 + 0.1, 0.16, 0.55)), ROOF.map(v => v * 0.8));  // ridge cap
+    addBox(b, chain(trans(x, eave - 0.12, zc - half - 0.03), scl(hw * 2, 0.26, 0.1)), [0.3, 0.3, 0.3]);    // fascia boards
+    addBox(b, chain(trans(x, eave - 0.12, zc + half + 0.03), scl(hw * 2, 0.26, 0.1)), [0.3, 0.3, 0.3]);
+  };
   // ---- tank apron and vehicle sheds
   slab(-45, -35, 90, 75);
   addCyl(b, chain(trans(0, APRON_Y + 0.04, 0), scl(14, 0.08, 14)), [0.36, 0.36, 0.36], 40); // turntable
@@ -5684,7 +5776,7 @@ function buildHangar() {
     addBox(b, chain(trans(x, 3.1, z - 3.95), scl(11, 6.2, 0.2)), DARK);
     addBox(b, chain(trans(x - 7.6, 3.1, z - 4.1), scl(3.6, 6.2, 0.25)), RUST);
     addBox(b, chain(trans(x + 7.6, 3.1, z - 4.1), scl(3.6, 6.2, 0.25)), RUST.map(v => v * 0.9));
-    for (let k = 0; k < 9; k++) addBox(b, chain(trans(x, 8.2 + Math.sin(k / 8 * Math.PI) * 1.5, z - 4.6 + k * 2.3), rotX(k < 4 ? -0.18 : k > 4 ? 0.18 : 0), scl(19, 0.18, 2.5)), ROOF.map(v => v * (k % 2 ? 0.94 : 1)));
+    shedRoof(x, z + 4);
     addBox(b, chain(trans(x, 6.7, z - 4.2), scl(12, 0.4, 0.35)), [0.25, 0.25, 0.25]);
     addBox(b, chain(trans(x, 7.15, z - 4.3), scl(4, 0.9, 0.1)), [0.82, 0.78, 0.62]);
     for (let k = 0; k < 3; k++) addBox(b, chain(trans(x + (k - 1) * 3.4, 4.8, z + 12.1), scl(1.6, 1.2, 0.1)), [0.15, 0.18, 0.2]);
@@ -5697,7 +5789,7 @@ function buildHangar() {
   for (let i = 0; i < 14; i++) for (let r = 0; r < 3; r++) addBox(b, chain(trans(-44 + i * 0.95 + (r % 2) * 0.45, APRON_Y + 0.18 + r * 0.32, -30), rotY(R(-0.08, 0.08)), scl(0.9, 0.32, 0.55)), [0.62, 0.56, 0.42]);
   for (let i = 0; i < 4; i++) addCyl(b, chain(trans(30 + i * 0.35, APRON_Y + 0.42, 33), rotZ(Math.PI / 2), scl(0.84, 0.3, 0.84)), [0.16, 0.16, 0.15], 12);
   addBox(b, chain(trans(-20, APRON_Y + 0.9, 33.5), scl(3, 0.12, 1)), WOOD); for (const sx of [-1, 1]) addBox(b, chain(trans(-20 + sx * 1.3, APRON_Y + 0.45, 33.5), scl(0.12, 0.9, 0.9)), WOOD);
-  for (let i = 0; i < 10; i++) addCyl(b, chain(trans(R(-35, 35), APRON_Y + 0.004, R(-25, 30)), scl(R(1, 3), 0.01, R(1, 2.5))), [0.36, 0.35, 0.33], 10);
+  for (let i = 0; i < 10; i++) addCyl(b, chain(trans(R(-35, 35), APRON_Y + 0.012 + i * 0.002, R(-25, 30)), scl(R(1, 3), 0.02, R(1, 2.5))), [0.36, 0.35, 0.33], 10); // oil stains, each a little higher so overlapping ones cannot z-fight
   // lamp posts (lit) and flag poles
   for (const [x, z] of [[-44, -34], [44, -34], [-44, 36], [44, 36], [150, -32], [250, -32]]) {
     addBox(b, chain(trans(x, 4.5, z), scl(0.22, 9, 0.22)), [0.3, 0.3, 0.3]);
@@ -5715,7 +5807,7 @@ function buildHangar() {
   const A = HSPOT.air;
   slab(A[0] - 50, -40, 100, 80);
   for (let i = 0; i < 3; i++) line(A[0] - 30 + i * 30, -10, 0.3, 40);
-  addCyl(b, chain(trans(A[0], APRON_Y + 0.007, A[2]), scl(16, 0.01, 16)), YEL, 40); addCyl(b, chain(trans(A[0], APRON_Y + 0.009, A[2]), scl(15.4, 0.01, 15.4)), CONC.map(v => v * 0.97), 40);
+  addCyl(b, chain(trans(A[0], APRON_Y + 0.015, A[2]), scl(16, 0.03, 16)), YEL, 40); addCyl(b, chain(trans(A[0], APRON_Y + 0.03, A[2]), scl(15.4, 0.03, 15.4)), CONC.map(v => v * 0.97), 40); // ring tops 1.5 cm apart (were 2 mm)
   {
     // arched hangar: barrel roof from lofted half rings, open front showing the dark interior
     const hx = A[0], hz = 60, rad = 17, len = 34, n = 14, rings = [];
@@ -5742,7 +5834,7 @@ function buildHangar() {
     for (let i = 0; i < 3; i++) addBox(b, chain(trans(tx - 4.02, 3, tz - 2 + i * 2), scl(0.05, 1.2, 1)), [0.15, 0.18, 0.2]);
   }
   for (let x = 40; x < 700; x += 10) addBox(b, chain(trans(x, APRON_Y / 2, -75), scl(9.94, APRON_Y, 30)), [0.45, 0.45, 0.43].map(v => v * R(0.95, 1.05)));
-  for (let x = 45; x < 700; x += 20) addBox(b, chain(trans(x, APRON_Y + 0.006, -75), scl(9, 0.01, 0.5)), WHITE);
+  for (let x = 45; x < 700; x += 20) addBox(b, chain(trans(x, APRON_Y + 0.03, -75), scl(9, 0.04, 0.5)), WHITE); // seen from far away: 5 cm proud
   for (let x = 120; x < 240; x += 10) addBox(b, chain(trans(x, APRON_Y / 2, -50), scl(9.94, APRON_Y, 20)), [0.5, 0.5, 0.48].map(v => v * R(0.95, 1.05))); // taxiway
   addBox(b, chain(trans(A[0] - 70, 4, 35), scl(0.15, 8, 0.15)), [0.85, 0.85, 0.85]);
   addCone(b, chain(trans(A[0] - 68.2, 7.6, 35), rotZ(-Math.PI / 2 + 0.25), scl(1, 3.6, 1)), [0.95, 0.45, 0.15], 10);
@@ -5848,10 +5940,13 @@ function hangarDrawUnits(sink) {
     if (u.type.air) draw(u.type.gearMesh, u.M, WHITE, 0, 1, 0.3);
   }
 }
+// The orbit camera never comes closer than ~8 m to anything, so the near plane can sit at 1 m: depth
+// precision across the apron is about 3x what the battle camera's 0.3 m gives (z ~ near/depth).
+const HANGAR_NEAR = 1;
 function renderHangar() {
   frameId++; cur = null;
   frameU.fogFar = 2300; frameU.nOff = 0.18;
-  const Pm = perspective(cam.fov, canvas.width / canvas.height, 0.3, 4500), V = lookAt(cam.pos, vadd(cam.pos, cam.dir), [0, 1, 0]);
+  const Pm = perspective(cam.fov, canvas.width / canvas.height, HANGAR_NEAR, 4500), V = lookAt(cam.pos, vadd(cam.pos, cam.dir), [0, 1, 0]);
   VP = mul(Pm, V); frustum(VP, FR);
   hangarShadows();
   gl.bindFramebuffer(gl.FRAMEBUFFER, msaa ? msaa.fbo : null);
@@ -6288,7 +6383,7 @@ function cineShake(p, k) { if (!REDUCED_MOTION) cine.shake = Math.max(cine.shake
 
 // ---- sound: everything goes through one bus that is faded and disconnected when the film ends
 function cineAudio() {
-  if (!AC || cine.bus || state !== "cine") return;
+  if (!AC || cine.bus || state !== "cine" || cine.gate) return;
   const t0 = AC.currentTime, bus = AC.createGain(), lp = AC.createBiquadFilter(), n = cine.nodes = [];
   lp.type = "lowpass"; lp.frequency.value = 18000;
   bus.gain.setValueAtTime(0, t0); bus.gain.linearRampToValueAtTime(1, t0 + 1.2);
@@ -6555,27 +6650,66 @@ function cineShowShot(i) {
   cap.classList.remove("on");
   if (kick || line) { $("cineKicker").textContent = kick; $("cineLine").textContent = line; void cap.offsetWidth; cap.classList.add("on"); if (i > 0) cineDrum(0.15, 70); }
 }
-function playCinematic() {
+// gate: show the start card first (first launch). The film waits on it, so it never plays half of its
+// opening in silence while the browser still blocks sound: the click or key that starts it unlocks audio.
+function playCinematic(gate = false) {
   if (state !== "menu" && state !== "over") return;
   initAudio(); // before a user gesture this makes a suspended context that the first click/key resumes
+  cine.gate = gate === true; cine.gt = 0; cine.fade0 = 1;
   cine.from = state;
   cine.saved = { tanks, shells, parts };
   shells = []; parts = [];
   cine.cast = cineCast();
   tanks = [];
   closeModal(); lobbyMenu(false); $("lobby").hidden = true; document.body.classList.remove("lobby-on");
-  cine.t = 0; cine.pt = -1; cine.shot = -1; cine.slow = 1; cine.slowSnd = 1; cine.shake = 0; cine.flash = 0; cine.smokeT = 0;
+  cine.t = 0; cine.pt = -1; cine.shot = -1; cine.posed = false; cine.slow = 1; cine.slowSnd = 1; cine.shake = 0; cine.flash = 0; cine.smokeT = 0;
   state = "cine";
   overlay.style.display = "none";
   document.body.classList.add("cine-on");
   cineEl.hidden = false; cineEl.classList.remove("end", "title", "out");
   void cineEl.offsetWidth; cineEl.classList.add("run");
-  $("cineDeploy").hidden = true;
+  $("cineDeploy").hidden = $("cineHangar").hidden = true; $("cineSkip").hidden = $("cineLeft").hidden = false;
+  cineChapters();
+  cineEl.classList.toggle("gate", cine.gate); $("cineGate").hidden = !cine.gate;
+  if (cine.gate) { cineGateHint(); $("gatePlay").focus({ preventScroll: true }); return; }
   cineAudio();
   $("cineSkip").focus({ preventScroll: true });
 }
+// start card -> film. The dimmed valley behind the card fades up instead of cutting to black first.
+function cineGateStart() {
+  if (state !== "cine" || !cine.gate) return;
+  cine.gate = false; cine.fade0 = GATE_DIM;
+  cineEl.classList.remove("gate"); $("cineGate").hidden = true;
+  initAudio(); cineAudio();
+  $("cineSkip").focus({ preventScroll: true });
+}
+const GATE_DIM = 0.45; // how dark the valley is behind the start card
+function cineGateHint() {
+  $("gateHint").textContent = SET.mute ? "Sound is muted · N to unmute · Esc skips at any time" : "Sound starts with the intro · N mutes · Esc skips at any time";
+}
+// progress bar: a tick at each captioned scene, so the length and the chapters read at a glance
+function cineChapters() {
+  const pr = $("cineProg");
+  if (pr.querySelector("b")) return;
+  for (const sh of CINE_SHOTS) if (sh[2] && sh[0] > 0) { const b = document.createElement("b"); b.style.left = `${(sh[0] / CINE_END * 100).toFixed(2)}%`; b.title = sh[2]; pr.appendChild(b); }
+}
+// intro shown once per browser: returning players open straight into the hangar ("Watch intro" replays it)
+const INTRO_KEY = "steelfront.intro";
+function introSeen() {
+  try { if (localStorage.getItem(INTRO_KEY) === "seen") return true; } catch (e) { /* storage blocked: fall through */ }
+  return profile.stats.battles > 0; // saves from before this flag existed: they have played already
+}
+function markIntroSeen() { if (SELFTEST) return; try { localStorage.setItem(INTRO_KEY, "seen"); } catch (e) { /* not persisted */ } }
+function helloBanner() {
+  const h = $("hello");
+  $("helloSub").textContent = profile.stats.battles > 0 ? `WELCOME BACK · ${profile.stats.battles} BATTLE${profile.stats.battles === 1 ? "" : "S"} FOUGHT` : "WELCOME TO THE HANGAR";
+  h.hidden = false; h.classList.remove("on"); void h.offsetWidth; h.classList.add("on");
+  clearTimeout(helloBanner.t); helloBanner.t = setTimeout(() => { h.classList.remove("on"); h.hidden = true; }, 2700);
+}
 function endCinematic(deploy) {
   if (state !== "cine") return;
+  markIntroSeen();
+  cine.gate = false; cineEl.classList.remove("gate"); $("cineGate").hidden = true;
   if (cine.bus) {
     const bus = cine.bus, nodes = cine.nodes, t0 = AC.currentTime;
     bus.gain.cancelScheduledValues(t0); bus.gain.setValueAtTime(bus.gain.value, t0); bus.gain.linearRampToValueAtTime(0, t0 + 0.35);
@@ -6592,8 +6726,23 @@ function endCinematic(deploy) {
   if (deploy) startPlaying();
   else $("lbGo").focus({ preventScroll: true }); // the battle overlay's Play button is hidden in the hangar
 }
+// start card: the film clock holds at 0 and the camera creeps along the opening crane shot (not with
+// reduced motion), with the valley dimmed behind the card
+function cineGateFrame(dt) {
+  if (!REDUCED_MOTION) cine.gt += dt;
+  tanks.length = 0;
+  for (const u of cine.cast.all) if (0 >= u.win[0] - 0.2) tanks.push(u);
+  if (!cine.posed) { cineScript(0); cine.posed = true; }
+  updateParticles(dt);
+  const [p0, tgt, fov] = CINE_SHOTS[0][4](0, 0, cine.cast), g = cine.gt, w = 4 * smoothstep(0, 6, g); // a slow sway around the film's first frame, so starting it is seamless
+  const p = vadd(p0, [Math.sin(g * 0.21) * w, Math.sin(g * 0.13) * w * 0.4, Math.cos(g * 0.17) * w * 0.6]);
+  cam.pos = p; cam.dir = vnorm(vsub(tgt, p)); cam.fov = fov;
+  css($("cineFade"), "opacity", GATE_DIM);
+  if (cineGateFrame.mute !== SET.mute) { cineGateFrame.mute = SET.mute; cineGateHint(); }
+}
 function updateCinematic(dt) {
   if (document.hidden) return;
+  if (cine.gate) { cineGateFrame(dt); return; }
   const d = dt * cine.slow;
   cine.pt = cine.t; cine.t += d; now += d;
   cine.slowSnd = cine.slow < 1 ? 0.5 : 1;
@@ -6625,18 +6774,28 @@ function updateCinematic(dt) {
   if (T < 7 && cine.bus && Math.random() < dt * 0.5) noiseHit(rand(0.08, 0.18), 260, 40, 2.4, cine.bus); // distant artillery
   cineSound();
   // fades, flash and title card
-  const fade = Math.max(1 - T / 1.4, smoothstep(CINE_END - 1.1, CINE_END, T));
+  const fade = Math.max(cine.fade0 * (1 - T / 1.4), smoothstep(CINE_END - 1.1, CINE_END, T));
   css($("cineFade"), "opacity", fade.toFixed(3));
   cine.flash *= Math.exp(-dt * 7);
   css($("cineFlash"), "opacity", cine.flash.toFixed(3));
-  css($("cineSound"), "display", AC && AC.state === "running" ? "none" : "");
+  const sndTxt = SET.mute ? "\u{1F507} Sound muted · N to unmute" : AC && AC.state === "running" ? "" : "\u{1F508} Click anywhere or press a key for sound";
+  if ($("cineSound").textContent !== sndTxt) $("cineSound").textContent = sndTxt;
+  css($("cineSound"), "display", sndTxt ? "" : "none");
   css($("cineProg").firstChild, "width", `${(T / CINE_END * 100).toFixed(1)}%`);
-  if (T > 49.2 && !cineEl.classList.contains("title")) { cineEl.classList.add("title"); $("cineDeploy").hidden = false; }
+  const left = fmtClock(CINE_END - T); if ($("cineLeft").textContent !== left) $("cineLeft").textContent = left;
+  if (T > 49.2 && !cineEl.classList.contains("title")) {
+    // title card: the choice moves to the centre (Deploy / hangar); the corner skip button goes away
+    cineEl.classList.add("title"); $("cineDeploy").hidden = $("cineHangar").hidden = false; $("cineSkip").hidden = $("cineLeft").hidden = true;
+    $("cineDeploy").focus({ preventScroll: true });
+  }
   if (T >= CINE_END) endCinematic(false);
 }
 $("cineSkip").addEventListener("click", e => { e.stopPropagation(); endCinematic(false); });
 $("cineDeploy").addEventListener("click", e => { e.stopPropagation(); endCinematic(true); });
-$("intro").addEventListener("click", playCinematic);
+$("cineHangar").addEventListener("click", e => { e.stopPropagation(); endCinematic(false); });
+$("gateSkip").addEventListener("click", e => { e.stopPropagation(); endCinematic(false); });
+$("cineGate").addEventListener("click", e => { e.stopPropagation(); cineGateStart(); }); // the whole card is the play button
+$("intro").addEventListener("click", () => playCinematic());
 // first gesture during the film turns the sound on (browsers block audio before one)
 document.addEventListener("pointerdown", () => { if (state === "cine") { initAudio(); cineAudio(); } });
 
@@ -6644,11 +6803,14 @@ document.addEventListener("pointerdown", () => { if (state === "cine") { initAud
 generateWorld();
 newBattle();
 showMenu("start");
-if (!/[?&]nointro\b/.test(location.search) && !SELFTEST) playCinematic(); // the intro opens every launch; Esc / Enter / Space or Skip goes to the menu
+// First launch: the start card, then the intro (Esc skips either). Returning players open straight into the
+// hangar with the name fading over it; ?intro forces the intro, ?nointro skips both.
+if (!SELFTEST && !/[?&]nointro\b/.test(location.search)) { if (/[?&]intro\b/.test(location.search) || !introSeen()) playCinematic(true); else helloBanner(); }
 let last = performance.now(), lastState = state;
 function frame(t) {
   // a rAF timestamp can be a little older than the last performance.now(), so dt never goes negative
   const ms = t - last, dt = clamp(ms / 1000, 0, 0.05); last = t;
+  applyPendingGfx(); // before anything is drawn this frame (see resize)
   if (state !== lastState) { frozen = false; lastState = state; }
   if (state === "playing") {
     // below 20 fps one frame covers several 50 ms steps (up to 0.25 s), so the battle clock and the
@@ -7329,7 +7491,7 @@ window.steelFront = { get player() { return player; }, get tanks() { return tank
   MODES, endBattle, useCons, saveProfile, loadProfile, startPlaying, showMenu, openShop, renderLobby, selectVehicle, get outcome() { return outcome; }, get battleTime() { return battleTime; }, set battleTime(v) { battleTime = v; },
   get timeScale() { return timeScale; }, set timeScale(v) { timeScale = clamp(+v || 1, 0.02, 1); },
   selftest: runSelfTest, selectAmmo: k => selectAmmo(player, k), AMMO,
-  intro: { play: playCinematic, skip: () => endCinematic(false), deploy: () => endCinematic(true), get t() { return cine.t; }, seek: t => { while (state === "cine" && cine.t < t) updateCinematic(0.05); } } };
+  intro: { play: playCinematic, start: cineGateStart, get gate() { return !!cine.gate; }, skip: () => endCinematic(false), deploy: () => endCinematic(true), get t() { return cine.t; }, seek: t => { while (state === "cine" && cine.t < t) updateCinematic(0.05); } } };
 </script>
 </body>
 </html>

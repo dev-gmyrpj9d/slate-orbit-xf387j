@@ -1,0 +1,300 @@
+# Steel Front
+
+A single-file WebGL2 combined-arms battle game (tanks, SPAA, aircraft, 8 vs 8 against AI). It has nothing to do with the Roblox project in the rest of this repo.
+
+| Path | What it is |
+| --- | --- |
+| `steelfront.html` | The playable game. Open it in Chrome, Edge, Firefox or Safari. |
+| `original/steelfront.original.html` | The uploaded baseline (`steelfront (5).html`, md5 `f54eb05bbc2964cbd361c15fc673c020`). Never edited. |
+| `tests/run-selftest.mjs` | Runs the built-in self-test in headless Chrome. |
+
+## Pass 1: War Thunder-style ground combat
+
+**Fixes**
+
+- A direct rocket, artillery or HE hit counted as being inside the kill radius, so it always destroyed the tank. One 25 mm-pen RS-82 on a Tiger's front plate was a kill. Now only bombs kill by distance alone. A direct strike has to beat the armour it hits, and the blast multiplier is capped at 1.
+- The reload ring under the gun marker used the base reload, so it was wrong with a damaged breech and with autocannon magazines.
+- The gun still aimed and fired during field repair, even though the crew is "outside fixing the tank".
+- Conquest AI ignored an owned zone while enemies were capturing it, as long as no ally was inside it.
+- In Last Stand, timing out with zone B neutral counted as "B held", which is a win. It is now a loss: "zone B was neutral, not held".
+- The `window.steelFront.select(key)` console hook threw for every historical vehicle.
+
+**New gameplay**
+
+- **Shell choice (1 / 2 / 3).** Every cannon tank carries three shell types:
+  - **AP:** the most penetration.
+  - **APHE:** 88% of the penetration but much more damage behind the plate.
+  - **HE:** bursts on contact. It can't get through real armour but wrecks open-topped vehicles.
+
+  Switching while the gun is loaded unloads it and reloads the new shell. Switching mid-reload just changes the round being loaded. AI tanks pick HE against open tops, APHE when it clears the target's front armour, and AP otherwise.
+- **Crew and modules.** Ground vehicles have 3 to 5 crew seats: commander, gunner, loader, driver, radio operator.
+  - A penetration's spall knocks out crew depending on where it lands (turret, hull front, side, roof or rear).
+  - With no gunner the gun can't traverse or fire. With no driver the tank can't move. With no loader reloads take 60% longer (a 3-man crew's gunner loads).
+  - A spare crewman takes over the gunner's or driver's seat after 5 s.
+  - The vehicle is lost when fewer than two crew remain.
+  - The HUD shows crew status, and a hit on you lists what it broke.
+- **Engine fires.** Penetrations into the engine bay can start a fire, which drains hull integrity. Press **F** to put it out; AI crews put theirs out after a few seconds.
+- **Penetration indicator.** Over an enemy vehicle, the gun marker turns green (likely penetration), yellow (maybe), red (no) or grey (likely ricochet) for the loaded shell. In the gunner sight it also shows penetration against effective armour in mm. It only appears when you are already aiming at the vehicle, so it doesn't reveal positions.
+
+## Pass 2: finding enemies, easier enemy AI
+
+This pass answers playtest feedback: it was hard to tell where the enemy was, and the enemy was too strong.
+
+**Enemy location cues**
+
+- **Spotting:** an enemy counts as spotted while you or an ally can see it, for 4 s after its main gun fires within 900 m of your side, and for 6 s after it hits you. You see an enemy if it is in line of sight and either within 650 m or in your view out to 1,200 m (1,800 m for aircraft). Before this pass only the AI and aircraft spotted anything, and only on the minimap.
+- **Markers:** a spotted enemy gets a red marker over it with its range in metres. When it is off-screen, a red arrow at the screen edge points to it (up to 8, nearest first). It also still shows on the minimap.
+- **Hit direction:** a red arc around the crosshair points to whoever just hit you, for 3 s.
+- **M** turns the markers and arrows on or off. The setting is saved; the hit arc always shows.
+
+**Enemy AI handicap.** All the numbers are in the `ENEMY_AI` table. Only team 1 AI is affected; allies, the player and the damage model are unchanged.
+
+| | Before | Now |
+| --- | --- | --- |
+| Range at which enemies spot targets | 520 m (flak 1,300 m) | ×0.85 |
+| Delay before the first shot at a new target | 0.8–2.0 s | ×1.8 |
+| Aim error (tanks, flak) | — | ×1.7 |
+| Pause after each shot | 0.2–1.0 s | 0.9–2.2 s |
+| Enemy pilots' aim error | — | ×1.5 |
+| Shell against armour | APHE or AP | AP (less spall) |
+
+Over 3 × 180 s simulated Conquest battles, the enemy used to out-kill your side 27 to 17. With the handicap your side leads 26 to 18.
+
+## Pass 3: easier flying, adjustable speed
+
+This pass answers playtest feedback: the plane was too hard to control, and there was no easy way to set its speed.
+
+**Speed.** Hold **W / S** to open or close the throttle, or press **1 / 2 / 3 / 4** for 25 / 50 / 75 / 100%. A throttle bar sits left of the crosshair:
+
+- the green fill is the throttle setting
+- the white tick is your current speed
+- the blue tick and the `→` number are the speed (km/h) you'll settle at in level flight
+- the red tick is the stall speed
+
+The left panel also shows the presets (the current one highlighted) and `THR n%→km/h`. The 1–3 keys still pick shells in a tank.
+
+Pass 3 also added an "easy flight" assist. It was removed in Pass 5 (see below).
+
+## Pass 4: lock-on rockets
+
+**Lock-on rockets (arcade, game-only).** Two new player vehicles carry SF-G rockets that steer themselves:
+
+- **Hornet R-5** (Ground forces, Steel Front): a light rocket tank with a 50 mm gun and two turret pods of 4 rockets. The pods reload one rocket every 8 s.
+- **P-51D Kestrel** (Aircraft, Steel Front): a Mustang-airframe variant with six .50 cal guns and 6 lock-on rockets instead of bombs. T rearms them as usual.
+
+How it works:
+
+1. A dashed seeker circle sits round the crosshair. Keep an enemy tank or aircraft inside it, in range (1,000 m for tanks, 1,400 m for aircraft) and in clear view. The seeker picks the enemy nearest the crosshair by itself.
+2. A yellow box closes in on the target (`LOCKING n%`). After 0.6 s it turns into a red `LOCKED TANK/AIR · range` box with `R: FIRE`.
+3. Press **R**. The rocket steers to the target, leading it, and flies a shallow loft against tanks so it clears crests. It bursts next to aircraft (proximity fuse), and has to beat the armour it hits on tanks (150 mm penetration). Without a lock, R fires the rocket straight ahead.
+
+Friendly units, wrecks, targets out of range and targets behind terrain or smoke never lock. AI units never use these vehicles, and an AI launcher could not home, so enemy difficulty is unchanged.
+
+## Pass 5: no flight assists
+
+Playtest feedback asked for all of easy flight to go, so it has been removed as a feature, not just switched off:
+
+- **Gone:** the auto pull-up (removed first, in Pass 4), stall protection, the automatic extra throttle, the 40° climb/dive cap and the steering smoothing. The L key, the easy-flight chip and the `EASY` / `+AUTO` labels on the HUD are gone too.
+- **Same model as the AI:** the player's plane now flies exactly the same model as AI pilots. Fly slow or pull too hard and you stall; hold a dive and you hit the ground.
+- **Old saved setting:** the `steelfront.easyflight` value an earlier build saved is deleted on load, so it can't turn anything back on.
+- **Kept:**
+  - mouse-aim, A/D roll and C free look
+  - the W/S throttle and the 1–4 presets
+  - the throttle bar with its cruise and stall ticks
+  - the STALL, PULL UP and RETURN TO THE BATTLE AREA warnings, which only warn
+  - the battle-area boundary: past the map edge or above 2,600 m the plane still turns back, as in the original game
+  - the lock-on rockets
+
+## Pass 6: combat feedback and replay goals
+
+A polish pass to make each battle more rewarding and give reasons to play again. Difficulty is unchanged: the score system doesn't touch the enemy AI handicap, and flight still has no assists.
+
+- **In battle:**
+  - Every hit, critical hit, kill, assist, zone capture and cleared wave pops up to the right of the crosshair with its points. Repeat machine-gun hits on one target merge into one counting line.
+  - Kills show a banner with the target's name and vehicle, a red X and ring on the crosshair, and a short rising chime.
+  - Bonuses and callouts: first blood, long shots (500 m or more), double / triple / multi kills within 12 s, and kill streaks at 3, 5 and 8.
+  - The info panel shows the running score and the current streak.
+- **After a battle:** the rewards screen leads with the battle score and its personal-best badges. It also shows the vehicle's mastery stars and progress, and the medals earned. If you earned none, it suggests two you haven't earned yet.
+- **Medals:** 11 to collect: First Blood, Double Strike, Triple Strike, Unbroken, Marksman, Tank Hunter, Air Ace, Zone Captain, Wingman, Smart Shot (lock-on rocket kill) and Survivor. Each pays +300 Cr / +150 XP, and the hangar's Career panel shows the collection.
+- **Vehicle mastery:** a vehicle's battle scores add up to 5 stars (600, 1,800, 4,000, 8,000 and 14,000). Each star pays a one-off credit bonus. Stars show on every vehicle card, and the info panel shows progress, battles, kills and best score.
+- **Not added:** daily streaks, timers, loot boxes, or anything you lose by taking a break.
+- **Saves:** medals, mastery and bests are part of the existing profile and are read field by field, so old saves load unchanged.
+- **Readability:** clustered enemy markers no longer print their distances on top of each other. The nearest label wins, and every marker is still drawn.
+
+## Pass 7: field objectives and the final push
+
+Playtest request: make the matches themselves more engaging. Battles were 20-minute zone and ticket grinds with nothing changing mid-match. This pass adds optional side events that start skirmishes in new places, and a closing phase so close battles end decisively. Enemy accuracy, spotting and reactions (`ENEMY_AI`) are unchanged, and no objective makes an enemy unit stronger.
+
+- **Field objectives.** About 60 s in, then 40–65 s after each one ends, one optional event starts. It is announced on screen and in the kill feed, and a gold line under the clock shows its range, compass direction and time left. Completing one scores +150 and pays 250 Cr / 120 XP at the end. Losing one, or ignoring it, only loses the bonus.
+  - **Supply drop** (ground): a crate parachutes down with a green smoke column. The first vehicle to drive into it gets a full repair, a fresh crew, an instant reload, refilled rockets and reset consumable cooldowns. The nearest enemy tank races you for it. The spot is picked so that no enemy tank is clearly closer than you.
+  - **Radio relay** (ground): a mast with yellow smoke. Hold it alone for 12 s; any enemy inside pauses the capture. Taking it reveals every enemy for 30 s and costs the enemy 15 tickets. Two enemies head there to contest it, and one ally comes to help.
+  - **Enemy commander**: one enemy (an aircraft if you are flying) gets a gold ★ marker and stays spotted. Destroying it within 100 s costs the enemy 20 tickets. The marked vehicle itself is not buffed.
+  - **Supply column**: three unarmed trucks drive across behind the enemy line, marked gold. Destroying all of them costs the enemy 15 tickets on top of the usual losses. Two allies move to intercept, and the trucks make good targets for aircraft. Trucks that get through leave the map and never respawn.
+  - **Where they run:** pilots only get the commander and the column. In Breakthrough the bonus is reinforcements instead of enemy tickets. Last Stand has no timed events; instead a supply crate lands 80–150 m from B after every destroyed wave and lasts 32 s.
+  - **Markers:** gold objective markers show even when M has hidden the enemy markers. The minimap shows a ring at the objective, and the relay's ring fills with the hold progress.
+- **Final push.** In Conquest, Annihilation and Air Superiority, the last 4 minutes, or the moment either side drops to 25% tickets, start the final push. Vehicle losses cost ×1.5 tickets and Conquest zone bleed doubles, for both sides equally. The objective line then reads FINAL PUSH. Last Stand's eighth wave is announced as the FINAL WAVE.
+- **Momentum readout.** The Conquest line under the clock now gives the zone count and who is draining whom, for example `zones 2–1 · enemy losing 0.3/s`.
+- **End screen:** it adds an objectives count and a "field objectives" reward row.
+
+## Pass 8: model polish and premium vehicles
+
+Playtest request: polish every vehicle's 3D model, and add stronger vehicles that cost money to unlock. "Money" here is the game's own earned credits; there is no payment integration and no real-money shop.
+
+**Models**
+
+- **Steel Front tanks rebuilt.** The Lynx L-4, Warden M-7, Bastion H-2 and Hornet R-5 were a few dozen plain boxes. They now share one parametric builder (`buildSF`) made from the same parts as the historical tanks:
+  - a lofted hull with a sloped glacis, sprung road wheels (5–8 by size), a drive sprocket, an idler, return rollers and a linked track
+  - fenders, side skirts on the heavies, headlights with guards, tow hooks, tools, exhausts, an engine grille, spare track links, the driver's hatch and periscope, and a bow MG
+  - a cast (rounded) or welded (angular) turret with a bustle, cupola, hatch, periscopes, antenna, stowage bin, smoke dischargers and handrails
+  - a mantlet, a sleeved barrel, a fume extractor, a muzzle brake and a coaxial MG
+  - Steel Front roundels as decals
+  - low-detail copies for distance, like the historical tanks
+
+  Dimensions, hit boxes, turret position and rocket-pod launch points are unchanged.
+- **Weathering pass on every model.** All 22 ground and air models go through `weather()` at build time, so there is no per-frame cost:
+  - ambient-occlusion darkening toward the bottom
+  - dust and mud on the lower hull and running gear
+  - sun-faded upper faces and shadowed undersides
+  - a small per-panel tone variation
+
+  Vertex colours multiply the camouflage tint, so every camo still works.
+
+**Premium vehicles** (Steel Front nation, bought once in the hangar, then owned for good)
+
+| Vehicle | Type | Price | Why it is strong |
+| --- | --- | --- | --- |
+| Valkyrie V-8 | Strike tank | 45,000 Cr | 76 km/h, 90 mm gun with 270 mm pen, 3.4 s reload |
+| Hornet R-9 Swarm | Heavy rocket tank | 55,000 Cr | 8 lock-on SF-G rockets in two quad pods (one back every 4.5 s), 130 hp, a real 76 mm gun |
+| Titan HX-9 | Super-heavy tank | 75,000 Cr | 250/290 mm frontal armour, 175 hp, 128 mm gun with 330 mm pen |
+| Bulwark AX-2 | Heavy attacker | 55,000 Cr | 2 × 37 mm cannon (70 mm pen), 4 × .50, 2 × 500 kg bombs, 8 HVARs, 120 hp armoured tub |
+| Talon J-1 | Jet fighter | 80,000 Cr | 846 km/h at low level (the fastest piston fighter does 594), 4 × 30 mm, 8 lock-on rockets, no propeller, afterburner glow |
+
+- **Hangar:**
+  - Locked cards show a 🔒 price. The info panel shows the price, your credits and any shortfall, plus an **Unlock** button.
+  - Buying takes two clicks: the first arms the button and the second, within 4 s, buys.
+  - TO BATTLE is disabled while a locked vehicle is selected.
+  - You can still preview a locked vehicle's model and stats.
+- **Rules:**
+  - Buying checks your credits, deducts the exact price and saves `profile.owned`.
+  - Loading a save keeps only known premium keys, and a locked vehicle is never kept selected.
+  - Old saves without the field load unchanged.
+  - A locked vehicle never spawns, not even on respawn or from the pause-menu picker; a stock Sherman or P-51 is used instead.
+- **Enemy unchanged:** premium vehicles are excluded from `AI_GROUND` / `AI_AIR` and from Last Stand heavy waves, so the enemy never fields them. `ENEMY_AI` is unchanged. Flight stays unassisted, and the Talon flies the same flight model with different numbers.
+
+## Pass 9: VFX, SFX, UI and UX polish
+
+Playtest request: improve every aspect (VFX, SFX, UX, UI and the rest) so the game is more attractive. Gameplay, difficulty, saves, unlocks and the unassisted flight model are unchanged.
+
+**VFX**
+- **Particles:** every particle (smoke, dust, fire, flashes) is now drawn as a faceted low-poly ball instead of a cube. It is still one instanced draw, inside the same particle budget.
+- **Cannon fire:** a bright two-stage muzzle flash, plus a blast-dust ring kicked up from the ground in front of the gun.
+- **Explosions and kills:** a short emissive flash and an expanding ground dust ring.
+- **Impacts:** hot sparks and a smoke wisp for a penetration, and a fan of bright streaks for a ricochet or non-penetration.
+- **Camera shake:**
+  - when you fire, when you are hit, and from explosions nearby
+  - capped at a small amplitude and fading within a fraction of a second
+  - it moves only the camera, never the aim
+  - Off / Reduced / Full in Settings, and Off by default under `prefers-reduced-motion`
+- **Low integrity:** below 35% integrity a red edge glow pulses slowly (never a flash); it can be turned off. The damage flash is slightly softer.
+- **Hit confirmation:** tank crosshairs now show yellow ticks on every hit, as the aircraft sight already did.
+
+**SFX**
+- **Mixer:** separate buses for combat effects, engines/ambience and interface feed a master gain and a compressor, so many explosions at once don't clip.
+- **Gesture start:** the AudioContext starts on the first click or key press. Nothing is queued while the browser keeps audio suspended.
+- **Voice cap:** at most 48 voices; quiet sounds are dropped first.
+- **Positional sound:** guns and explosions are placed in stereo by screen direction and muffled with distance.
+- **Cannon:** a layered sub thump, a filtered-noise body and a close-range crack.
+- **Hits:** your hits clang on a penetration and whine on a ricochet. Being hit gives a heavy clank or a ricochet whine.
+- **Bombs and engines:** bombs reuse the positional explosion sound. Engines get a sub-octave growl.
+- **Ambience:** a soft wind bed and an occasional distant artillery rumble during battle.
+- **Interface:** soft ticks for buttons and for opening and closing windows.
+
+**UI and UX**
+- **Settings window** (hangar Menu, or the pause screen):
+  - master, effects, engine/ambience and interface volume, and mute
+  - mouse sensitivity, camera shake, the low-integrity glow, enemy markers and graphics quality
+  - saved in `steelfront.settings`, apart from the profile, so a progress reset keeps them; unreadable or out-of-range values are clamped or ignored
+- **New keys:** **N** mutes or unmutes anywhere. **H** shows a controls card for your current vehicle. A small hint line (`H controls · N mute · Esc pause & settings`) sits at the bottom of the battle HUD.
+- **Pause screen:** Resume, Settings and Leave now sit at the top instead of below a long scroll.
+- **Deploying:** fades in from black.
+- **Help:** the in-game help and the controls tables cover all of this.
+
+**Known limits**
+- **Particle style:** effects are low-poly particles rather than textured sprites, which keeps the game's look and needs no image assets.
+- **No 3D audio:** sounds are panned left/right, not run through HRTF panning.
+- **No music:** battles have no soundtrack; the intro keeps its own score.
+- **Test hook:** `steelFront.timeScale` (console only) slows the simulation to capture short effects in screenshots.
+
+## Pass 10: second polish pass
+
+Playtest request, again: improve VFX, SFX, UI and UX so the game is more attractive. This pass adds new feedback rather than retuning the first one; gameplay, difficulty, the enemy AI handicap, saves, unlocks and unassisted flight are unchanged.
+
+**VFX**
+- **Track marks:** ground vehicles near the camera press dark strips into the ground under both tracks, following the slope. They fade over 35 s, are capped per graphics preset (900 on Medium/High, 360 on Low) and are cleared for every battle.
+- **Shell trails:** cannon shells in flight draw a faint hot streak and a glowing head. They are drawn from the shells themselves, so they cost no particles.
+- **Exhaust:** a short dark exhaust puff when a vehicle near the camera pulls away.
+
+**SFX** (all on the existing buses, so volume, mute and gesture start apply)
+- **Breech clack:** a two-part metallic clack the moment your cannon is loaded, paired with a green pulse on the gun marker.
+- **Track clatter:** link noise whose rate follows your ground speed and stops when you stop.
+- **Near misses:** an enemy shell passing within about 14 m of you gives a placed, falling whizz, once per shell.
+- **Zone stings:** a rising three-note chime when your team captures a zone and two low notes when one is lost (interface volume).
+
+**UI and UX**
+- **Capture ring:** standing in a zone that is not yet yours shows a ring with the zone letter over the hull indicator: blue while capturing, orange and pulsing when contested, red when the enemy is taking it. It replaces the centre-screen "CAPTURING A 43%" text.
+- **Health bar:** green, amber below 60%, red below 35%. A pale segment shows what the last hit took and drains away.
+- **Stat row:** speed (large), kills, deaths, score and streak are laid out as chips instead of one long line.
+- **Edge arrows:** enemy markers and edge arrows no longer sit under the top score bar, the info panel or the minimap.
+- **Hangar:** **← / →** pick the previous or next vehicle in the line-up and **Enter** goes to battle (not while a window or menu is open, and a focused button keeps its own Enter). The drag-to-rotate hint no longer hides behind the vehicle tabs.
+
+**Known limits**
+- **Track-mark scope:** marks are flat strips laid only within 260 m of the camera; they do not deform the terrain.
+- **Trail distance:** shell trails are thin, so they read best from the side and up close.
+- **Same audio limits:** sound is still stereo, not HRTF, and there is still no battle music.
+
+## Testing
+
+```sh
+node steelfront/tests/run-selftest.mjs    # exits 0 on PASS; set CHROME=/path/to/chrome if it isn't on PATH
+```
+
+You can also open `steelfront.html?selftest` in any browser. The page runs 206 seeded checks and shows the results on screen. The checks cover:
+
+- the armour lookup and damage model
+- each fix above, as a regression check
+- crew effects, shell switching, HE and fire
+- the AI's zone and shell choices
+- spotting, the marker and arrow directions, and the enemy AI handicap
+- unassisted flight: no assist code or saved setting is left. A straight-down aim dives steeply into the ground, an idle-throttle climb stalls and the throttle stays put. The player's input path matches the raw flight model exactly. Also checked: the throttle keys, level-flight speed per throttle, and that L does nothing
+- lock-on rockets: which units can lock (friendly, out of range, outside the circle, destroyed), lock timing, tank→tank (moving), tank→aircraft, plane→aircraft and plane→tank hits, unguided fire without a lock, AI never homing, pod reload, the R key and the lock HUD
+- battle score: merged hit popups, kill / first blood / long-shot scoring, double kills, assists, streak reset on death, HUD drawing, medals, mastery stars and their one-off bonus, personal bests, the rewards screen and hangar, safe loading of medal and mastery data from a save, and that the enemy AI handicap is unchanged
+- field objectives: scheduling, spot choice, the supply crate (not while landing, full repair, an enemy reaching it first), the relay (contested, reveal, tickets), the commander, the supply column (passive trucks, the bonus, no respawn, escaping), AI diverts, HUD drawing, rewards, the final push trigger and ticket costs, the Conquest momentum line, Breakthrough reinforcements, the Last Stand crate, and that `ENEMY_AI` is unchanged
+- match flow: every mode runs to a timed result with rewards, a final-push kill can win the battle, and a 90 s Air Superiority battle with a supply column runs clean
+- vehicle models and premium vehicles: every model builds (with low-detail copies, and a prop-less jet), the weathering pass, premium stats beat the stock line-up, premium vehicles never appear in AI slots or Last Stand waves, failed and two-step purchases, the exact deduction, no double buy, ownership through save and load (junk dropped, old saves fine), locked vehicles falling back to stock at spawn and respawn, a 20 s Talon flight, rendering every premium vehicle with the HUD, and the hangar's price, shortfall, locked TO BATTLE and owned states
+- audio, settings and effects: safe settings loading, the audio buses, nothing queued while suspended, stereo placement, shake off / capped / fading / reduced and never moving the aim, effect particles within budget and expiring, a clean start for each battle, the low-integrity glow and its setting, the H card, N mute, the pause bar, the settings window and live sliders, and that the enemy AI handicap is untouched
+- polish pass 2: track marks (both tracks, on the ground, capped, expiring, none far away, cleared each battle), exhaust only when pulling away, the breech clack once per reload, a near-miss whizz once per enemy shell (none for your own), track clatter following speed, the capture ring and zone sting, the health bar's lost segment and colours, the stat chips, edge-arrow clearance, rendering marks and trails without GL errors, hangar ← / → and Enter (not from a button or with a window open), and that `ENEMY_AI` is unchanged
+- lock-on test setup: the lane must be visible from the rocket pods as well as the seeker, and the test aircraft flies at an altitude the seeker can see (both used to fail on some random maps)
+- two 150 s simulated battles (Conquest and Last Stand) checked for exceptions, NaNs and zombie crews
+
+The self-test uses a throwaway profile and never writes your save. `?nointro` skips the intro.
+
+## Manual QA checklist
+
+Run this in a real browser after changes to gameplay, HUD or input.
+
+1. Launch: the intro plays, and Esc skips it to the hangar. Every vehicle card selects, and the hangar info panel lists **Shells** for cannon tanks but not for the Wirbelwind or aircraft.
+2. Deploy in a Sherman (Conquest). Click to lock the mouse. W/A/S/D drive the tank, the mouse aims and left click fires. Shift or right mouse toggles the gunner sight; the wheel zooms.
+3. Press 1, 2 and 3. Each press shows "LOADING …" and the selected button is highlighted. With a loaded gun, switching starts a reload. Fired shells hit with visibly different results (HE gives a small burst on the ground).
+4. Aim at an enemy: the marker turns green, yellow, red or grey. In the sight it shows `pen/effective mm`. A Panther's front hull is red for the Sherman and its side is green.
+5. Get penetrated, or use the console. Crew chips cross out, the hit message lists the knocked-out crew, and "New gunner in Ns" appears and resolves.
+6. Catch fire: "ON FIRE — F to extinguish" appears. F puts the fire out without starting a repair. A second F starts the repair. During the repair the gun neither turns nor fires.
+7. Fly an aircraft: the panel shows throttle presets 1–4, not shells or crew. W/S and 1–4 change the throttle bar and the speed settles at the blue tick. There are no assists: at 0% throttle in a climb the plane stalls (STALL warning, throttle stays at 0%), and aiming straight down dives into the ground. Rockets on a heavy tank's front no longer kill it outright, while bombs still do.
+8. Last Stand: let the timer run out with B neutral (console: `steelFront.battleTime = steelFront.mode.time`). The result is DEFEAT.
+9. Spotted enemies show a red marker with their range. Turn away and an edge arrow points back at them; M toggles both. Get hit and a red arc points to the shooter.
+10. Deploy the Hornet R-5, then the P-51D Kestrel. Hold an enemy inside the dashed circle: the yellow box turns red (LOCKED), R fires, and the rocket curves onto the target. A friendly unit never locks.
+11. Tab shows the scoreboard, P the FPS counter and Esc pauses. Leaving to the hangar pays no rewards.
+12. Wait about a minute in Conquest: a field objective is announced and the gold line under the clock tracks it. Drive into a supply crate (full repair), hold a relay for 12 s (enemies revealed, enemy −15 tickets), and in an aircraft find the gold trucks or the ★ commander. With 4 minutes left, FINAL PUSH appears and the line under the clock says so.
+13. Destroy two enemies within 12 s: the banner reads DOUBLE KILL, and the popups list the kill points and bonuses without covering the hit report. At the end of the battle the rewards screen shows the score, mastery stars and medals, and the hangar card shows the vehicle's stars.
+14. In the hangar, pick the Titan HX-9 with too few credits: the card shows 🔒 75,000 Cr, the panel shows the shortfall and TO BATTLE is disabled. With enough credits, Unlock → Confirm takes exactly the price, the card shows ★ owned, and the Titan deploys. Reload the page: it is still owned.
+15. Open Menu → Settings: move Master volume and Camera shake, reload the page, and they are kept. In battle, N mutes, H shows the controls card, firing gives a muzzle flash and a dust ring, and below 35% integrity the edges glow red.
+16. In a tank: drive and look back to see the track marks fade; fire and listen for the breech clack when loaded (the gun marker pulses green); stand in a zone to see the capture ring fill and hear the chime when it is taken; take a hit to see the pale segment drain off the health bar. In the hangar, ← / → change vehicle and Enter deploys.
